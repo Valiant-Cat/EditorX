@@ -8,6 +8,6 @@ data class LoadedPlugin(
     val name: String,
     val version: String,
     val description: String,
-    val jarFile: File,
+    val jarFile: File?, // 可以为null，支持源码插件
     val loader: URLClassLoader?
 )

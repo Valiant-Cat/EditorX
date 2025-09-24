@@ -13,6 +13,7 @@
             <option value="$PROJECT_DIR$/gui" />
             <option value="$PROJECT_DIR$/plugins" />
             <option value="$PROJECT_DIR$/plugins/explorer" />
+            <option value="$PROJECT_DIR$/plugins/testplugin" />
           </set>
         </option>
       </GradleProjectSettings>

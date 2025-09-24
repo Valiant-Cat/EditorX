@@ -6,3 +6,4 @@ rootProject.name = "apk_editor"
 include(":core")
 include(":gui")
 include(":plugins:explorer")
+include(":plugins:testplugin")

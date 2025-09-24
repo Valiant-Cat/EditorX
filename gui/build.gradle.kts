@@ -8,6 +8,8 @@ version = "1.0.0"
 
 dependencies {
     implementation(project(":core"))
+    implementation(project(":plugins:explorer"))
+    implementation(project(":plugins:testplugin"))
 
     implementation("com.fifesoft:rsyntaxtextarea:3.4.0")
     implementation("com.formdev:flatlaf:3.4")

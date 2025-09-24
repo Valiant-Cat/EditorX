@@ -1,5 +1,6 @@
 package editor.plugin
 
+import editor.util.ClassScanner
 import java.io.File
 import java.net.URLClassLoader
 import java.util.concurrent.ConcurrentHashMap
@@ -18,6 +19,19 @@ class PluginManager(private val contextFactory: PluginContextFactory) {
     fun loadPlugins() {
         logger.info("开始加载插件...")
 
+        // 1. 加载JAR插件
+        loadJarPlugins()
+
+        // 2. 扫描并加载源码插件
+        scanAndLoadSourcePlugins()
+
+        logger.info("插件加载完成，共加载 ${plugins.size} 个插件")
+    }
+
+    /**
+     * 加载JAR格式的插件
+     */
+    private fun loadJarPlugins() {
         val pluginDir = File("plugins")
         if (!pluginDir.exists()) {
             pluginDir.mkdirs()
@@ -25,15 +39,89 @@ class PluginManager(private val contextFactory: PluginContextFactory) {
         } else {
             val jarFiles = pluginDir.listFiles { file -> file.isFile && file.extension.lowercase() == "jar" }
             if (!jarFiles.isNullOrEmpty()) {
-                logger.info("找到 ${jarFiles.size} 个外部插件文件")
-                jarFiles.forEach { jarFile -> loadPlugin(jarFile) }
+                logger.info("找到 ${jarFiles.size} 个JAR插件文件")
+                jarFiles.forEach { jarFile -> loadJarPlugin(jarFile) }
             }
         }
-
-        logger.info("插件加载完成，共加载 ${plugins.size} 个插件")
     }
 
-    private fun loadPlugin(jarFile: File) {
+    /**
+     * 扫描并加载源码插件
+     */
+    private fun scanAndLoadSourcePlugins() {
+        logger.info("开始扫描源码插件...")
+
+        try {
+            // 扫描多个包中的插件
+            val packagesToScan = listOf(
+                "editor",
+            )
+            
+            val allPluginClasses = mutableSetOf<Class<*>>()
+            
+            for (packageName in packagesToScan) {
+                logger.info("扫描包: $packageName")
+                val pluginClasses = ClassScanner.findSubclasses(packageName, Plugin::class.java)
+                logger.info("在包 $packageName 中找到 ${pluginClasses.size} 个插件类")
+                pluginClasses.forEach { clazz ->
+                    logger.info("发现插件类: ${clazz.name}")
+                }
+                allPluginClasses.addAll(pluginClasses)
+            }
+            
+            // 加载所有发现的插件
+            allPluginClasses.forEach { pluginClass ->
+                // 检查是否已经加载过同名插件
+                val simpleName = pluginClass.simpleName
+                if (plugins.containsKey(simpleName)) {
+                    logger.info("插件 $simpleName 已存在，跳过加载")
+                    return@forEach
+                }
+                
+                logger.info("发现插件类: ${pluginClass.name}")
+                loadSourcePluginClass(pluginClass)
+            }
+            
+            logger.info("源码插件扫描完成，共发现 ${allPluginClasses.size} 个插件类")
+        } catch (e: Exception) {
+            logger.warning("扫描源码插件时出错: ${e.message}")
+        }
+    }
+
+    /**
+     * 加载源码插件类
+     */
+    private fun loadSourcePluginClass(pluginClass: Class<*>) {
+        try {
+            val plugin = pluginClass.getDeclaredConstructor().newInstance() as Plugin
+            val pluginName = pluginClass.simpleName
+            val pluginVersion = "dev" // 源码插件使用dev版本
+            val pluginDesc = "源码插件: $pluginName"
+
+            val loadedPlugin = LoadedPlugin(
+                plugin = plugin,
+                name = pluginName,
+                version = pluginVersion,
+                description = pluginDesc,
+                jarFile = null, // 源码插件没有JAR文件
+                loader = null // 使用当前类加载器
+            )
+
+            val context = contextFactory.createPluginContext(loadedPlugin)
+
+            plugin.activate(context)
+            plugins[loadedPlugin.name] = loadedPlugin
+
+            logger.info("源码插件加载成功: ${loadedPlugin.name} v${loadedPlugin.version} (类: ${pluginClass.name})")
+        } catch (e: Exception) {
+            logger.warning("加载源码插件类 ${pluginClass.name} 失败: ${e.message}")
+        }
+    }
+
+    /**
+     * 加载JAR格式的插件
+     */
+    private fun loadJarPlugin(jarFile: File) {
         try {
             logger.info("正在加载插件: ${jarFile.name}")
 
