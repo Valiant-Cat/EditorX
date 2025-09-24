@@ -1,6 +1,5 @@
-package editor.gui.plugin
+package editor.plugin
 
-import editor.plugin.Plugin
 import java.io.File
 import java.net.URLClassLoader
 import java.util.concurrent.ConcurrentHashMap
@@ -15,15 +14,6 @@ class PluginManager(private val contextFactory: PluginContextFactory) {
     private val logger = Logger.getLogger(PluginManager::class.java.name)
     private val plugins = ConcurrentHashMap<String, LoadedPlugin>()
     private val pluginLoaders = ConcurrentHashMap<String, URLClassLoader>()
-
-    data class LoadedPlugin(
-        val plugin: Plugin,
-        val name: String,
-        val version: String,
-        val description: String,
-        val jarFile: File,
-        val loader: URLClassLoader?
-    )
 
     fun loadPlugins() {
         logger.info("开始加载插件...")

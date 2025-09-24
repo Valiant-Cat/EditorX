@@ -17,19 +17,19 @@ kotlin {
     jvmToolchain(21)
 }
 
-// 插件打包任务
-tasks.register<Jar>("pluginJar") {
-    archiveBaseName.set("explorer-plugin")
-    archiveVersion.set("1.0.0")
+// 配置标准jar任务
+afterEvaluate {
+    tasks.jar {
+        archiveBaseName.set("explorer")
+        archiveVersion.set("1.0.0")
 
-    from(sourceSets.main.get().output)
-
-    manifest {
-        attributes(
-            "Plugin-Name" to "Explorer",
-            "Plugin-Desc" to "文件浏览器插件",
-            "Plugin-Version" to "1.0.0",
-            "Main-Class" to "editor.plugins.explorer.ExplorerPlugin"
-        )
+        manifest {
+            attributes(
+                "Plugin-Name" to "Explorer",
+                "Plugin-Desc" to "文件浏览器插件",
+                "Plugin-Version" to "1.0.0",
+                "Main-Class" to "editor.plugins.explorer.ExplorerPlugin"
+            )
+        }
     }
 }

@@ -1,12 +1,11 @@
 package editor.gui
 
-import editor.gui.plugin.PluginContextFactory
-import editor.gui.plugin.PluginManager
+import editor.gui.plugin.GuiPluginInitializer
 import editor.gui.ui.MainWindow
+import java.util.logging.Level
+import java.util.logging.Logger
 import javax.swing.SwingUtilities
 import javax.swing.UIManager
-import java.util.logging.Logger
-import java.util.logging.Level
 
 /**
  * Editor GUI 主入口点
@@ -49,14 +48,7 @@ private fun initializeMainWindow() {
     val mv = MainWindow()
     mv.isVisible = true
 
-    // 加载插件
-    try {
-        val contextFactory = PluginContextFactory(mv)
-        val pluginManager = PluginManager(contextFactory)
-        pluginManager.loadPlugins()
-        mv.statusBar.setMessage("插件系统已启动")
-    } catch (e: Exception) {
-        mv.statusBar.setMessage("插件加载失败: ${e.message}")
-    }
+    // 初始化插件
+    GuiPluginInitializer.initialize(mv)
 }
 
