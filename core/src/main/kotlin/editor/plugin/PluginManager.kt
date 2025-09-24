@@ -61,7 +61,7 @@ class PluginManager(private val contextFactory: PluginContextFactory) {
             val pluginVersion = versionFromMf ?: "1.0.0"
             val pluginDesc = descFromMf ?: ""
 
-            val loaded = LoadedPlugin(
+            val loadedPlugin = LoadedPlugin(
                 plugin = plugin,
                 name = pluginName,
                 version = pluginVersion,
@@ -70,13 +70,13 @@ class PluginManager(private val contextFactory: PluginContextFactory) {
                 loader = loader
             )
 
-            val context = contextFactory.createPluginContext()
+            val context = contextFactory.createPluginContext(loadedPlugin)
 
             plugin.activate(context)
-            plugins[loaded.name] = loaded
-            pluginLoaders[loaded.name] = loader
+            plugins[loadedPlugin.name] = loadedPlugin
+            pluginLoaders[loadedPlugin.name] = loader
 
-            logger.info("插件加载成功: ${loaded.name} v${loaded.version}")
+            logger.info("插件加载成功: ${loadedPlugin.name} v${loadedPlugin.version}")
         } catch (e: Exception) {
             logger.severe("加载插件失败: ${jarFile.name}, 错误: ${e.message}")
             e.printStackTrace()

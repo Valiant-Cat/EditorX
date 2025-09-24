@@ -1,8 +1,9 @@
 package editor.gui.plugin
 
 import editor.gui.ViewProvider
-import editor.gui.widget.SvgIcon
 import editor.gui.ui.MainWindow
+import editor.gui.widget.SvgIcon
+import editor.plugin.LoadedPlugin
 import editor.plugin.PluginContext
 import java.awt.*
 import java.io.File
@@ -12,27 +13,37 @@ import javax.swing.ImageIcon
 
 /**
  * GUI 实现的插件上下文
+ * 为每个插件创建独立的实例，包含插件标识信息
  */
 class GuiPluginContext(
-    private val mainWindow: MainWindow
+    private val mainWindow: MainWindow,
+    private val loadedPlugin: LoadedPlugin,
 ) : PluginContext {
-    private val logger = Logger.getLogger(GuiPluginContext::class.java.name)
+    private val logger =
+        Logger.getLogger("${GuiPluginContext::class.java.name}[${loadedPlugin.name}-${loadedPlugin.version}]")
+
+    override fun getLoadedPlugin(): LoadedPlugin {
+        return loadedPlugin
+    }
 
     override fun addActivityBarItem(id: String, iconPath: String, tooltip: String, viewProvider: ViewProvider) {
         try {
             val icon = loadIcon(iconPath)
-            mainWindow.activityBar.registerItem(id, icon ?: ImageIcon(), tooltip, viewProvider)
-            logger.info("布局提供器注册成功: $id")
+            // 为每个插件创建唯一的ID，避免冲突
+            val uniqueId = "${loadedPlugin.name}_$id"
+            mainWindow.activityBar.registerItem(uniqueId, icon ?: ImageIcon(), tooltip, viewProvider)
+            logger.info("插件[${loadedPlugin.name}] 布局提供器注册成功: $id -> $uniqueId")
         } catch (e: Exception) {
-            logger.warning("注册布局提供器失败: $id, 错误: ${e.message}")
-            mainWindow.activityBar.registerItem(id, ImageIcon(), tooltip, viewProvider)
+            logger.warning("插件[${loadedPlugin.name}] 注册布局提供器失败: $id, 错误: ${e.message}")
+            val uniqueId = "${loadedPlugin.name}_$id"
+            mainWindow.activityBar.registerItem(uniqueId, ImageIcon(), tooltip, viewProvider)
         }
     }
 
     override fun openFile(file: File) {
         try {
             mainWindow.editor.openFile(file)
-            logger.info("文件已打开: ${file.name}")
+            logger.info("插件[${loadedPlugin.name}] 文件已打开: ${file.name}")
         } catch (e: Exception) {
             logger.warning("打开文件失败: ${file.name}, 错误: ${e.message}")
         }

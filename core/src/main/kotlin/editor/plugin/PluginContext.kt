@@ -9,6 +9,12 @@ import java.io.File
  * GUI 模块提供该接口的实现，插件通过此上下文与主程序交互。
  */
 interface PluginContext {
+
+    /**
+     * 获取已加载插件对象
+     */
+    fun getLoadedPlugin(): LoadedPlugin
+
     /**
      * 在 ActivityBar 注册一个入口按钮，并指定其视图提供器
      */

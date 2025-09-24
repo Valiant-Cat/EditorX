@@ -37,7 +37,7 @@ class ExplorerPlugin : Plugin {
         context.addActivityBarItem(
             "explorer",
             "icons/explorer.svg",
-            "文件浏览器",
+            context.getLoadedPlugin().name,
             object : CachedViewProvider() {
                 override fun createView(): JComponent {
                     return createExplorerView()

@@ -1,6 +1,7 @@
 package editor.gui.plugin
 
 import editor.gui.ui.MainWindow
+import editor.plugin.LoadedPlugin
 import editor.plugin.PluginContext
 import editor.plugin.PluginContextFactory
 import editor.plugin.PluginManager
@@ -10,8 +11,8 @@ object GuiPluginInitializer {
     fun initialize(mv: MainWindow) {
         try {
             val contextFactory = object : PluginContextFactory {
-                override fun createPluginContext(): PluginContext {
-                    return GuiPluginContext(mv)
+                override fun createPluginContext(loadedPlugin: LoadedPlugin): PluginContext {
+                    return GuiPluginContext(mv, loadedPlugin)
                 }
             }
             val pluginManager = PluginManager(contextFactory)
