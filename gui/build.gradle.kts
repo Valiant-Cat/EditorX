@@ -1,5 +1,5 @@
 plugins {
-    kotlin("jvm") version "2.1.0"
+    id("buildsrc.convention.kotlin-jvm")
     application
 }
 
@@ -26,6 +26,5 @@ tasks.test {
 }
 
 application {
-    mainClass.set("editor.gui.EditorGuiKt")
+    mainClass.set("editorx.gui.EditorGuiKt")
 }
-

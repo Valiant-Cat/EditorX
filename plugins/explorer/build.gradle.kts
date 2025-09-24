@@ -1,5 +1,5 @@
 plugins {
-    kotlin("jvm") version "2.1.0"
+    id("buildsrc.convention.kotlin-jvm")
 }
 
 group = "com.xiaomao.tools"
@@ -28,7 +28,7 @@ afterEvaluate {
                 "Plugin-Name" to "Explorer",
                 "Plugin-Desc" to "文件浏览器插件",
                 "Plugin-Version" to "1.0.0",
-                "Main-Class" to "editor.plugins.explorer.ExplorerPlugin"
+                "Main-Class" to "editorx.plugins.explorer.ExplorerPlugin"
             )
         }
     }
