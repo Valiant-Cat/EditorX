@@ -36,7 +36,7 @@ class MainWindow : JFrame() {
 
     private val verticalSplit by lazy {
         JSplitPane(JSplitPane.VERTICAL_SPLIT, horizontalSplit, panel).apply {
-            dividerLocation = 700
+            dividerLocation = Int.MAX_VALUE  // 初始时隐藏Panel
             isOneTouchExpandable = false
             dividerSize = 8
         }

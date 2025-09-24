@@ -40,7 +40,7 @@ class ExplorerPlugin : Plugin {
                     return createExplorerView()
                 }
 
-                override fun area(): ViewArea = ViewArea.SIDEBAR
+                override fun area(): ViewArea = ViewArea.PANEL
             }
         )
         println("Explorer插件已启动")

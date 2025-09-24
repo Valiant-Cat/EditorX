@@ -104,19 +104,33 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
     private fun showView(id: String, viewProvider: ViewProvider) {
         when (viewProvider.area()) {
             ViewArea.SIDEBAR -> {
-                sideBar?.registerView(id, viewProvider.getView()); sideBar?.showView(id)
+                sideBar?.showView(id, viewProvider.getView())
             }
 
             ViewArea.PANEL -> {
-                panel?.registerView(id, null, viewProvider.getView()); panel?.showView(id)
+                panel?.showView(id, viewProvider.getView())
             }
         }
     }
 
     private fun hideView(id: String, displayLocation: ViewArea) {
         when (displayLocation) {
-            ViewArea.SIDEBAR -> sideBar?.removeView(id)
-            ViewArea.PANEL -> panel?.removeView(id)
+            ViewArea.SIDEBAR -> {
+                // 只是隐藏SideBar，不移除视图
+                sideBar?.let { 
+                    if (it.getCurrentViewId() == id) {
+                        it.hideSideBar()
+                    }
+                }
+            }
+            ViewArea.PANEL -> {
+                // 只是隐藏Panel，不移除视图
+                panel?.let {
+                    if (it.getCurrentViewId() == id) {
+                        it.hidePanel()
+                    }
+                }
+            }
         }
     }
 

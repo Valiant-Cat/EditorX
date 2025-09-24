@@ -10,39 +10,38 @@ class SideBar(private val mainWindow: MainWindow) : JPanel() {
     private val cardLayout = CardLayout()
     private val views = mutableMapOf<String, JComponent>()
     private var currentViewId: String? = null
-    private var defaultViewId: String? = null
     private var isVisible = false
 
-    init { setupSideBar() }
+    init {
+        setupSideBar()
+    }
 
     private fun setupSideBar() {
         layout = cardLayout
         background = Color.WHITE
         border = BorderFactory.createEmptyBorder(5, 5, 5, 5)
-        // 初始时隐藏SideBar
         isVisible = false
         // 初始化时隐藏SideBar
         updateVisibility()
     }
 
-    fun registerView(id: String, component: JComponent) {
-        views[id] = component
-        add(component, id)
-        if (defaultViewId == null && views.size == 1) defaultViewId = id
-    }
+    fun showView(id: String, component: JComponent? = null) {
+        // 如果视图不存在且提供了组件，则先注册
+        if (!views.containsKey(id) && component != null) {
+            views[id] = component
+            add(component, id)
+        }
 
-    fun showView(id: String) {
+        // 显示指定的视图
         if (views.containsKey(id)) {
             cardLayout.show(this, id)
             currentViewId = id
-            // 只有当显示非默认视图时才显示SideBar
-            if (id != "default" && !isVisible) {
+            // 显示SideBar
+            if (!isVisible) {
                 isVisible = true
                 updateVisibility()
             }
-            revalidate(); repaint()
-        } else {
-            defaultViewId?.let { showView(it) }
+            revalidate()
         }
     }
 
@@ -65,7 +64,7 @@ class SideBar(private val mainWindow: MainWindow) : JPanel() {
                     hideSideBar()
                 }
             }
-            revalidate(); repaint()
+            revalidate()
         }
     }
 
@@ -76,7 +75,7 @@ class SideBar(private val mainWindow: MainWindow) : JPanel() {
         hideSideBar()
     }
 
-    private fun hideSideBar() {
+    fun hideSideBar() {
         isVisible = false
         updateVisibility()
     }
@@ -99,7 +98,7 @@ class SideBar(private val mainWindow: MainWindow) : JPanel() {
         // 通知父容器重新布局
         parent?.revalidate()
     }
-    
+
     private fun updateDividerLocation(location: Int) {
         // 查找包含SideBar的JSplitPane并更新其dividerLocation
         var current = parent

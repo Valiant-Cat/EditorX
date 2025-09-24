@@ -1,100 +1,103 @@
 package editorx.gui.ui.panel
 
 import editorx.gui.ui.MainWindow
-import java.awt.BorderLayout
+import java.awt.CardLayout
 import java.awt.Color
 import javax.swing.*
 
 class Panel(private val mainWindow: MainWindow) : JPanel() {
-    private val tabbedPane = JTabbedPane()
-    private val viewMap = mutableMapOf<String, JComponent>()
+    private val cardLayout = CardLayout()
+    private val views = mutableMapOf<String, JComponent>()
+    private var currentViewId: String? = null
+    private var isVisible = false
 
-    init { setupPanel() }
+    init {
+        setupPanel()
+    }
 
     private fun setupPanel() {
-        layout = BorderLayout()
-        tabbedPane.apply {
-            tabPlacement = JTabbedPane.BOTTOM
-            tabLayoutPolicy = JTabbedPane.SCROLL_TAB_LAYOUT
-            background = Color.WHITE
-        }
-        add(tabbedPane, BorderLayout.CENTER)
-        createDefaultViews()
+        layout = cardLayout
+        background = Color.WHITE
+        border = BorderFactory.createEmptyBorder(5, 5, 5, 5)
+        isVisible = false
+        // 初始化时隐藏Panel
+        updateVisibility()
     }
 
-    private fun createDefaultViews() {
-        val outputPanel = JScrollPane().apply {
-            val textArea = JTextArea().apply {
-                isEditable = false
-                font = java.awt.Font("Consolas", java.awt.Font.PLAIN, 12)
-                background = Color.BLACK
-                foreground = Color.GREEN
-                text = "EditorX 输出面板\n等待输出...\n"
-            }
-            setViewportView(textArea)
-            verticalScrollBarPolicy = JScrollPane.VERTICAL_SCROLLBAR_ALWAYS
-            horizontalScrollBarPolicy = JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED
+    fun showView(id: String, component: JComponent? = null) {
+        // 如果视图不存在且提供了组件，则先注册
+        if (!views.containsKey(id) && component != null) {
+            views[id] = component
+            add(component, id)
         }
-        registerView("输出", null, outputPanel)
 
-        val problemsPanel = JScrollPane().apply {
-            val listModel = DefaultListModel<String>()
-            val list = JList(listModel).apply {
-                selectionMode = ListSelectionModel.SINGLE_SELECTION
-                font = java.awt.Font("Consolas", java.awt.Font.PLAIN, 12)
-            }
-            listModel.addElement("没有发现问题")
-            setViewportView(list)
-            verticalScrollBarPolicy = JScrollPane.VERTICAL_SCROLLBAR_ALWAYS
-        }
-        registerView("问题", null, problemsPanel)
-
-        val terminalPanel = JPanel().apply {
-            layout = BorderLayout()
-            val textArea = JTextArea().apply {
-                isEditable = true
-                font = java.awt.Font("Consolas", java.awt.Font.PLAIN, 12)
-                background = Color.BLACK
-                foreground = Color.WHITE
-                text = "EditorX 终端\n$ "
-            }
-            add(JScrollPane(textArea).apply {
-                verticalScrollBarPolicy = JScrollPane.VERTICAL_SCROLLBAR_ALWAYS
-            }, BorderLayout.CENTER)
-        }
-        registerView("终端", null, terminalPanel)
-    }
-
-    fun registerView(title: String, icon: Icon?, component: JComponent) {
-        viewMap[title] = component
-        tabbedPane.addTab(title, icon, component)
-    }
-
-    fun showView(title: String) {
-        for (i in 0 until tabbedPane.tabCount) {
-            if (tabbedPane.getTitleAt(i) == title) { tabbedPane.selectedIndex = i; return }
-        }
-    }
-
-    fun getCurrentViewTitle(): String = if (tabbedPane.selectedIndex >= 0) tabbedPane.getTitleAt(tabbedPane.selectedIndex) else ""
-
-    fun removeView(title: String) {
-        for (i in 0 until tabbedPane.tabCount) {
-            if (tabbedPane.getTitleAt(i) == title) {
-                tabbedPane.removeTabAt(i)
-                viewMap.remove(title)
-                return
+        // 显示指定的视图
+        if (views.containsKey(id)) {
+            cardLayout.show(this, id)
+            currentViewId = id
+            // 显示Panel
+            if (!isVisible) {
+                isVisible = true
+                updateVisibility()
             }
         }
     }
 
-    fun hasView(title: String): Boolean = viewMap.containsKey(title)
-    fun getView(title: String): JComponent? = viewMap[title]
-    fun getAllViewTitles(): Set<String> = viewMap.keys.toSet()
+    fun getCurrentViewId(): String? = currentViewId
+    fun getRegisteredViewIds(): Set<String> = views.keys.toSet()
+
+    fun removeView(id: String) {
+        views[id]?.let { component ->
+            remove(component)
+            views.remove(id)
+            if (currentViewId == id) {
+                // 检查是否还有其他视图
+                if (views.isNotEmpty()) {
+                    // 显示下一个可用的视图
+                    val nextView = views.keys.first()
+                    showView(nextView)
+                } else {
+                    // 没有其他视图，隐藏Panel
+                    hidePanel()
+                }
+            }
+            revalidate()
+            repaint()
+        }
+    }
 
     fun clearViews() {
-        val defaultViews = setOf("输出", "问题", "终端")
-        val viewsToRemove = viewMap.keys.filter { it !in defaultViews }
+        val viewsToRemove = views.keys.toList()
         viewsToRemove.forEach { removeView(it) }
+        hidePanel()
     }
+
+    fun hidePanel() {
+        isVisible = false
+        updateVisibility()
+    }
+
+    private fun updateVisibility() {
+        if (isVisible) {
+            updateDividerLocation(700) // 显示Panel时设置合适的位置
+        } else {
+            updateDividerLocation(0) // 隐藏Panel时完全隐藏
+        }
+        // 通知父容器重新布局
+        parent?.revalidate()
+    }
+
+    private fun updateDividerLocation(location: Int) {
+        // 查找包含Panel的JSplitPane并更新其dividerLocation
+        var current = parent
+        while (current != null) {
+            if (current is javax.swing.JSplitPane) {
+                current.dividerLocation = location
+                break
+            }
+            current = current.parent
+        }
+    }
+
+    fun isPanelVisible(): Boolean = isVisible
 }
