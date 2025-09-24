@@ -92,10 +92,19 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
 
     private fun handleButtonClick(id: String) {
         val viewProvider = viewProviderMap[id] ?: return
-        if (activeViews.contains(id)) {
+        
+        // 检查当前视图是否可见
+        val isCurrentlyVisible = when (viewProvider.area()) {
+            ViewArea.SIDEBAR -> sideBar?.isSideBarVisible() == true
+            ViewArea.PANEL -> panel?.isPanelVisible() == true
+        }
+        
+        if (isCurrentlyVisible) {
+            // 当前可见，隐藏视图
             hideView(id, viewProvider.area())
             activeViews.remove(id)
         } else {
+            // 当前隐藏，显示视图
             showView(id, viewProvider)
             activeViews.add(id)
         }
@@ -116,7 +125,7 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
     private fun hideView(id: String, displayLocation: ViewArea) {
         when (displayLocation) {
             ViewArea.SIDEBAR -> {
-                // 只是隐藏SideBar，不移除视图
+                // 隐藏SideBar，但保持视图注册状态
                 sideBar?.let { 
                     if (it.getCurrentViewId() == id) {
                         it.hideSideBar()
@@ -124,7 +133,7 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
                 }
             }
             ViewArea.PANEL -> {
-                // 只是隐藏Panel，不移除视图
+                // 隐藏Panel，但保持视图注册状态
                 panel?.let {
                     if (it.getCurrentViewId() == id) {
                         it.hidePanel()
