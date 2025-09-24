@@ -1,0 +1,25 @@
+package editor.plugin
+
+/**
+ * 插件接口
+ */
+interface Plugin {
+
+    /**
+     * 获取插件信息
+     */
+    fun getPluginInfo(): PluginInfo
+
+    /**
+     * 插件被启用
+     */
+    fun activate(context: PluginContext)
+
+    /**
+     * 插件被禁用
+     */
+    fun deactivate() {
+        // optional method
+    }
+}
+
