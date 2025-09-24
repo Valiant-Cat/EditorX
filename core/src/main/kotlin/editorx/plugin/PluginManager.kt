@@ -98,7 +98,7 @@ class PluginManager(private val contextFactory: PluginContextFactory) {
             val loadedPlugin = LoadedPlugin(
                 plugin = plugin,
                 id = pluginClass.name,
-                name = pluginClass.simpleName,
+                name = "${pluginClass.simpleName}-dev",
                 version = "dev",
             )
 
