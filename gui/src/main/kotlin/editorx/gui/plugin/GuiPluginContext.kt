@@ -6,6 +6,7 @@ import editorx.gui.widget.SvgIcon
 import editorx.plugin.LoadedPlugin
 import editorx.plugin.PluginContext
 import java.awt.*
+import java.awt.image.BufferedImage
 import java.io.File
 import java.util.logging.Logger
 import javax.swing.Icon
@@ -19,6 +20,11 @@ class GuiPluginContext(
     private val mainWindow: MainWindow,
     private val loadedPlugin: LoadedPlugin,
 ) : PluginContext {
+
+    companion object {
+        private const val ICON_SIZE = 24
+    }
+
     private val logger =
         Logger.getLogger("${GuiPluginContext::class.java.name}[${loadedPlugin.name}-${loadedPlugin.version}]")
 
@@ -27,12 +33,8 @@ class GuiPluginContext(
     }
 
     override fun addActivityBarItem(iconPath: String, viewProvider: ViewProvider) {
-        try {
-            val icon = loadIcon(iconPath)
-            mainWindow.activityBar.addItem(loadedPlugin.id, loadedPlugin.name, icon ?: ImageIcon(), viewProvider)
-        } catch (e: Exception) {
-            mainWindow.activityBar.addItem(loadedPlugin.id, loadedPlugin.name, ImageIcon(), viewProvider)
-        }
+        val icon = loadIcon(iconPath)
+        mainWindow.activityBar.addItem(loadedPlugin.id, loadedPlugin.name, icon, viewProvider)
     }
 
     override fun openFile(file: File) {
@@ -43,20 +45,23 @@ class GuiPluginContext(
         }
     }
 
-    private fun loadIcon(iconPath: String): Icon? {
+    private fun loadIcon(iconPath: String): Icon {
         return try {
             when {
                 iconPath.isEmpty() -> createDefaultIcon()
                 iconPath.endsWith(".svg") -> {
                     val svgIcon = SvgIcon.fromResource("/$iconPath")
-                    svgIcon ?: run {
+                    svgIcon?.let { resizeIcon(it, ICON_SIZE, ICON_SIZE) } ?: run {
                         logger.warning("SVG图标资源未找到: $iconPath"); createDefaultIcon()
                     }
                 }
 
                 else -> {
                     val resource = javaClass.getResource("/$iconPath")
-                    if (resource != null) ImageIcon(resource) else {
+                    if (resource != null) {
+                        val originalIcon = ImageIcon(resource)
+                        resizeIcon(originalIcon, ICON_SIZE, ICON_SIZE)
+                    } else {
                         logger.warning("图标资源未找到: $iconPath"); createDefaultIcon()
                     }
                 }
@@ -67,17 +72,52 @@ class GuiPluginContext(
         }
     }
 
+    private fun resizeIcon(icon: Icon, width: Int, height: Int): Icon {
+        return object : Icon {
+            override fun getIconWidth(): Int = width
+            override fun getIconHeight(): Int = height
+
+            override fun paintIcon(c: Component?, g: Graphics, x: Int, y: Int) {
+                val g2d = g as Graphics2D
+                g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
+                g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+
+                // 保存原始变换
+                val originalTransform = g2d.transform
+
+                // 计算缩放比例
+                val originalWidth = icon.iconWidth
+                val originalHeight = icon.iconHeight
+                val scaleX = width.toDouble() / originalWidth
+                val scaleY = height.toDouble() / originalHeight
+
+                // 应用缩放变换
+                g2d.scale(scaleX, scaleY)
+
+                // 调整绘制位置以适应缩放
+                val scaledX = x / scaleX
+                val scaledY = y / scaleY
+
+                // 绘制原始图标（现在会被缩放到目标尺寸）
+                icon.paintIcon(c, g2d, scaledX.toInt(), scaledY.toInt())
+
+                // 恢复原始变换
+                g2d.transform = originalTransform
+            }
+        }
+    }
+
     private fun createDefaultIcon(): Icon {
         return object : Icon {
-            override fun getIconWidth(): Int = 16
-            override fun getIconHeight(): Int = 16
+            override fun getIconWidth(): Int = ICON_SIZE
+            override fun getIconHeight(): Int = ICON_SIZE
 
             override fun paintIcon(c: Component?, g: Graphics, x: Int, y: Int) {
                 val g2d = g as Graphics2D
                 g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
                 g2d.color = Color(108, 112, 126)
-                g2d.fillRoundRect(x + 2, y + 4, 12, 10, 2, 2)
-                g2d.fillRoundRect(x + 2, y + 2, 8, 4, 1, 1)
+                g2d.fillRect(x + 2, y + 2, ICON_SIZE - 4, ICON_SIZE - 4)
             }
         }
     }

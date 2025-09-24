@@ -5,9 +5,8 @@ import editorx.gui.ViewProvider
 import editorx.gui.ui.MainWindow
 import editorx.gui.ui.panel.Panel
 import editorx.gui.ui.sidebar.SideBar
-import java.awt.Color
-import java.awt.Dimension
-import java.awt.Insets
+import java.awt.*
+import java.awt.geom.RoundRectangle2D
 import javax.swing.*
 
 class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
@@ -18,7 +17,7 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
     private val viewProviderMap = mutableMapOf<String, ViewProvider>()
     private val activeViews = mutableSetOf<String>()
 
-    private val backgroundColor = Color.decode("#2c2c2c")
+    private val backgroundColor = Color.decode("#f4f4f4")
     private val selectedColor = Color.decode("#007acc")
     private val hoverColor = Color.decode("#404040")
     private val borderColor = Color.GRAY
@@ -29,7 +28,7 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
 
     private fun setupActivityBar() {
         layout = BoxLayout(this, BoxLayout.Y_AXIS)
-        preferredSize = Dimension(50, 0)
+        preferredSize = Dimension(40, 0)
         border = BorderFactory.createCompoundBorder(
             BorderFactory.createMatteBorder(0, 0, 0, 1, borderColor),
             BorderFactory.createEmptyBorder(5, 5, 5, 5)
@@ -47,30 +46,47 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
         revalidate(); repaint()
     }
 
-    private fun createActivityButton(icon: Icon, tooltip: String, viewId: String): JButton = JButton(icon).apply {
-        toolTipText = tooltip
-        margin = Insets(2, 2, 2, 2)
-        preferredSize = Dimension(40, 40)
-        minimumSize = Dimension(40, 40)
-        maximumSize = Dimension(40, 40)
-        isFocusPainted = false
-        isBorderPainted = false
-        isOpaque = true
-        background = backgroundColor
-        foreground = Color.WHITE
-        alignmentX = java.awt.Component.CENTER_ALIGNMENT
-        addMouseListener(object : java.awt.event.MouseAdapter() {
-            override fun mouseEntered(e: java.awt.event.MouseEvent) {
-                if (background != selectedColor) background = hoverColor
+    private fun createActivityButton(icon: Icon, tooltip: String, viewId: String): JButton {
+        return object : JButton(icon) {
+            override fun paintComponent(g: Graphics) {
+                val g2d = g as Graphics2D
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+                
+                // 绘制圆角背景
+                val shape = RoundRectangle2D.Float(0f, 0f, width.toFloat(), height.toFloat(), 8f, 8f)
+                g2d.color = background
+                g2d.fill(shape)
+                
+                // 绘制图标
+                super.paintComponent(g)
             }
+        }.apply {
+            toolTipText = tooltip
+            margin = Insets(2, 2, 2, 2)
+            preferredSize = Dimension(32, 32)
+            minimumSize = Dimension(32, 32)
+            maximumSize = Dimension(32, 32)
+            isFocusPainted = false
+            isBorderPainted = false
+            isOpaque = false  // 设置为false，因为我们自定义绘制背景
+            background = backgroundColor
+            foreground = Color.WHITE
+            alignmentX = Component.CENTER_ALIGNMENT
+            addMouseListener(object : java.awt.event.MouseAdapter() {
+                override fun mouseEntered(e: java.awt.event.MouseEvent) {
+                    if (background != selectedColor) background = hoverColor
+                    repaint()
+                }
 
-            override fun mouseExited(e: java.awt.event.MouseEvent) {
-                if (background != selectedColor) background = backgroundColor
+                override fun mouseExited(e: java.awt.event.MouseEvent) {
+                    if (background != selectedColor) background = backgroundColor
+                    repaint()
+                }
+            })
+            addActionListener {
+                handleButtonClick(viewId)
+                updateButtonState(viewId)
             }
-        })
-        addActionListener {
-            handleButtonClick(viewId)
-            updateButtonState(viewId)
         }
     }
 
@@ -107,6 +123,7 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
     private fun updateButtonState(id: String) {
         val button = buttonMap[id] ?: return
         button.background = if (activeViews.contains(id)) selectedColor else backgroundColor
+        button.repaint()
     }
 
     fun removeviewProvider(id: String) {
