@@ -16,7 +16,7 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
     private val buttonGroup = ButtonGroup()
     private val buttonMap = mutableMapOf<String, JButton>()
     private val viewProviderMap = mutableMapOf<String, ViewProvider>()
-    private val activeViews = mutableSetOf<String>()
+    private var activeId: String? = null
 
     private val backgroundColor = Color.decode("#f2f2f2")
     private val selectedColor = ThemeManager.palette.primaryContainer
@@ -78,18 +78,18 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
             alignmentX = Component.CENTER_ALIGNMENT
             addMouseListener(object : java.awt.event.MouseAdapter() {
                 override fun mouseEntered(e: java.awt.event.MouseEvent) {
-                    if (background != selectedColor) background = hoverColor
+                    if (activeId != viewId) background = hoverColor
                     repaint()
                 }
 
                 override fun mouseExited(e: java.awt.event.MouseEvent) {
-                    if (background != selectedColor) background = backgroundColor
+                    if (activeId != viewId) background = backgroundColor
                     repaint()
                 }
             })
             addActionListener {
                 handleButtonClick(viewId)
-                updateButtonState(viewId)
+                updateAllButtonStates()
             }
         }
     }
@@ -99,9 +99,9 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
         // VSCode 模式：ActivityBar 仅控制 SideBar
         val isCurrentlyDisplayed = sideBar?.getCurrentViewId() == id && sideBar?.isSideBarVisible() == true
         if (isCurrentlyDisplayed) {
-            sideBar?.hideSideBar(); activeViews.remove(id)
+            sideBar?.hideSideBar(); activeId = null
         } else {
-            sideBar?.showView(id, viewProvider.getView()); activeViews.add(id)
+            sideBar?.showView(id, viewProvider.getView()); activeId = id
         }
     }
 
@@ -109,10 +109,11 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
     private fun showView(id: String, viewProvider: ViewProvider) { sideBar?.showView(id, viewProvider.getView()) }
     private fun hideView(id: String) { if (sideBar?.getCurrentViewId() == id) sideBar?.hideSideBar() }
 
-    private fun updateButtonState(id: String) {
-        val button = buttonMap[id] ?: return
-        button.background = if (activeViews.contains(id)) selectedColor else backgroundColor
-        button.repaint()
+    private fun updateAllButtonStates() {
+        buttonMap.forEach { (id, btn) ->
+            btn.background = if (activeId == id) selectedColor else backgroundColor
+            btn.repaint()
+        }
     }
 
     fun removeviewProvider(id: String) {
@@ -121,13 +122,13 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
             remove(button)
             buttonMap.remove(id)
             viewProviderMap.remove(id)
-            activeViews.remove(id)
+            if (activeId == id) activeId = null
             revalidate(); repaint()
         }
     }
 
     fun clearviewProviders() {
         buttonMap.values.forEach { button -> buttonGroup.remove(button); remove(button) }
-        buttonMap.clear(); viewProviderMap.clear(); activeViews.clear(); revalidate(); repaint()
+        buttonMap.clear(); viewProviderMap.clear(); activeId = null; revalidate(); repaint()
     }
 }
