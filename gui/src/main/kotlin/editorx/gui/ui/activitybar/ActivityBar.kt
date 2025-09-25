@@ -47,8 +47,10 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
         buttonGroup.add(btn)
         buttonMap[id] = btn
         viewProviderMap[id] = viewProvider
-        add(btn)
-        add(Box.createVerticalStrut(5))
+        
+        // 按照排序顺序重新排列所有按钮
+        reorderButtons()
+        
         revalidate(); repaint()
 
         // 默认选中逻辑（无持久化）：
@@ -167,5 +169,26 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
     fun clearviewProviders() {
         buttonMap.values.forEach { button -> buttonGroup.remove(button); remove(button) }
         buttonMap.clear(); viewProviderMap.clear(); activeId = null; revalidate(); repaint()
+    }
+    
+    /**
+     * 按照Constants中定义的顺序重新排列按钮
+     */
+    private fun reorderButtons() {
+        // 移除所有现有组件
+        removeAll()
+        
+        // 按照排序顺序添加按钮
+        val sortedIds = buttonMap.keys.sortedBy { id ->
+            Constants.getPluginOrderInActivityBar(id)
+        }
+        
+        sortedIds.forEach { id ->
+            val button = buttonMap[id]
+            if (button != null) {
+                add(button)
+                add(Box.createVerticalStrut(5))
+            }
+        }
     }
 }
