@@ -186,7 +186,7 @@ class ExplorerPlugin : Plugin {
         if (!fileNode.isDirectory) {
             val tempFile = File.createTempFile("apk_", "_${fileNode.file.name}")
             tempFile.writeText("// 这是从APK中提取的文件内容\n// 文件: ${fileNode.file.name}\n// 实际内容需要从APK中解析\n")
-//            context?.openFile(tempFile)
+            context?.openFile(tempFile)
             statusLabel.text = "已打开: ${fileNode.file.name}"
         }
     }

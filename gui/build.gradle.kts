@@ -6,9 +6,11 @@ plugins {
 dependencies {
     implementation(project(":core"))
     implementation(project(":plugins:explorer"))
+    implementation(project(":plugins:testplugin"))
 
     implementation("com.fifesoft:rsyntaxtextarea:3.4.0")
     implementation("com.formdev:flatlaf:3.4")
+    implementation("com.formdev:flatlaf-extras:3.4")
 
     testImplementation(kotlin("test"))
 }

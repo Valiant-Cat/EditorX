@@ -1,0 +1,223 @@
+> Task :buildSrc:checkKotlinGradlePluginConfigurationErrors
+> Task :buildSrc:generateExternalPluginSpecBuilders UP-TO-DATE
+> Task :buildSrc:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+> Task :buildSrc:compilePluginsBlocks UP-TO-DATE
+> Task :buildSrc:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+> Task :buildSrc:generateScriptPluginAdapters UP-TO-DATE
+> Task :buildSrc:compileKotlin UP-TO-DATE
+> Task :buildSrc:compileJava NO-SOURCE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:pluginDescriptors UP-TO-DATE
+> Task :buildSrc:processResources UP-TO-DATE
+> Task :buildSrc:classes UP-TO-DATE
+> Task :buildSrc:jar UP-TO-DATE
+> Task :core:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :core:compileKotlin UP-TO-DATE
+> Task :core:compileJava NO-SOURCE
+> Task :core:processResources NO-SOURCE
+> Task :core:classes UP-TO-DATE
+> Task :core:jar UP-TO-DATE
+> Task :gui:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :plugins:explorer:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :plugins:explorer:compileKotlin UP-TO-DATE
+> Task :plugins:explorer:compileJava NO-SOURCE
+> Task :plugins:explorer:processResources UP-TO-DATE
+> Task :plugins:explorer:classes UP-TO-DATE
+> Task :plugins:explorer:jar UP-TO-DATE
+> Task :plugins:testplugin:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :plugins:testplugin:compileKotlin UP-TO-DATE
+> Task :plugins:testplugin:compileJava NO-SOURCE
+> Task :plugins:testplugin:processResources NO-SOURCE
+> Task :plugins:testplugin:classes UP-TO-DATE
+> Task :plugins:testplugin:jar UP-TO-DATE
+> Task :gui:compileKotlin UP-TO-DATE
+> Task :gui:compileJava NO-SOURCE
+> Task :gui:processResources NO-SOURCE
+> Task :gui:classes UP-TO-DATE
+
+> Task :gui:run
+9月 25, 2025 4:08:30 下午 editorx.gui.EditorGuiKt initializeApplication
+信息: EditorX 初始化完成
+9月 25, 2025 4:08:31 下午 editorx.plugin.PluginManager loadPlugins
+信息: 开始加载插件...
+9月 25, 2025 4:08:31 下午 editorx.plugin.PluginManager scanAndLoadSourcePlugins
+信息: 开始扫描源码插件...
+9月 25, 2025 4:08:31 下午 editorx.plugin.PluginManager scanAndLoadSourcePlugins
+信息: 扫描包: editorx
+ClassScanner: 开始扫描包 editorx (路径: editorx)
+ClassScanner: 找到资源 1: file:/Volumes/Disk_APFS/Work/XiaMao/Tools/editorx/gui/build/classes/kotlin/main/editorx (协议: file)
+ClassScanner: 扫描文件系统目录: /Volumes/Disk_APFS/Work/XiaMao/Tools/editorx/gui/build/classes/kotlin/main/editorx
+ClassScanner: 扫描目录 /Volumes/Disk_APFS/Work/XiaMao/Tools/editorx/gui/build/classes/kotlin/main/editorx，包含 1 个文件/目录
+ClassScanner: 进入子目录: gui
+ClassScanner: 扫描目录 /Volumes/Disk_APFS/Work/XiaMao/Tools/editorx/gui/build/classes/kotlin/main/editorx/gui，包含 7 个文件/目录
+ClassScanner: 进入子目录: ui
+ClassScanner: 扫描目录 /Volumes/Disk_APFS/Work/XiaMao/Tools/editorx/gui/build/classes/kotlin/main/editorx/gui/ui，包含 10 个文件/目录
+ClassScanner: 进入子目录: sidebar
+ClassScanner: 扫描目录 /Volumes/Disk_APFS/Work/XiaMao/Tools/editorx/gui/build/classes/kotlin/main/editorx/gui/ui/sidebar，包含 1 个文件/目录
+ClassScanner: 检查类文件: editorx.gui.ui.sidebar.SideBar
+ClassScanner: 检查类 editorx.gui.ui.sidebar.SideBar - 可分配: false, 不是超类: true
+ClassScanner: 进入子目录: panel
+ClassScanner: 扫描目录 /Volumes/Disk_APFS/Work/XiaMao/Tools/editorx/gui/build/classes/kotlin/main/editorx/gui/ui/panel，包含 1 个文件/目录
+ClassScanner: 检查类文件: editorx.gui.ui.panel.Panel
+ClassScanner: 检查类 editorx.gui.ui.panel.Panel - 可分配: false, 不是超类: true
+ClassScanner: 进入子目录: util
+ClassScanner: 扫描目录 /Volumes/Disk_APFS/Work/XiaMao/Tools/editorx/gui/build/classes/kotlin/main/editorx/gui/ui/util，包含 2 个文件/目录
+ClassScanner: 检查类文件: editorx.gui.ui.util.NoLineSplitPaneUI$createDefaultDivider$1
+ClassScanner: 检查类 editorx.gui.ui.util.NoLineSplitPaneUI$createDefaultDivider$1 - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.ui.util.NoLineSplitPaneUI
+ClassScanner: 检查类 editorx.gui.ui.util.NoLineSplitPaneUI - 可分配: false, 不是超类: true
+ClassScanner: 进入子目录: titlebar
+ClassScanner: 扫描目录 /Volumes/Disk_APFS/Work/XiaMao/Tools/editorx/gui/build/classes/kotlin/main/editorx/gui/ui/titlebar，包含 2 个文件/目录
+ClassScanner: 检查类文件: editorx.gui.ui.titlebar.TitleBar
+ClassScanner: 检查类 editorx.gui.ui.titlebar.TitleBar - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.ui.titlebar.TitleBar$createFileMenu$1
+ClassScanner: 检查类 editorx.gui.ui.titlebar.TitleBar$createFileMenu$1 - 可分配: false, 不是超类: true
+ClassScanner: 进入子目录: statusbar
+ClassScanner: 扫描目录 /Volumes/Disk_APFS/Work/XiaMao/Tools/editorx/gui/build/classes/kotlin/main/editorx/gui/ui/statusbar，包含 1 个文件/目录
+ClassScanner: 检查类文件: editorx.gui.ui.statusbar.StatusBar
+ClassScanner: 检查类 editorx.gui.ui.statusbar.StatusBar - 可分配: false, 不是超类: true
+ClassScanner: 进入子目录: plugin
+ClassScanner: 扫描目录 /Volumes/Disk_APFS/Work/XiaMao/Tools/editorx/gui/build/classes/kotlin/main/editorx/gui/ui/plugin，包含 1 个文件/目录
+ClassScanner: 检查类文件: editorx.gui.ui.plugin.PluginManagerDialog
+ClassScanner: 检查类 editorx.gui.ui.plugin.PluginManagerDialog - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.ui.MainWindow
+ClassScanner: 检查类 editorx.gui.ui.MainWindow - 可分配: false, 不是超类: true
+ClassScanner: 进入子目录: command
+ClassScanner: 扫描目录 /Volumes/Disk_APFS/Work/XiaMao/Tools/editorx/gui/build/classes/kotlin/main/editorx/gui/ui/command，包含 6 个文件/目录
+ClassScanner: 检查类文件: editorx.gui.ui.command.CommandPalette$show$list$1$1
+ClassScanner: 检查类 editorx.gui.ui.command.CommandPalette$show$list$1$1 - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.ui.command.CommandPalette$show$4
+ClassScanner: 检查类 editorx.gui.ui.command.CommandPalette$show$4 - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.ui.command.CommandPalette$CommandItem
+ClassScanner: 检查类 editorx.gui.ui.command.CommandPalette$CommandItem - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.ui.command.CommandPalette
+ClassScanner: 检查类 editorx.gui.ui.command.CommandPalette - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.ui.command.CommandPalette$show$2
+ClassScanner: 检查类 editorx.gui.ui.command.CommandPalette$show$2 - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.ui.command.CommandPalette$show$3
+ClassScanner: 检查类 editorx.gui.ui.command.CommandPalette$show$3 - 可分配: false, 不是超类: true
+ClassScanner: 进入子目录: activitybar
+ClassScanner: 扫描目录 /Volumes/Disk_APFS/Work/XiaMao/Tools/editorx/gui/build/classes/kotlin/main/editorx/gui/ui/activitybar，包含 3 个文件/目录
+ClassScanner: 检查类文件: editorx.gui.ui.activitybar.ActivityBar$createActivityButton$2$1
+ClassScanner: 检查类 editorx.gui.ui.activitybar.ActivityBar$createActivityButton$2$1 - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.ui.activitybar.ActivityBar$createActivityButton$1
+ClassScanner: 检查类 editorx.gui.ui.activitybar.ActivityBar$createActivityButton$1 - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.ui.activitybar.ActivityBar
+ClassScanner: 检查类 editorx.gui.ui.activitybar.ActivityBar - 可分配: false, 不是超类: true
+ClassScanner: 进入子目录: editor
+ClassScanner: 扫描目录 /Volumes/Disk_APFS/Work/XiaMao/Tools/editorx/gui/build/classes/kotlin/main/editorx/gui/ui/editor，包含 6 个文件/目录
+ClassScanner: 检查类文件: editorx.gui.ui.editor.Editor$openFile$textArea$1$2
+ClassScanner: 检查类 editorx.gui.ui.editor.Editor$openFile$textArea$1$2 - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.ui.editor.Editor$1$1
+ClassScanner: 检查类 editorx.gui.ui.editor.Editor$1$1 - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.ui.editor.Editor$createCloseButton$1$closeLabel$1$1
+ClassScanner: 检查类 editorx.gui.ui.editor.Editor$createCloseButton$1$closeLabel$1$1 - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.ui.editor.Editor$enableDropTarget$1
+ClassScanner: 检查类 editorx.gui.ui.editor.Editor$enableDropTarget$1 - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.ui.editor.Editor
+ClassScanner: 检查类 editorx.gui.ui.editor.Editor - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.ui.editor.Editor$3
+ClassScanner: 检查类 editorx.gui.ui.editor.Editor$3 - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.EditorGuiKt
+ClassScanner: 检查类 editorx.gui.EditorGuiKt - 可分配: false, 不是超类: true
+ClassScanner: 进入子目录: widget
+ClassScanner: 扫描目录 /Volumes/Disk_APFS/Work/XiaMao/Tools/editorx/gui/build/classes/kotlin/main/editorx/gui/widget，包含 3 个文件/目录
+ClassScanner: 检查类文件: editorx.gui.widget.SvgIcon$Companion
+ClassScanner: 检查类 editorx.gui.widget.SvgIcon$Companion - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.widget.SvgIcon$SvgPath
+ClassScanner: 检查类 editorx.gui.widget.SvgIcon$SvgPath - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.widget.SvgIcon
+ClassScanner: 检查类 editorx.gui.widget.SvgIcon - 可分配: false, 不是超类: true
+ClassScanner: 进入子目录: plugin
+ClassScanner: 扫描目录 /Volumes/Disk_APFS/Work/XiaMao/Tools/editorx/gui/build/classes/kotlin/main/editorx/gui/plugin，包含 4 个文件/目录
+ClassScanner: 检查类文件: editorx.gui.plugin.GuiPluginContext$Companion
+ClassScanner: 检查类 editorx.gui.plugin.GuiPluginContext$Companion - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.plugin.GuiPluginContext
+ClassScanner: 检查类 editorx.gui.plugin.GuiPluginContext - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.plugin.GuiPluginContext$createDefaultIcon$1
+ClassScanner: 检查类 editorx.gui.plugin.GuiPluginContext$createDefaultIcon$1 - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.plugin.GuiPluginContext$resizeIcon$1
+ClassScanner: 检查类 editorx.gui.plugin.GuiPluginContext$resizeIcon$1 - 可分配: false, 不是超类: true
+ClassScanner: 进入子目录: theme
+ClassScanner: 扫描目录 /Volumes/Disk_APFS/Work/XiaMao/Tools/editorx/gui/build/classes/kotlin/main/editorx/gui/theme，包含 3 个文件/目录
+ClassScanner: 检查类文件: editorx.gui.theme.Material3Palette
+ClassScanner: 检查类 editorx.gui.theme.Material3Palette - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.theme.ThemeManager
+ClassScanner: 检查类 editorx.gui.theme.ThemeManager - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.theme.Material3
+ClassScanner: 检查类 editorx.gui.theme.Material3 - 可分配: false, 不是超类: true
+ClassScanner: 进入子目录: services
+ClassScanner: 扫描目录 /Volumes/Disk_APFS/Work/XiaMao/Tools/editorx/gui/build/classes/kotlin/main/editorx/gui/services，包含 2 个文件/目录
+ClassScanner: 检查类文件: editorx.gui.services.GuiServices
+ClassScanner: 检查类 editorx.gui.services.GuiServices - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.services.DefaultWorkspaceManager
+ClassScanner: 检查类 editorx.gui.services.DefaultWorkspaceManager - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.EditorGuiKt$initializeMainWindow$contextFactory$1
+ClassScanner: 检查类 editorx.gui.EditorGuiKt$initializeMainWindow$contextFactory$1 - 可分配: false, 不是超类: true
+ClassScanner: 找到资源 2: jar:file:/Volumes/Disk_APFS/Work/XiaMao/Tools/editorx/plugins/explorer/build/libs/explorer-1.0.0.jar!/editorx (协议: jar)
+ClassScanner: 扫描JAR文件: /Volumes/Disk_APFS/Work/XiaMao/Tools/editorx/plugins/explorer/build/libs/explorer-1.0.0.jar
+ClassScanner: 检查类 editorx.plugins.explorer.ExplorerPlugin - 可分配: true, 不是超类: true
+ClassScanner: 找到插件类: editorx.plugins.explorer.ExplorerPlugin
+ClassScanner: 检查类 editorx.plugins.explorer.ExplorerPlugin$createFileTree$1$1 - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.plugins.explorer.ExplorerPlugin$activate$1 - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.plugins.explorer.ExplorerPlugin$createFileTree$1$2 - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.plugins.explorer.FileTreeCellRenderer - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.plugins.explorer.FileNode - 可分配: false, 不是超类: true
+ClassScanner: 找到资源 3: jar:file:/Volumes/Disk_APFS/Work/XiaMao/Tools/editorx/plugins/testplugin/build/libs/testplugin.jar!/editorx (协议: jar)
+ClassScanner: 扫描JAR文件: /Volumes/Disk_APFS/Work/XiaMao/Tools/editorx/plugins/testplugin/build/libs/testplugin.jar
+ClassScanner: 检查类 editorx.plugins.testplugin.TestPlugin$activate$1 - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.plugins.testplugin.TestPlugin - 可分配: true, 不是超类: true
+ClassScanner: 找到插件类: editorx.plugins.testplugin.TestPlugin
+ClassScanner: 找到资源 4: jar:file:/Volumes/Disk_APFS/Work/XiaMao/Tools/editorx/core/build/libs/core.jar!/editorx (协议: jar)
+ClassScanner: 扫描JAR文件: /Volumes/Disk_APFS/Work/XiaMao/Tools/editorx/core/build/libs/core.jar
+ClassScanner: 检查类 editorx.settings.PropertiesSettingsStore - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.settings.SettingsStore$DefaultImpls - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.settings.SettingsStore - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.util.ClassScanner - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.workspace.WorkspaceManager - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.plugin.LoadedPlugin - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.plugin.PluginContextFactory - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.plugin.PluginContext - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.plugin.Plugin$DefaultImpls - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.plugin.Plugin - 可分配: true, 不是超类: false
+ClassScanner: 检查类 editorx.plugin.PluginManager - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.gui.CachedViewProvider - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.gui.ViewProvider - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.gui.ViewArea - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.command.CommandRegistry$DefaultImpls - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.command.CommandContext - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.command.CommandRegistry - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.command.CommandRegistryKt - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.command.CommandMeta - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.command.DefaultCommandRegistry - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.event.FileOpened - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.event.PluginUnloaded - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.event.EditorXEvent - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.event.SimpleEventBus - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.event.FileSaved - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.event.Subscription - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.event.PluginLoaded - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.event.EventBus - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.event.SimpleEventBus$subscribe$1 - 可分配: false, 不是超类: true
+ClassScanner: 检查类 editorx.event.ActiveFileChanged - 可分配: false, 不是超类: true
+ClassScanner: 包 editorx 扫描完成，找到 2 个插件类
+9月 25, 2025 4:08:31 下午 editorx.plugin.PluginManager scanAndLoadSourcePlugins
+信息: 在包 editorx 中找到 2 个插件类
+9月 25, 2025 4:08:31 下午 editorx.plugin.PluginManager scanAndLoadSourcePlugins
+信息: 发现插件类: editorx.plugins.testplugin.TestPlugin
+9月 25, 2025 4:08:31 下午 editorx.plugin.PluginManager scanAndLoadSourcePlugins
+信息: 发现插件类: editorx.plugins.explorer.ExplorerPlugin
+9月 25, 2025 4:08:31 下午 editorx.plugin.PluginManager scanAndLoadSourcePlugins
+信息: 发现插件类: editorx.plugins.testplugin.TestPlugin
+9月 25, 2025 4:08:31 下午 editorx.plugin.PluginManager loadSourcePluginClass
+信息: 源码插件加载成功: TestPlugin-dev vdev (类: editorx.plugins.testplugin.TestPlugin)
+9月 25, 2025 4:08:31 下午 editorx.plugin.PluginManager scanAndLoadSourcePlugins
+信息: 发现插件类: editorx.plugins.explorer.ExplorerPlugin
+Explorer插件已启动
+9月 25, 2025 4:08:31 下午 editorx.plugin.PluginManager loadSourcePluginClass
+信息: 源码插件加载成功: ExplorerPlugin-dev vdev (类: editorx.plugins.explorer.ExplorerPlugin)
+9月 25, 2025 4:08:31 下午 editorx.plugin.PluginManager scanAndLoadSourcePlugins
+信息: 源码插件扫描完成，共发现 2 个插件类
+9月 25, 2025 4:08:31 下午 editorx.plugin.PluginManager loadPlugins
+信息: 插件加载完成，共加载 2 个插件
+2025-09-25 16:09:14.500 java[47205:385908] TSM AdjustCapsLockLEDForKeyTransitionHandling - _ISSetPhysicalKeyboardCapsLockLED Inhibit

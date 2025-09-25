@@ -18,11 +18,12 @@ class StatusBar(private val mainWindow: MainWindow) : JPanel() {
 
     private fun setupStatusBar() {
         layout = FlowLayout(FlowLayout.LEFT, 5, 2)
+        val separator = Color(0xDE, 0xDE, 0xDE)
         border = BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(1, 0, 0, 0, Color.GRAY),
+            BorderFactory.createMatteBorder(1, 0, 0, 0, separator),
             BorderFactory.createEmptyBorder(2, 5, 2, 5)
         )
-        background = Color.WHITE
+        background = Color.decode("#f2f2f2")
         preferredSize = Dimension(0, 25)
         setupComponents()
     }

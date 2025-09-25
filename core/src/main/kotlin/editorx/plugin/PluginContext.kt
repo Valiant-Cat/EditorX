@@ -1,6 +1,10 @@
 package editorx.plugin
 
+import editorx.command.CommandRegistry
+import editorx.event.EventBus
 import editorx.gui.ViewProvider
+import editorx.settings.SettingsStore
+import editorx.workspace.WorkspaceManager
 import java.io.File
 
 /**
@@ -24,4 +28,24 @@ interface PluginContext {
      * 让主编辑器打开一个文件
      */
     fun openFile(file: File)
+
+    /**
+     * 获取全局命令注册表
+     */
+    fun commands(): CommandRegistry
+
+    /**
+     * 获取全局事件总线
+     */
+    fun eventBus(): EventBus
+
+    /**
+     * 获取设置存储
+     */
+    fun settings(): SettingsStore
+
+    /**
+     * 获取工作区管理器
+     */
+    fun workspace(): WorkspaceManager
 }

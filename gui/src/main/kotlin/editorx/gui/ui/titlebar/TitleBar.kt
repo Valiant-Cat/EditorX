@@ -1,7 +1,10 @@
 package editorx.gui.ui.titlebar
 
 import editorx.gui.ui.MainWindow
+import editorx.gui.ui.command.CommandPalette
+import editorx.gui.ui.plugin.PluginManagerDialog
 import java.awt.event.ActionEvent
+import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import javax.swing.*
 import javax.swing.filechooser.FileNameExtensionFilter
@@ -15,21 +18,51 @@ class TitleBar(private val mainWindow: MainWindow) : JMenuBar() {
 
     private fun createFileMenu(): JMenu {
         val fileMenu = JMenu("文件").apply { mnemonic = KeyEvent.VK_F }
-        val openApkItem = JMenuItem("打开 APK...").apply {
+        val openFileItem = JMenuItem("打开文件...").apply {
             mnemonic = KeyEvent.VK_O
-            accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_O, ActionEvent.CTRL_MASK)
-            addActionListener { openApkFile() }
+            accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_O, InputEvent.CTRL_DOWN_MASK)
+            addActionListener { mainWindow.openFileChooserAndOpen() }
         }
+        val openApkItem = JMenuItem("打开 APK...").apply { addActionListener { openApkFile() } }
         val openFolderItem = JMenuItem("打开文件夹...").apply {
             mnemonic = KeyEvent.VK_D
-            accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_D, ActionEvent.CTRL_MASK)
+            accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_D, InputEvent.CTRL_DOWN_MASK)
             addActionListener { openFolder() }
         }
-        fileMenu.add(openApkItem); fileMenu.add(openFolderItem); fileMenu.addSeparator()
-        val recentFilesMenu = JMenu("最近打开"); fileMenu.add(recentFilesMenu); fileMenu.addSeparator()
+        val saveItem = JMenuItem("保存").apply {
+            mnemonic = KeyEvent.VK_S
+            accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_S, InputEvent.CTRL_DOWN_MASK)
+            addActionListener { mainWindow.editor.saveCurrent() }
+        }
+        val saveAsItem = JMenuItem("另存为...").apply {
+            accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_S, InputEvent.CTRL_DOWN_MASK or InputEvent.SHIFT_DOWN_MASK)
+            addActionListener { mainWindow.editor.saveCurrentAs() }
+        }
+        fileMenu.add(openFileItem); fileMenu.add(openApkItem); fileMenu.add(openFolderItem); fileMenu.addSeparator()
+        fileMenu.add(saveItem); fileMenu.add(saveAsItem); fileMenu.addSeparator()
+        val recentFilesMenu = JMenu("最近打开")
+        recentFilesMenu.addMenuListener(object : javax.swing.event.MenuListener {
+            override fun menuSelected(e: javax.swing.event.MenuEvent) {
+                recentFilesMenu.removeAll()
+                val recents = mainWindow.services.workspace.recentFiles()
+                if (recents.isEmpty()) {
+                    recentFilesMenu.add(JMenuItem("(无)"))
+                } else {
+                    recents.forEach { file ->
+                        val item = JMenuItem(file.name)
+                        item.toolTipText = file.absolutePath
+                        item.addActionListener { mainWindow.editor.openFile(file) }
+                        recentFilesMenu.add(item)
+                    }
+                }
+            }
+            override fun menuDeselected(e: javax.swing.event.MenuEvent) {}
+            override fun menuCanceled(e: javax.swing.event.MenuEvent) {}
+        })
+        fileMenu.add(recentFilesMenu); fileMenu.addSeparator()
         val exitItem = JMenuItem("退出").apply {
             mnemonic = KeyEvent.VK_X
-            accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_Q, ActionEvent.CTRL_MASK)
+            accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_Q, InputEvent.CTRL_DOWN_MASK)
             addActionListener { System.exit(0) }
         }
         fileMenu.add(exitItem)
@@ -41,16 +74,16 @@ class TitleBar(private val mainWindow: MainWindow) : JMenuBar() {
         val undoItem = JMenuItem("撤销").apply { mnemonic = KeyEvent.VK_Z; accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_Z, ActionEvent.CTRL_MASK); isEnabled = false }
         val redoItem = JMenuItem("重做").apply { mnemonic = KeyEvent.VK_Y; accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_Y, ActionEvent.CTRL_MASK); isEnabled = false }
         editMenu.add(undoItem); editMenu.add(redoItem); editMenu.addSeparator()
-        val findItem = JMenuItem("查找...").apply { mnemonic = KeyEvent.VK_F; accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_F, ActionEvent.CTRL_MASK); addActionListener { showFindDialog() } }
-        val replaceItem = JMenuItem("替换...").apply { mnemonic = KeyEvent.VK_H; accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_H, ActionEvent.CTRL_MASK); addActionListener { showReplaceDialog() } }
+        val findItem = JMenuItem("查找...").apply { mnemonic = KeyEvent.VK_F; accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_F, InputEvent.CTRL_DOWN_MASK); addActionListener { showFindDialog() } }
+        val replaceItem = JMenuItem("替换...").apply { mnemonic = KeyEvent.VK_H; accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_H, InputEvent.CTRL_DOWN_MASK); addActionListener { showReplaceDialog() } }
         editMenu.add(findItem); editMenu.add(replaceItem)
         return editMenu
     }
 
     private fun createViewMenu(): JMenu {
         val viewMenu = JMenu("视图").apply { mnemonic = KeyEvent.VK_V }
-        val toggleSidebarItem = JMenuItem("切换侧边栏").apply { mnemonic = KeyEvent.VK_B; accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_B, ActionEvent.CTRL_MASK); addActionListener { toggleSidebar() } }
-        val togglePanelItem = JMenuItem("切换底部面板").apply { mnemonic = KeyEvent.VK_P; accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_P, ActionEvent.CTRL_MASK); addActionListener { toggleBottomPanel() } }
+        val toggleSidebarItem = JMenuItem("切换侧边栏").apply { mnemonic = KeyEvent.VK_B; accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_B, InputEvent.CTRL_DOWN_MASK); addActionListener { toggleSidebar() } }
+        val togglePanelItem = JMenuItem("切换底部面板").apply { mnemonic = KeyEvent.VK_P; accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_P, InputEvent.CTRL_DOWN_MASK); addActionListener { toggleBottomPanel() } }
         viewMenu.add(toggleSidebarItem); viewMenu.add(togglePanelItem)
         return viewMenu
     }
@@ -58,8 +91,12 @@ class TitleBar(private val mainWindow: MainWindow) : JMenuBar() {
     private fun createToolsMenu(): JMenu {
         val toolsMenu = JMenu("工具").apply { mnemonic = KeyEvent.VK_T }
         val pluginManagerItem = JMenuItem("插件管理...").apply { addActionListener { showPluginManager() } }
+        val commandPaletteItem = JMenuItem("命令面板...").apply {
+            accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_P, InputEvent.CTRL_DOWN_MASK or InputEvent.SHIFT_DOWN_MASK)
+            addActionListener { mainWindow.services.commands.execute("help.commandPalette") }
+        }
         val settingsItem = JMenuItem("设置...").apply { mnemonic = KeyEvent.VK_S; addActionListener { showSettings() } }
-        toolsMenu.add(pluginManagerItem); toolsMenu.addSeparator(); toolsMenu.add(settingsItem)
+        toolsMenu.add(pluginManagerItem); toolsMenu.addSeparator(); toolsMenu.add(commandPaletteItem); toolsMenu.addSeparator(); toolsMenu.add(settingsItem)
         return toolsMenu
     }
 
@@ -89,9 +126,18 @@ class TitleBar(private val mainWindow: MainWindow) : JMenuBar() {
 
     private fun showFindDialog() { JOptionPane.showMessageDialog(this, "查找功能待实现", "提示", JOptionPane.INFORMATION_MESSAGE) }
     private fun showReplaceDialog() { JOptionPane.showMessageDialog(this, "替换功能待实现", "提示", JOptionPane.INFORMATION_MESSAGE) }
-    private fun toggleSidebar() { val sidebar = mainWindow.sideBar; sidebar.isVisible = !sidebar.isVisible }
-    private fun toggleBottomPanel() { val panel = mainWindow.panel; panel.isVisible = !panel.isVisible }
-    private fun showPluginManager() { JOptionPane.showMessageDialog(this, "插件管理器待实现", "提示", JOptionPane.INFORMATION_MESSAGE) }
+    private fun toggleSidebar() {
+        val sidebar = mainWindow.sideBar
+        if (sidebar.isSideBarVisible()) sidebar.hideSideBar() else sidebar.getCurrentViewId()?.let { sidebar.showView(it) }
+    }
+    private fun toggleBottomPanel() {
+        val panel = mainWindow.panel
+        if (panel.isPanelVisible()) panel.hidePanel() else panel.getCurrentViewId()?.let { panel.showView(it) }
+    }
+    private fun showPluginManager() {
+        val pm = mainWindow.pluginManager ?: return
+        PluginManagerDialog(mainWindow, pm).isVisible = true
+    }
     private fun showSettings() { JOptionPane.showMessageDialog(this, "设置界面待实现", "提示", JOptionPane.INFORMATION_MESSAGE) }
     private fun showAbout() {
         val aboutMessage = """

@@ -15,16 +15,30 @@ class SvgIcon(
     override fun getIconWidth(): Int = width
     override fun getIconHeight(): Int = height
     override fun paintIcon(c: Component?, g: Graphics, x: Int, y: Int) {
-        val g2d = g as Graphics2D
-        g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-        g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
-        val originalTransform = g2d.transform
-        val scaleX = width.toDouble() / 16.0
-        val scaleY = height.toDouble() / 16.0
-        g2d.translate(x.toDouble(), y.toDouble())
-        g2d.scale(scaleX, scaleY)
-        for (path in pathData) path.draw(g2d)
-        g2d.transform = originalTransform
+        val g2d = g.create() as Graphics2D
+        try {
+            val oldAA = g2d.getRenderingHint(RenderingHints.KEY_ANTIALIASING)
+            val oldRender = g2d.getRenderingHint(RenderingHints.KEY_RENDERING)
+            val oldTransform = g2d.transform
+            val oldPaint = g2d.paint
+            val oldStroke = g2d.stroke
+
+            g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+            g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
+            val scaleX = width.toDouble() / 16.0
+            val scaleY = height.toDouble() / 16.0
+            g2d.translate(x.toDouble(), y.toDouble())
+            g2d.scale(scaleX, scaleY)
+            for (path in pathData) path.draw(g2d)
+
+            g2d.stroke = oldStroke
+            g2d.paint = oldPaint
+            g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, oldAA)
+            g2d.setRenderingHint(RenderingHints.KEY_RENDERING, oldRender)
+            g2d.transform = oldTransform
+        } finally {
+            g2d.dispose()
+        }
     }
     private fun parseSvgPaths(): List<SvgPath> {
         val paths = mutableListOf<SvgPath>()

@@ -1,102 +1,84 @@
 package editorx.gui.ui.panel
 
 import editorx.gui.ui.MainWindow
-import java.awt.CardLayout
+import java.awt.BorderLayout
 import java.awt.Color
 import javax.swing.*
 
 class Panel(private val mainWindow: MainWindow) : JPanel() {
-    private val cardLayout = CardLayout()
+    private val tabbedPane = JTabbedPane(JTabbedPane.TOP, JTabbedPane.SCROLL_TAB_LAYOUT)
     private val views = mutableMapOf<String, JComponent>()
-    private var currentViewId: String? = null
     private var isVisible = false
 
-    init {
-        setupPanel()
-    }
+    init { setupPanel() }
 
     private fun setupPanel() {
-        layout = cardLayout
+        layout = BorderLayout()
         background = Color.WHITE
-        border = BorderFactory.createEmptyBorder(5, 5, 5, 5)
-        isVisible = false
-        // 初始化时隐藏Panel
+        // 保持干净，不再额外加一条分割线
+        border = BorderFactory.createEmptyBorder(0, 0, 0, 0)
+        add(tabbedPane, BorderLayout.CENTER)
         updateVisibility()
     }
 
     fun showView(id: String, component: JComponent? = null) {
-        // 如果视图不存在且提供了组件，则先注册
         if (!views.containsKey(id) && component != null) {
             views[id] = component
-            add(component, id)
+            tabbedPane.addTab(id, component)
         }
-
-        // 显示指定的视图
-        if (views.containsKey(id)) {
-            cardLayout.show(this, id)
-            currentViewId = id
-            // 显示Panel
-            if (!isVisible) {
-                isVisible = true
-                updateVisibility()
-            }
-        }
+        val idx = tabbedPane.indexOfTab(id)
+        if (idx >= 0) tabbedPane.selectedIndex = idx
+        if (!isVisible) { isVisible = true; updateVisibility() }
     }
 
-    fun getCurrentViewId(): String? = currentViewId
+    fun getCurrentViewId(): String? = if (tabbedPane.selectedIndex >= 0) tabbedPane.getTitleAt(tabbedPane.selectedIndex) else null
     fun getRegisteredViewIds(): Set<String> = views.keys.toSet()
 
     fun removeView(id: String) {
-        views[id]?.let { component ->
-            remove(component)
-            views.remove(id)
-            if (currentViewId == id) {
-                // 检查是否还有其他视图
-                if (views.isNotEmpty()) {
-                    // 显示下一个可用的视图
-                    val nextView = views.keys.first()
-                    showView(nextView)
-                } else {
-                    // 没有其他视图，隐藏Panel
-                    hidePanel()
-                }
-            }
-            revalidate()
-            repaint()
+        val idx = tabbedPane.indexOfTab(id)
+        if (idx >= 0) {
+            val comp = tabbedPane.getComponentAt(idx) as? JComponent
+            tabbedPane.removeTabAt(idx)
+            comp?.let { views.remove(id) }
+            if (tabbedPane.tabCount == 0) hidePanel()
+            revalidate(); repaint()
         }
     }
 
     fun clearViews() {
-        val viewsToRemove = views.keys.toList()
-        viewsToRemove.forEach { removeView(it) }
-        hidePanel()
+        tabbedPane.removeAll(); views.clear(); hidePanel()
     }
 
-    fun hidePanel() {
-        isVisible = false
-        updateVisibility()
-    }
+    fun hidePanel() { isVisible = false; updateVisibility() }
 
     private fun updateVisibility() {
+        val split = findParentSplit()
         if (isVisible) {
-            updateDividerLocation(700) // 显示Panel时设置合适的位置
+            split?.dividerSize = 8
+            updateDividerLocation(700)
         } else {
-            updateDividerLocation(Int.MAX_VALUE) // 隐藏Panel时完全隐藏
+            // 保留一个可拖拽的握柄（8px），并把分割条移动到可用的最大位置
+            split?.dividerSize = 8
+            split?.let { sp ->
+                val target = sp.maximumDividerLocation
+                sp.dividerLocation = target
+            }
         }
-        // 通知父容器重新布局
         parent?.revalidate()
     }
 
     private fun updateDividerLocation(location: Int) {
-        // 查找包含Panel的JSplitPane并更新其dividerLocation
+        val split = findParentSplit()
+        split?.dividerLocation = location
+    }
+
+    private fun findParentSplit(): javax.swing.JSplitPane? {
         var current = parent
         while (current != null) {
-            if (current is javax.swing.JSplitPane) {
-                current.dividerLocation = location
-                break
-            }
+            if (current is javax.swing.JSplitPane) return current
             current = current.parent
         }
+        return null
     }
 
     fun isPanelVisible(): Boolean = isVisible

@@ -1,10 +1,13 @@
 package editorx.gui.plugin
-
 import editorx.gui.ViewProvider
 import editorx.gui.ui.MainWindow
 import editorx.gui.widget.SvgIcon
+import editorx.command.CommandRegistry
+import editorx.event.EventBus
 import editorx.plugin.LoadedPlugin
 import editorx.plugin.PluginContext
+import editorx.settings.SettingsStore
+import editorx.workspace.WorkspaceManager
 import java.awt.*
 import java.awt.image.BufferedImage
 import java.io.File
@@ -45,15 +48,18 @@ class GuiPluginContext(
         }
     }
 
+    override fun commands(): CommandRegistry = mainWindow.services.commands
+    override fun eventBus(): EventBus = mainWindow.services.eventBus
+    override fun settings(): SettingsStore = mainWindow.services.settings
+    override fun workspace(): WorkspaceManager = mainWindow.services.workspace
+
     private fun loadIcon(iconPath: String): Icon {
         return try {
             when {
                 iconPath.isEmpty() -> createDefaultIcon()
                 iconPath.endsWith(".svg") -> {
-                    val svgIcon = SvgIcon.fromResource("/$iconPath")
-                    svgIcon?.let { resizeIcon(it, ICON_SIZE, ICON_SIZE) } ?: run {
-                        logger.warning("SVG图标资源未找到: $iconPath"); createDefaultIcon()
-                    }
+                    val resPath = if (iconPath.startsWith("/")) iconPath else "/$iconPath"
+                    SvgIcon.fromResource(resPath, ICON_SIZE, ICON_SIZE) ?: createDefaultIcon()
                 }
 
                 else -> {
@@ -78,32 +84,33 @@ class GuiPluginContext(
             override fun getIconHeight(): Int = height
 
             override fun paintIcon(c: Component?, g: Graphics, x: Int, y: Int) {
-                val g2d = g as Graphics2D
-                g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
-                g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
-                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+                val g2 = g.create() as Graphics2D
+                try {
+                    val oldInterp = g2.getRenderingHint(RenderingHints.KEY_INTERPOLATION)
+                    val oldRender = g2.getRenderingHint(RenderingHints.KEY_RENDERING)
+                    val oldAA = g2.getRenderingHint(RenderingHints.KEY_ANTIALIASING)
+                    val oldTx = g2.transform
 
-                // 保存原始变换
-                val originalTransform = g2d.transform
+                    g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
+                    g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
+                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
 
-                // 计算缩放比例
-                val originalWidth = icon.iconWidth
-                val originalHeight = icon.iconHeight
-                val scaleX = width.toDouble() / originalWidth
-                val scaleY = height.toDouble() / originalHeight
+                    val originalWidth = icon.iconWidth
+                    val originalHeight = icon.iconHeight
+                    val scaleX = width.toDouble() / originalWidth
+                    val scaleY = height.toDouble() / originalHeight
+                    g2.scale(scaleX, scaleY)
+                    val scaledX = x / scaleX
+                    val scaledY = y / scaleY
+                    icon.paintIcon(c, g2, scaledX.toInt(), scaledY.toInt())
 
-                // 应用缩放变换
-                g2d.scale(scaleX, scaleY)
-
-                // 调整绘制位置以适应缩放
-                val scaledX = x / scaleX
-                val scaledY = y / scaleY
-
-                // 绘制原始图标（现在会被缩放到目标尺寸）
-                icon.paintIcon(c, g2d, scaledX.toInt(), scaledY.toInt())
-
-                // 恢复原始变换
-                g2d.transform = originalTransform
+                    g2.transform = oldTx
+                    g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, oldInterp)
+                    g2.setRenderingHint(RenderingHints.KEY_RENDERING, oldRender)
+                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, oldAA)
+                } finally {
+                    g2.dispose()
+                }
             }
         }
     }
@@ -114,10 +121,18 @@ class GuiPluginContext(
             override fun getIconHeight(): Int = ICON_SIZE
 
             override fun paintIcon(c: Component?, g: Graphics, x: Int, y: Int) {
-                val g2d = g as Graphics2D
-                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-                g2d.color = Color(108, 112, 126)
-                g2d.fillRect(x + 2, y + 2, ICON_SIZE - 4, ICON_SIZE - 4)
+                val g2 = g.create() as Graphics2D
+                try {
+                    val oldAA = g2.getRenderingHint(RenderingHints.KEY_ANTIALIASING)
+                    val oldPaint = g2.paint
+                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+                    g2.color = Color(108, 112, 126)
+                    g2.fillRect(x + 2, y + 2, ICON_SIZE - 4, ICON_SIZE - 4)
+                    g2.paint = oldPaint
+                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, oldAA)
+                } finally {
+                    g2.dispose()
+                }
             }
         }
     }

@@ -1,5 +1,6 @@
 package editorx.gui.ui.activitybar
 
+import editorx.gui.theme.ThemeManager
 import editorx.gui.ViewArea
 import editorx.gui.ViewProvider
 import editorx.gui.ui.MainWindow
@@ -17,10 +18,9 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
     private val viewProviderMap = mutableMapOf<String, ViewProvider>()
     private val activeViews = mutableSetOf<String>()
 
-    private val backgroundColor = Color.decode("#f4f4f4")
-    private val selectedColor = Color.decode("#007acc")
-    private val hoverColor = Color.decode("#404040")
-    private val borderColor = Color.GRAY
+    private val backgroundColor = Color.decode("#f2f2f2")
+    private val selectedColor = ThemeManager.palette.primaryContainer
+    private val hoverColor = ThemeManager.palette.surfaceVariant
 
     init {
         setupActivityBar()
@@ -28,9 +28,13 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
 
     private fun setupActivityBar() {
         layout = BoxLayout(this, BoxLayout.Y_AXIS)
-        preferredSize = Dimension(40, 0)
+        preferredSize = Dimension(44, 0)
+        minimumSize = Dimension(44, 0)
+        maximumSize = Dimension(44, Int.MAX_VALUE)
+        // 在靠近可拖拽区域一侧增加一条细分割线以增强层次
+        val separator = Color(0xDE, 0xDE, 0xDE)
         border = BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(0, 0, 0, 1, borderColor),
+            BorderFactory.createMatteBorder(0, 0, 0, 1, separator),
             BorderFactory.createEmptyBorder(5, 5, 5, 5)
         )
         background = backgroundColor
@@ -49,15 +53,15 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
     private fun createActivityButton(icon: Icon, tooltip: String, viewId: String): JButton {
         return object : JButton(icon) {
             override fun paintComponent(g: Graphics) {
-                val g2d = g as Graphics2D
-                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-                
-                // 绘制圆角背景
-                val shape = RoundRectangle2D.Float(0f, 0f, width.toFloat(), height.toFloat(), 8f, 8f)
-                g2d.color = background
-                g2d.fill(shape)
-                
-                // 绘制图标
+                val g2 = g.create() as Graphics2D
+                try {
+                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+                    val shape = RoundRectangle2D.Float(0f, 0f, width.toFloat(), height.toFloat(), 8f, 8f)
+                    g2.color = background
+                    g2.fill(shape)
+                } finally {
+                    g2.dispose()
+                }
                 super.paintComponent(g)
             }
         }.apply {
@@ -92,56 +96,18 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
 
     private fun handleButtonClick(id: String) {
         val viewProvider = viewProviderMap[id] ?: return
-        
-        // 检查当前视图是否正在显示
-        val isCurrentlyDisplayed = when (viewProvider.area()) {
-            ViewArea.SIDEBAR -> sideBar?.getCurrentViewId() == id && sideBar?.isSideBarVisible() == true
-            ViewArea.PANEL -> panel?.getCurrentViewId() == id && panel?.isPanelVisible() == true
-        }
-        
+        // VSCode 模式：ActivityBar 仅控制 SideBar
+        val isCurrentlyDisplayed = sideBar?.getCurrentViewId() == id && sideBar?.isSideBarVisible() == true
         if (isCurrentlyDisplayed) {
-            // 当前正在显示，隐藏视图
-            hideView(id, viewProvider.area())
-            activeViews.remove(id)
+            sideBar?.hideSideBar(); activeViews.remove(id)
         } else {
-            // 当前未显示，显示视图
-            showView(id, viewProvider)
-            activeViews.add(id)
+            sideBar?.showView(id, viewProvider.getView()); activeViews.add(id)
         }
     }
 
-    private fun showView(id: String, viewProvider: ViewProvider) {
-        when (viewProvider.area()) {
-            ViewArea.SIDEBAR -> {
-                sideBar?.showView(id, viewProvider.getView())
-            }
-
-            ViewArea.PANEL -> {
-                panel?.showView(id, viewProvider.getView())
-            }
-        }
-    }
-
-    private fun hideView(id: String, displayLocation: ViewArea) {
-        when (displayLocation) {
-            ViewArea.SIDEBAR -> {
-                // 隐藏SideBar，但保持视图注册状态
-                sideBar?.let { 
-                    if (it.getCurrentViewId() == id) {
-                        it.hideSideBar()
-                    }
-                }
-            }
-            ViewArea.PANEL -> {
-                // 隐藏Panel，但保持视图注册状态
-                panel?.let {
-                    if (it.getCurrentViewId() == id) {
-                        it.hidePanel()
-                    }
-                }
-            }
-        }
-    }
+    // 不再支持 ActivityBar 直接展示到底部 Panel
+    private fun showView(id: String, viewProvider: ViewProvider) { sideBar?.showView(id, viewProvider.getView()) }
+    private fun hideView(id: String) { if (sideBar?.getCurrentViewId() == id) sideBar?.hideSideBar() }
 
     private fun updateButtonState(id: String) {
         val button = buttonMap[id] ?: return

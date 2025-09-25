@@ -20,3 +20,4 @@ rootProject.name = "EditorX"
 include(":core")
 include(":gui")
 include(":plugins:explorer")
+include(":plugins:testplugin")

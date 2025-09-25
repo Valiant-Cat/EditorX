@@ -1,5 +1,8 @@
 package editorx.plugin
 
+import editorx.event.EventBus
+import editorx.event.PluginLoaded
+import editorx.event.PluginUnloaded
 import editorx.util.ClassScanner
 import java.io.File
 import java.net.URLClassLoader
@@ -11,7 +14,10 @@ import java.util.logging.Logger
  * 插件管理器
  * 负责插件的加载、卸载和生命周期管理
  */
-class PluginManager(private val contextFactory: PluginContextFactory) {
+class PluginManager(
+    private val contextFactory: PluginContextFactory,
+    private val eventBus: EventBus? = null
+) {
     private val logger = Logger.getLogger(PluginManager::class.java.name)
     private val plugins = ConcurrentHashMap<String, LoadedPlugin>()
     private val pluginLoaders = ConcurrentHashMap<String, URLClassLoader>()
@@ -27,6 +33,8 @@ class PluginManager(private val contextFactory: PluginContextFactory) {
 
         logger.info("插件加载完成，共加载 ${plugins.size} 个插件")
     }
+
+    fun listLoaded(): List<LoadedPlugin> = plugins.values.toList()
 
     /**
      * 加载JAR格式的插件
@@ -106,6 +114,7 @@ class PluginManager(private val contextFactory: PluginContextFactory) {
 
             plugin.activate(context)
             plugins[loadedPlugin.name] = loadedPlugin
+            eventBus?.publish(PluginLoaded(loadedPlugin.id, loadedPlugin.name, loadedPlugin.version))
 
             logger.info("源码插件加载成功: ${loadedPlugin.name} v${loadedPlugin.version} (类: ${pluginClass.name})")
         } catch (e: Exception) {
@@ -167,6 +176,7 @@ class PluginManager(private val contextFactory: PluginContextFactory) {
             plugin.activate(context)
             plugins[loadedPlugin.name] = loadedPlugin
             pluginLoaders[loadedPlugin.name] = loader
+            eventBus?.publish(PluginLoaded(loadedPlugin.id, loadedPlugin.name, loadedPlugin.version))
 
             logger.info("插件加载成功: ${loadedPlugin.name} v${loadedPlugin.version}")
         } catch (e: Exception) {
@@ -178,9 +188,11 @@ class PluginManager(private val contextFactory: PluginContextFactory) {
     fun unloadPlugin(pluginName: String) {
         plugins[pluginName]?.let { pluginInfo ->
             try {
+                runCatching { plugins[pluginName]?.plugin?.deactivate() }
                 pluginInfo.loader?.close()
                 plugins.remove(pluginName)
                 pluginLoaders.remove(pluginName)
+                eventBus?.publish(PluginUnloaded(pluginInfo.id, pluginName))
                 logger.info("插件卸载成功: $pluginName")
             } catch (e: Exception) {
                 logger.severe("卸载插件失败: $pluginName, 错误: ${e.message}")
