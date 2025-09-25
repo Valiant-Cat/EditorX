@@ -73,4 +73,10 @@ object ThemeManager {
         UIManager.put("SplitPaneDivider.gripColor", Color(0xC8, 0xC8, 0xC8))
         UIManager.put("SplitPaneDivider.background", p.surface)
     }
+
+    // Design tokens centralized here
+    val separator: Color get() = Color(0xDE, 0xDE, 0xDE)
+    val activityBarBackground: Color get() = Color(0xF2, 0xF2, 0xF2)
+    val activityBarItemSelected: Color get() = palette.primaryContainer
+    val activityBarItemHover: Color get() = Color(0, 0, 0, 20) // very light overlay
 }

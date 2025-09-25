@@ -18,9 +18,9 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
     private val viewProviderMap = mutableMapOf<String, ViewProvider>()
     private var activeId: String? = null
 
-    private val backgroundColor = Color.decode("#f2f2f2")
-    private val selectedColor = ThemeManager.palette.primaryContainer
-    private val hoverColor = ThemeManager.palette.surfaceVariant
+    private val backgroundColor = ThemeManager.activityBarBackground
+    private val selectedColor = ThemeManager.activityBarItemSelected
+    private val hoverColor = ThemeManager.activityBarItemHover
 
     init {
         setupActivityBar()
@@ -32,7 +32,7 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
         minimumSize = Dimension(44, 0)
         maximumSize = Dimension(44, Int.MAX_VALUE)
         // 在靠近可拖拽区域一侧增加一条细分割线以增强层次
-        val separator = Color(0xDE, 0xDE, 0xDE)
+        val separator = ThemeManager.separator
         border = BorderFactory.createCompoundBorder(
             BorderFactory.createMatteBorder(0, 0, 0, 1, separator),
             BorderFactory.createEmptyBorder(5, 5, 5, 5)
