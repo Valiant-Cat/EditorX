@@ -78,6 +78,8 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         
         // 设置拖放支持 - 确保整个Editor区域都支持拖放
         enableDropTarget()
+        // 同时在 tabbedPane 表面也安装 DropTarget，避免已有文件时事件落到子组件而丢失
+        installFileDropTarget(tabbedPane)
         
         // 设置TransferHandler来处理拖放
         transferHandler = object : javax.swing.TransferHandler() {
@@ -313,6 +315,9 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             background = Color.WHITE
             viewport.background = Color.WHITE
         }
+        // 让新建的编辑器视图也支持文件拖入
+        installFileDropTarget(scroll)
+        installFileDropTarget(textArea)
         val title = file.name
         tabbedPane.addTab(title, null, scroll, null)
         val index = tabbedPane.tabCount - 1
@@ -609,6 +614,46 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                 }
             }
         })
+    }
+
+    // 在指定组件上安装文件拖放监听，确保无论鼠标落在何处都能打开文件
+    private fun installFileDropTarget(component: java.awt.Component) {
+        try {
+            DropTarget(component, object : DropTargetListener {
+                override fun dragEnter(dtde: DropTargetDragEvent) {
+                    if (isDragAcceptable(dtde)) dtde.acceptDrag(DnDConstants.ACTION_COPY) else dtde.rejectDrag()
+                }
+                override fun dragOver(dtde: DropTargetDragEvent) {
+                    if (isDragAcceptable(dtde)) dtde.acceptDrag(DnDConstants.ACTION_COPY) else dtde.rejectDrag()
+                }
+                override fun dropActionChanged(dtde: DropTargetDragEvent) {
+                    if (isDragAcceptable(dtde)) dtde.acceptDrag(DnDConstants.ACTION_COPY) else dtde.rejectDrag()
+                }
+                override fun dragExit(dtde: DropTargetEvent) {}
+                override fun drop(dtde: DropTargetDropEvent) {
+                    if (!isDragAcceptable(dtde)) { dtde.rejectDrop(); return }
+                    dtde.acceptDrop(DnDConstants.ACTION_COPY)
+                    try {
+                        val transferable = dtde.transferable
+                        val dataFlavors = transferable.transferDataFlavors
+                        for (flavor in dataFlavors) {
+                            if (flavor.isFlavorJavaFileListType) {
+                                @Suppress("UNCHECKED_CAST")
+                                val fileList = transferable.getTransferData(flavor) as List<File>
+                                fileList.filter { it.isFile && it.canRead() }.forEach { openFile(it) }
+                                dtde.dropComplete(true)
+                                return
+                            }
+                        }
+                        dtde.dropComplete(false)
+                    } catch (e: Exception) {
+                        e.printStackTrace(); dtde.dropComplete(false)
+                    }
+                }
+            })
+        } catch (_: Exception) {
+            // 忽略个别组件不支持安装 DropTarget 的情况
+        }
     }
 
     private fun isDragAcceptable(event: DropTargetDragEvent): Boolean {
