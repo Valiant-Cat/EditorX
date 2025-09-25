@@ -7,6 +7,7 @@ import editorx.gui.ui.MainWindow
 import editorx.gui.widget.SvgIcon
 import editorx.plugin.PluginContext
 import editorx.settings.SettingsStore
+import editorx.util.IconUtils
 import editorx.workspace.WorkspaceManager
 import java.awt.*
 import java.io.File
@@ -61,7 +62,7 @@ class GuiPluginContext(
                     val resource = javaClass.getResource("/$iconPath")
                     if (resource != null) {
                         val originalIcon = ImageIcon(resource)
-                        resizeIcon(originalIcon, ICON_SIZE, ICON_SIZE)
+                        IconUtils.resizeIcon(originalIcon, ICON_SIZE, ICON_SIZE)
                     } else {
                         logger.warning("图标资源未找到: $iconPath"); createDefaultIcon()
                     }
@@ -70,43 +71,6 @@ class GuiPluginContext(
         } catch (e: Exception) {
             logger.warning("加载图标失败: $iconPath, 错误: ${e.message}")
             createDefaultIcon()
-        }
-    }
-
-    private fun resizeIcon(icon: Icon, width: Int, height: Int): Icon {
-        return object : Icon {
-            override fun getIconWidth(): Int = width
-            override fun getIconHeight(): Int = height
-
-            override fun paintIcon(c: Component?, g: Graphics, x: Int, y: Int) {
-                val g2 = g.create() as Graphics2D
-                try {
-                    val oldInterp = g2.getRenderingHint(RenderingHints.KEY_INTERPOLATION)
-                    val oldRender = g2.getRenderingHint(RenderingHints.KEY_RENDERING)
-                    val oldAA = g2.getRenderingHint(RenderingHints.KEY_ANTIALIASING)
-                    val oldTx = g2.transform
-
-                    g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
-                    g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
-                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-
-                    val originalWidth = icon.iconWidth
-                    val originalHeight = icon.iconHeight
-                    val scaleX = width.toDouble() / originalWidth
-                    val scaleY = height.toDouble() / originalHeight
-                    g2.scale(scaleX, scaleY)
-                    val scaledX = x / scaleX
-                    val scaledY = y / scaleY
-                    icon.paintIcon(c, g2, scaledX.toInt(), scaledY.toInt())
-
-                    g2.transform = oldTx
-                    g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, oldInterp)
-                    g2.setRenderingHint(RenderingHints.KEY_RENDERING, oldRender)
-                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, oldAA)
-                } finally {
-                    g2.dispose()
-                }
-            }
         }
     }
 
