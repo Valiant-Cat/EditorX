@@ -1,5 +1,6 @@
 package editorx.gui.ui.activitybar
 
+import editorx.gui.Constants
 import editorx.gui.theme.ThemeManager
 import editorx.gui.SideBarViewProvider
 import editorx.gui.ui.MainWindow
@@ -16,6 +17,7 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
     private val buttonMap = mutableMapOf<String, JButton>()
     private val viewProviderMap = mutableMapOf<String, SideBarViewProvider>()
     private var activeId: String? = null
+    private var autoSelected: Boolean = false
 
     private val backgroundColor = ThemeManager.activityBarBackground
     private val selectedColor = ThemeManager.activityBarItemSelected
@@ -41,12 +43,39 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
 
     fun addItem(id: String, tooltip: String, icon: Icon, viewProvider: SideBarViewProvider) {
         val btn = createActivityButton(icon, tooltip, id)
+        val wasEmpty = buttonMap.isEmpty()
         buttonGroup.add(btn)
         buttonMap[id] = btn
         viewProviderMap[id] = viewProvider
         add(btn)
         add(Box.createVerticalStrut(5))
         revalidate(); repaint()
+
+        // 默认选中逻辑（无持久化）：
+        // 1) 若注册的是配置中的默认插件，则默认选中它
+        // 2) 否则在第一个条目注册完成时，默认激活第一个
+        // 3) 若之前是自动选中的非默认，后续默认插件注册时，切换到默认插件
+        val isPreferred = id == Constants.ACTIVITY_BAR_DEFAULT_ID
+        when {
+            // 尚未有任何选中：优先选择首选，否则选择第一个
+            activeId == null && isPreferred -> {
+                handleButtonClick(id, userInitiated = false)
+                autoSelected = true
+                updateAllButtonStates()
+            }
+
+            activeId == null && wasEmpty -> {
+                handleButtonClick(id, userInitiated = false)
+                autoSelected = true
+                updateAllButtonStates()
+            }
+            // 若当前是自动选中的非首选，而新来的正好是首选，则切换到首选
+            isPreferred && autoSelected && activeId != id -> {
+                handleButtonClick(id, userInitiated = false)
+                autoSelected = true
+                updateAllButtonStates()
+            }
+        }
     }
 
     private fun createActivityButton(icon: Icon, tooltip: String, viewId: String): JButton {
@@ -87,26 +116,35 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
                 }
             })
             addActionListener {
-                handleButtonClick(viewId)
+                handleButtonClick(viewId, userInitiated = true)
                 updateAllButtonStates()
             }
         }
     }
 
-    private fun handleButtonClick(id: String) {
+    private fun handleButtonClick(id: String, userInitiated: Boolean = false) {
         val viewProvider = viewProviderMap[id] ?: return
         // VSCode 模式：ActivityBar 仅控制 SideBar
         val isCurrentlyDisplayed = sideBar?.getCurrentViewId() == id && sideBar?.isSideBarVisible() == true
         if (isCurrentlyDisplayed) {
             sideBar?.hideSideBar(); activeId = null
+            // 用户触发隐藏时，视为用户决定
+            if (userInitiated) autoSelected = false
         } else {
             sideBar?.showView(id, viewProvider.getView()); activeId = id
+            // 被用户触发的选中将覆盖自动选中状态
+            autoSelected = !userInitiated
         }
     }
 
     // 不再支持 ActivityBar 直接展示到底部 Panel
-    private fun showView(id: String, viewProvider: SideBarViewProvider) { sideBar?.showView(id, viewProvider.getView()) }
-    private fun hideView(id: String) { if (sideBar?.getCurrentViewId() == id) sideBar?.hideSideBar() }
+    private fun showView(id: String, viewProvider: SideBarViewProvider) {
+        sideBar?.showView(id, viewProvider.getView())
+    }
+
+    private fun hideView(id: String) {
+        if (sideBar?.getCurrentViewId() == id) sideBar?.hideSideBar()
+    }
 
     private fun updateAllButtonStates() {
         buttonMap.forEach { (id, btn) ->

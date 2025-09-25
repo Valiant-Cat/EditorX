@@ -4,6 +4,9 @@ package editorx.plugin
  * 插件接口
  */
 interface Plugin {
+    /** 获取插件信息 */
+    fun getInfo(): PluginInfo
+
     /** 插件被启用 */
     fun activate(context: PluginContext)
 

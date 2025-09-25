@@ -6,9 +6,15 @@ import java.net.URLClassLoader
 
 data class LoadedPlugin(
     val plugin: Plugin,
-    val id: String,
-    val name: String,
-    val version: String,
-    val jarFile: File? = null,
-    val loader: URLClassLoader? = null
-)
+    val classLoader: URLClassLoader? = null
+) {
+
+    /** 插件ID */
+    val id: String get() = plugin.getInfo().id
+
+    /** 插件名称 */
+    val name: String get() = plugin.getInfo().name
+
+    /** 插件版本 */
+    val version: String get() = plugin.getInfo().version
+}

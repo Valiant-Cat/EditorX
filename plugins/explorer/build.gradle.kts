@@ -17,9 +17,6 @@ afterEvaluate {
 
         manifest {
             attributes(
-                "Plugin-Id" to "explorer",
-                "Plugin-Name" to "Explorer",
-                "Plugin-Version" to archiveVersion,
                 "Main-Class" to "editorx.plugins.explorer.ExplorerPlugin"
             )
         }

@@ -3,6 +3,7 @@ package editorx.plugins.explorer
 import editorx.gui.CachedSideBarViewProvider
 import editorx.plugin.Plugin
 import editorx.plugin.PluginContext
+import editorx.plugin.PluginInfo
 import java.awt.BorderLayout
 import java.awt.Color
 import java.awt.Dimension
@@ -27,7 +28,13 @@ class ExplorerPlugin : Plugin {
     private var currentApkFile: File? = null
     private var context: PluginContext? = null
 
-    // 插件信息改由 JAR Manifest 提供（Plugin-Name、Plugin-Description 等）
+    override fun getInfo(): PluginInfo {
+        return PluginInfo(
+            id = "explorer",
+            name = "Explorer",
+            version = "0.1.0",
+        )
+    }
 
     override fun activate(context: PluginContext) {
         this.context = context

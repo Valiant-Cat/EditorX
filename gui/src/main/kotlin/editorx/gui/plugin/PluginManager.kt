@@ -106,9 +106,6 @@ class PluginManager(
 
             val loadedPlugin = LoadedPlugin(
                 plugin = plugin,
-                id = pluginClass.name,
-                name = "${pluginClass.simpleName}-dev",
-                version = "dev",
             )
 
             val context = contextFactory.createPluginContext(loadedPlugin)
@@ -136,16 +133,10 @@ class PluginManager(
             // 读取 Manifest 获取主类与元信息
             val manifest = JarFile(jarFile).use { it.manifest }
             val attrs = manifest?.mainAttributes
-            val idFromMf = attrs?.getValue("Plugin-Id")
-            val nameFromMf = attrs?.getValue("Plugin-Name")
-            val versionFromMf = attrs?.getValue("Plugin-Version")
             val mainClassName = attrs?.getValue("Main-Class")
 
             // 检查元信息是否缺失
             val missingAttributes = mutableListOf<String>()
-            if (idFromMf.isNullOrBlank()) missingAttributes.add("Plugin-Id")
-            if (nameFromMf.isNullOrBlank()) missingAttributes.add("Plugin-Name")
-            if (versionFromMf.isNullOrBlank()) missingAttributes.add("Plugin-Version")
             if (mainClassName.isNullOrBlank()) missingAttributes.add("Main-Class")
 
             if (missingAttributes.isNotEmpty()) {
@@ -165,11 +156,7 @@ class PluginManager(
 
             val loadedPlugin = LoadedPlugin(
                 plugin = plugin,
-                id = idFromMf!!,
-                name = nameFromMf!!,
-                version = versionFromMf!!,
-                jarFile = jarFile,
-                loader = loader
+                classLoader = loader
             )
 
             val context = contextFactory.createPluginContext(loadedPlugin)
@@ -190,7 +177,7 @@ class PluginManager(
         plugins[pluginName]?.let { pluginInfo ->
             try {
                 runCatching { plugins[pluginName]?.plugin?.deactivate() }
-                pluginInfo.loader?.close()
+                pluginInfo.classLoader?.close()
                 plugins.remove(pluginName)
                 pluginLoaders.remove(pluginName)
                 eventBus?.publish(PluginUnloaded(pluginInfo.id, pluginName))
