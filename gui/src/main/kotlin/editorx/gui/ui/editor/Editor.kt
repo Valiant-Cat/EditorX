@@ -8,11 +8,14 @@ import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea
 import org.fife.ui.rsyntaxtextarea.SyntaxConstants
 import org.fife.ui.rtextarea.RTextScrollPane
 import java.awt.Color
+import java.awt.CardLayout
+import javax.swing.SwingUtilities
 import java.awt.Dimension
 import java.awt.Font
 import java.awt.datatransfer.DataFlavor
 import java.awt.dnd.*
 import java.awt.event.MouseAdapter
+import java.awt.event.MouseMotionAdapter
 import java.awt.event.MouseEvent
 import java.io.File
 import java.nio.file.Files
@@ -113,6 +116,159 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         }
     }
 
+    // VSCode 风格的 Tab 头：固定槽位 + hover/选中显示 close 按钮
+    private fun createVSCodeTabHeader(file: File): JPanel = JPanel().apply {
+        layout = java.awt.BorderLayout(); isOpaque = true; background = Color.WHITE
+        val header = this
+        var hovering = false
+        val titleLabel = JLabel(file.name).apply {
+            border = BorderFactory.createEmptyBorder(0, 8, 0, 6)
+            horizontalAlignment = JLabel.LEFT
+        }
+        add(titleLabel, java.awt.BorderLayout.CENTER)
+
+        val closeSlot = object : JPanel(CardLayout()) {
+            var highlight = false
+            override fun paintComponent(g: java.awt.Graphics) {
+                if (highlight) {
+                    val g2 = g.create() as java.awt.Graphics2D
+                    try {
+                        g2.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON)
+                        // 极淡的白色半透明填充 + 细描边，避免出现深色块
+                        g2.color = java.awt.Color(255, 255, 255, 20)
+                        g2.fillRoundRect(0, 0, width, height, 6, 6)
+                        g2.color = ThemeManager.separator
+                        g2.stroke = java.awt.BasicStroke(1f)
+                        g2.drawRoundRect(1, 1, width - 2, height - 2, 6, 6)
+                    } finally { g2.dispose() }
+                }
+                super.paintComponent(g)
+            }
+        }.apply {
+            isOpaque = false
+            preferredSize = Dimension(18, 18)
+            minimumSize = Dimension(18, 18)
+            maximumSize = Dimension(18, 18)
+        }
+        val empty = JPanel().apply { isOpaque = false }
+        val closeBtn = JLabel("×").apply {
+            font = font.deriveFont(Font.PLAIN, 13f)
+            foreground = ThemeManager.editorTabCloseDefault
+            horizontalAlignment = JLabel.CENTER
+            verticalAlignment = JLabel.CENTER
+            addMouseListener(object : MouseAdapter() {
+                override fun mouseEntered(e: MouseEvent) {
+                    hovering = true
+                    closeSlot.highlight = true
+                    closeSlot.repaint()
+                    foreground = ThemeManager.editorTabCloseSelected
+                    cursor = java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)
+                }
+                override fun mouseExited(e: MouseEvent) {
+                    closeSlot.highlight = false
+                    closeSlot.repaint()
+                    hovering = false
+                    val idxLocal = tabbedPane.indexOfTabComponent(header)
+                    val selected = (idxLocal == tabbedPane.selectedIndex)
+                    foreground = if (selected) ThemeManager.editorTabCloseSelected else ThemeManager.editorTabCloseDefault
+                    cursor = java.awt.Cursor.getDefaultCursor()
+                    val inside = header.mousePosition != null
+                    if (idxLocal >= 0 && idxLocal != tabbedPane.selectedIndex && !inside && !hovering) {
+                        (closeSlot.layout as CardLayout).show(closeSlot, "empty")
+                    }
+                }
+                override fun mousePressed(e: MouseEvent) {
+                    val idx3 = tabbedPane.indexOfTabComponent(header)
+                    if (idx3 >= 0) { closeTab(idx3); e.consume() }
+                }
+            })
+        }
+        closeSlot.add(empty, "empty")
+        closeSlot.add(closeBtn, "btn")
+        (closeSlot.layout as CardLayout).show(closeSlot, "empty")
+        add(closeSlot, java.awt.BorderLayout.EAST)
+
+        // 点击整个槽位也可关闭（当按钮可见时）
+        closeSlot.addMouseListener(object : MouseAdapter() {
+            override fun mousePressed(e: MouseEvent) {
+                if (closeBtn.isShowing) {
+                    val idx = tabbedPane.indexOfTabComponent(header)
+                    if (idx >= 0) { closeTab(idx); e.consume() }
+                }
+            }
+            override fun mouseEntered(e: MouseEvent) { hovering = true; val idx = tabbedPane.indexOfTabComponent(header); if (idx >= 0 && idx != tabbedPane.selectedIndex) (closeSlot.layout as CardLayout).show(closeSlot, "btn"); closeSlot.highlight = true; closeSlot.repaint() }
+            override fun mouseExited(e: MouseEvent) {
+                hovering = false
+                closeSlot.highlight = false; closeSlot.repaint()
+                val idx = tabbedPane.indexOfTabComponent(header)
+                val inside = header.mousePosition != null
+                if (idx >= 0 && idx != tabbedPane.selectedIndex && !inside && !hovering) {
+                    (closeSlot.layout as CardLayout).show(closeSlot, "empty")
+                }
+            }
+        })
+
+        putClientProperty("titleLabel", titleLabel)
+        putClientProperty("closeSlot", closeSlot)
+        putClientProperty("closeLabel", closeBtn)
+
+        addMouseListener(object : MouseAdapter() {
+            override fun mouseEntered(e: MouseEvent) {
+                hovering = true
+                val idx = tabbedPane.indexOfTabComponent(header)
+                if (idx >= 0 && idx != tabbedPane.selectedIndex) (closeSlot.layout as CardLayout).show(closeSlot, "btn")
+            }
+            override fun mouseExited(e: MouseEvent) {
+                hovering = false
+                val idx = tabbedPane.indexOfTabComponent(header)
+                val inside = header.mousePosition != null
+                if (idx >= 0 && idx != tabbedPane.selectedIndex && !inside && !hovering) {
+                    (closeSlot.layout as CardLayout).show(closeSlot, "empty")
+                }
+            }
+            override fun mousePressed(e: MouseEvent) {
+                val idx = tabbedPane.indexOfTabComponent(header)
+                if (idx >= 0) tabbedPane.selectedIndex = idx
+            }
+        })
+
+        // 在整个 header 内移动时也持续显示关闭按钮
+        addMouseMotionListener(object : MouseMotionAdapter() {
+            override fun mouseMoved(e: MouseEvent) {
+                hovering = true
+                val idx = tabbedPane.indexOfTabComponent(header)
+                if (idx >= 0 && idx != tabbedPane.selectedIndex) (closeSlot.layout as CardLayout).show(closeSlot, "btn")
+            }
+        })
+
+        titleLabel.addMouseListener(object : MouseAdapter() {
+            override fun mousePressed(e: MouseEvent) {
+                val idx = tabbedPane.indexOfTabComponent(header)
+                if (idx >= 0) tabbedPane.selectedIndex = idx
+            }
+            override fun mouseEntered(e: MouseEvent) {
+                hovering = true
+                val idx = tabbedPane.indexOfTabComponent(header)
+                if (idx >= 0 && idx != tabbedPane.selectedIndex) (closeSlot.layout as CardLayout).show(closeSlot, "btn")
+            }
+            override fun mouseExited(e: MouseEvent) {
+                hovering = false
+                val idx = tabbedPane.indexOfTabComponent(header)
+                val inside = header.mousePosition != null
+                if (idx >= 0 && idx != tabbedPane.selectedIndex && !inside && !hovering) (closeSlot.layout as CardLayout).show(closeSlot, "empty")
+            }
+        })
+
+        titleLabel.addMouseMotionListener(object : MouseMotionAdapter() {
+            override fun mouseMoved(e: MouseEvent) {
+                hovering = true
+                val idx = tabbedPane.indexOfTabComponent(header)
+                if (idx >= 0 && idx != tabbedPane.selectedIndex) (closeSlot.layout as CardLayout).show(closeSlot, "btn")
+            }
+        })
+
+    }
+
     fun openFile(file: File) {
         if (fileToTab.containsKey(file)) { 
             tabbedPane.selectedIndex = fileToTab[file]!!
@@ -163,7 +319,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         fileToTab[file] = index
         tabToFile[index] = file
         tabTextAreas[index] = textArea
-        val closeButton = createTabHeader(file)
+        val closeButton = createVSCodeTabHeader(file)
         tabbedPane.setTabComponentAt(index, closeButton)
         tabbedPane.selectedIndex = index
         dirtyTabs.remove(index)
@@ -177,54 +333,77 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             horizontalAlignment = JLabel.LEFT
         }
         add(titleLabel, java.awt.BorderLayout.CENTER)
-        val closeLabel = JLabel("×").apply {
+
+        // 右侧固定槽位 (18x18)，内部用 CardLayout 切换“按钮 / 占位”
+        val closeSlot = JPanel(CardLayout()).apply {
+            isOpaque = false
+            preferredSize = Dimension(18, 18)
+            minimumSize = Dimension(18, 18)
+            maximumSize = Dimension(18, 18)
+        }
+        val filler = JPanel().apply { isOpaque = false }
+        val closeBtn = JLabel("×").apply {
             font = font.deriveFont(Font.PLAIN, 13f)
             foreground = ThemeManager.editorTabCloseDefault
-            preferredSize = Dimension(18, 18)
             horizontalAlignment = JLabel.CENTER
             verticalAlignment = JLabel.CENTER
-            isOpaque = false
-            isVisible = false // 默认未选中时不显示
             addMouseListener(object : MouseAdapter() {
                 override fun mouseEntered(e: MouseEvent) {
-                    isOpaque = true
-                    background = ThemeManager.editorTabCloseHoverBackground
+                    closeSlot.isOpaque = true
+                    closeSlot.background = ThemeManager.editorTabCloseHoverBackground
                     foreground = ThemeManager.editorTabCloseSelected
                     cursor = java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)
                 }
                 override fun mouseExited(e: MouseEvent) {
-                    isOpaque = false
-                    background = null
-                    // 根据是否选中决定颜色
+                    closeSlot.isOpaque = false
+                    closeSlot.background = null
                     val idx = tabbedPane.indexOfTabComponent(this@apply)
-                    foreground = if (idx == tabbedPane.selectedIndex) ThemeManager.editorTabCloseSelected else ThemeManager.editorTabCloseDefault
+                    val selected = (idx == tabbedPane.selectedIndex)
+                    foreground = if (selected) ThemeManager.editorTabCloseSelected else ThemeManager.editorTabCloseDefault
                     cursor = java.awt.Cursor.getDefaultCursor()
                 }
-                override fun mouseClicked(e: MouseEvent) {
+                override fun mousePressed(e: MouseEvent) {
                     val idx = tabbedPane.indexOfTabComponent(this@apply)
                     if (idx >= 0) closeTab(idx)
                 }
             })
         }
-        add(closeLabel, java.awt.BorderLayout.EAST)
+        closeSlot.layout = CardLayout()
+        closeSlot.add(filler, "empty")
+        closeSlot.add(closeBtn, "btn")
+        (closeSlot.layout as CardLayout).show(closeSlot, "empty")
+        add(closeSlot, java.awt.BorderLayout.EAST)
 
-        // 保存控件引用以便更新样式
+        // 保存引用
         putClientProperty("titleLabel", titleLabel)
-        putClientProperty("closeLabel", closeLabel)
+        putClientProperty("closeSlot", closeSlot)
+        putClientProperty("closeLabel", closeBtn)
 
-        // hover 时，仅未选中标签显示关闭按钮
+        // 标签头 hover：未选中时显示按钮/离开隐藏；点击选择
         addMouseListener(object : MouseAdapter() {
             override fun mouseEntered(e: MouseEvent) {
                 val idx = tabbedPane.indexOfTabComponent(this@apply)
                 if (idx >= 0 && idx != tabbedPane.selectedIndex) {
-                    closeLabel.isVisible = true
+                    (closeSlot.layout as CardLayout).show(closeSlot, "btn")
                 }
             }
             override fun mouseExited(e: MouseEvent) {
                 val idx = tabbedPane.indexOfTabComponent(this@apply)
                 if (idx >= 0 && idx != tabbedPane.selectedIndex) {
-                    closeLabel.isVisible = false
+                    (closeSlot.layout as CardLayout).show(closeSlot, "empty")
                 }
+            }
+            override fun mousePressed(e: MouseEvent) {
+                val idx = tabbedPane.indexOfTabComponent(this@apply)
+                if (idx >= 0) tabbedPane.selectedIndex = idx
+            }
+        })
+
+        // 标题点击也切换选中
+        titleLabel.addMouseListener(object : MouseAdapter() {
+            override fun mousePressed(e: MouseEvent) {
+                val idx = tabbedPane.indexOfTabComponent(this@apply)
+                if (idx >= 0) tabbedPane.selectedIndex = idx
             }
         })
     }
@@ -241,22 +420,34 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             label?.foreground = if (isSelected) ThemeManager.editorTabSelectedForeground else ThemeManager.editorTabForeground
             label?.font = (label?.font ?: Font("Dialog", Font.PLAIN, 12)).deriveFont(if (isSelected) Font.BOLD else Font.PLAIN)
 
-            // 关闭按钮可见性
+            // 关闭按钮显示策略（CardLayout 切换保持占位）
+            val slot = comp.getClientProperty("closeSlot") as? JPanel
             val close = comp.getClientProperty("closeLabel") as? JLabel
-            if (close != null) {
-                close.isVisible = isSelected // 选中显示，未选中默认隐藏
-                close.foreground = if (isSelected) ThemeManager.editorTabCloseSelected else ThemeManager.editorTabCloseDefault
-                close.isOpaque = false
-                close.background = null
+            if (slot != null && close != null) {
+                val cl = slot.layout as CardLayout
+                if (isSelected) {
+                    cl.show(slot, "btn")
+                    close.foreground = ThemeManager.editorTabCloseSelected
+                } else {
+                    cl.show(slot, "empty")
+                    close.foreground = ThemeManager.editorTabCloseDefault
+                }
+                slot.isOpaque = false
+                slot.background = null
             }
 
-            // 选中下划线指示
-            val border = if (isSelected) {
-                BorderFactory.createMatteBorder(0, 0, 2, 0, ThemeManager.editorTabSelectedUnderline)
-            } else {
-                BorderFactory.createEmptyBorder(0, 0, 2, 0)
+            // 若存在固定槽位，依据选中态切换卡片，确保占位
+            run {
+                val slot = comp.getClientProperty("closeSlot") as? JPanel
+                val cl = slot?.layout as? CardLayout
+                if (slot != null && cl != null) {
+                    if (isSelected) cl.show(slot, "btn") else cl.show(slot, "empty")
+                    slot.isOpaque = false; slot.background = null
+                }
             }
-            comp.border = border
+
+            // 不再使用下划线，保持背景一致（可留 2px 空白保持高度统一）
+            comp.border = BorderFactory.createEmptyBorder(0, 0, 2, 0)
         }
     }
 

@@ -87,5 +87,7 @@ object ThemeManager {
     val editorTabHoverBackground: Color get() = Color(0, 0, 0, 15)
     val editorTabCloseDefault: Color get() = Color(0x8A, 0x8A, 0x8A)
     val editorTabCloseSelected: Color get() = palette.onSurface
-    val editorTabCloseHoverBackground: Color get() = Color(0, 0, 0, 24)
+    // 更淡的半透明浅灰（偏白），用于关闭按钮悬停背景（≈8%）
+    val editorTabCloseHoverBackground: Color get() = Color(255, 255, 255, 20)
+    val editorTabCloseInvisible: Color get() = Color(0, 0, 0, 0)
 }

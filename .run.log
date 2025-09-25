@@ -36,13 +36,13 @@
 > Task :gui:classes UP-TO-DATE
 
 > Task :gui:run
-9月 25, 2025 4:08:30 下午 editorx.gui.EditorGuiKt initializeApplication
+9月 25, 2025 6:40:53 下午 editorx.gui.EditorGuiKt initializeApplication
 信息: EditorX 初始化完成
-9月 25, 2025 4:08:31 下午 editorx.plugin.PluginManager loadPlugins
+9月 25, 2025 6:40:54 下午 editorx.plugin.PluginManager loadPlugins
 信息: 开始加载插件...
-9月 25, 2025 4:08:31 下午 editorx.plugin.PluginManager scanAndLoadSourcePlugins
+9月 25, 2025 6:40:54 下午 editorx.plugin.PluginManager scanAndLoadSourcePlugins
 信息: 开始扫描源码插件...
-9月 25, 2025 4:08:31 下午 editorx.plugin.PluginManager scanAndLoadSourcePlugins
+9月 25, 2025 6:40:54 下午 editorx.plugin.PluginManager scanAndLoadSourcePlugins
 信息: 扫描包: editorx
 ClassScanner: 开始扫描包 editorx (路径: editorx)
 ClassScanner: 找到资源 1: file:/Volumes/Disk_APFS/Work/XiaMao/Tools/editorx/gui/build/classes/kotlin/main/editorx (协议: file)
@@ -105,19 +105,37 @@ ClassScanner: 检查类 editorx.gui.ui.activitybar.ActivityBar$createActivityBut
 ClassScanner: 检查类文件: editorx.gui.ui.activitybar.ActivityBar
 ClassScanner: 检查类 editorx.gui.ui.activitybar.ActivityBar - 可分配: false, 不是超类: true
 ClassScanner: 进入子目录: editor
-ClassScanner: 扫描目录 /Volumes/Disk_APFS/Work/XiaMao/Tools/editorx/gui/build/classes/kotlin/main/editorx/gui/ui/editor，包含 6 个文件/目录
+ClassScanner: 扫描目录 /Volumes/Disk_APFS/Work/XiaMao/Tools/editorx/gui/build/classes/kotlin/main/editorx/gui/ui/editor，包含 15 个文件/目录
 ClassScanner: 检查类文件: editorx.gui.ui.editor.Editor$openFile$textArea$1$2
 ClassScanner: 检查类 editorx.gui.ui.editor.Editor$openFile$textArea$1$2 - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.ui.editor.Editor$createVSCodeTabHeader$1$2
+ClassScanner: 检查类 editorx.gui.ui.editor.Editor$createVSCodeTabHeader$1$2 - 可分配: false, 不是超类: true
 ClassScanner: 检查类文件: editorx.gui.ui.editor.Editor$1$1
 ClassScanner: 检查类 editorx.gui.ui.editor.Editor$1$1 - 可分配: false, 不是超类: true
-ClassScanner: 检查类文件: editorx.gui.ui.editor.Editor$createCloseButton$1$closeLabel$1$1
-ClassScanner: 检查类 editorx.gui.ui.editor.Editor$createCloseButton$1$closeLabel$1$1 - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.ui.editor.Editor$createVSCodeTabHeader$1$4
+ClassScanner: 检查类 editorx.gui.ui.editor.Editor$createVSCodeTabHeader$1$4 - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.ui.editor.Editor$createVSCodeTabHeader$1$1
+ClassScanner: 检查类 editorx.gui.ui.editor.Editor$createVSCodeTabHeader$1$1 - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.ui.editor.Editor$createVSCodeTabHeader$1$closeBtn$1$1
+ClassScanner: 检查类 editorx.gui.ui.editor.Editor$createVSCodeTabHeader$1$closeBtn$1$1 - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.ui.editor.Editor$createVSCodeTabHeader$1$3
+ClassScanner: 检查类 editorx.gui.ui.editor.Editor$createVSCodeTabHeader$1$3 - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.ui.editor.Editor$createVSCodeTabHeader$1$closeSlot$1
+ClassScanner: 检查类 editorx.gui.ui.editor.Editor$createVSCodeTabHeader$1$closeSlot$1 - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.ui.editor.Editor$createVSCodeTabHeader$1$5
+ClassScanner: 检查类 editorx.gui.ui.editor.Editor$createVSCodeTabHeader$1$5 - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.ui.editor.Editor$createTabHeader$1$1
+ClassScanner: 检查类 editorx.gui.ui.editor.Editor$createTabHeader$1$1 - 可分配: false, 不是超类: true
 ClassScanner: 检查类文件: editorx.gui.ui.editor.Editor$enableDropTarget$1
 ClassScanner: 检查类 editorx.gui.ui.editor.Editor$enableDropTarget$1 - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.ui.editor.Editor$createTabHeader$1$closeBtn$1$1
+ClassScanner: 检查类 editorx.gui.ui.editor.Editor$createTabHeader$1$closeBtn$1$1 - 可分配: false, 不是超类: true
 ClassScanner: 检查类文件: editorx.gui.ui.editor.Editor
 ClassScanner: 检查类 editorx.gui.ui.editor.Editor - 可分配: false, 不是超类: true
 ClassScanner: 检查类文件: editorx.gui.ui.editor.Editor$3
 ClassScanner: 检查类 editorx.gui.ui.editor.Editor$3 - 可分配: false, 不是超类: true
+ClassScanner: 检查类文件: editorx.gui.ui.editor.Editor$createTabHeader$1$2
+ClassScanner: 检查类 editorx.gui.ui.editor.Editor$createTabHeader$1$2 - 可分配: false, 不是超类: true
 ClassScanner: 检查类文件: editorx.gui.EditorGuiKt
 ClassScanner: 检查类 editorx.gui.EditorGuiKt - 可分配: false, 不是超类: true
 ClassScanner: 进入子目录: widget
@@ -201,23 +219,22 @@ ClassScanner: 检查类 editorx.event.EventBus - 可分配: false, 不是超类:
 ClassScanner: 检查类 editorx.event.SimpleEventBus$subscribe$1 - 可分配: false, 不是超类: true
 ClassScanner: 检查类 editorx.event.ActiveFileChanged - 可分配: false, 不是超类: true
 ClassScanner: 包 editorx 扫描完成，找到 2 个插件类
-9月 25, 2025 4:08:31 下午 editorx.plugin.PluginManager scanAndLoadSourcePlugins
+9月 25, 2025 6:40:54 下午 editorx.plugin.PluginManager scanAndLoadSourcePlugins
 信息: 在包 editorx 中找到 2 个插件类
-9月 25, 2025 4:08:31 下午 editorx.plugin.PluginManager scanAndLoadSourcePlugins
-信息: 发现插件类: editorx.plugins.testplugin.TestPlugin
-9月 25, 2025 4:08:31 下午 editorx.plugin.PluginManager scanAndLoadSourcePlugins
+9月 25, 2025 6:40:54 下午 editorx.plugin.PluginManager scanAndLoadSourcePlugins
 信息: 发现插件类: editorx.plugins.explorer.ExplorerPlugin
-9月 25, 2025 4:08:31 下午 editorx.plugin.PluginManager scanAndLoadSourcePlugins
+9月 25, 2025 6:40:54 下午 editorx.plugin.PluginManager scanAndLoadSourcePlugins
 信息: 发现插件类: editorx.plugins.testplugin.TestPlugin
-9月 25, 2025 4:08:31 下午 editorx.plugin.PluginManager loadSourcePluginClass
-信息: 源码插件加载成功: TestPlugin-dev vdev (类: editorx.plugins.testplugin.TestPlugin)
-9月 25, 2025 4:08:31 下午 editorx.plugin.PluginManager scanAndLoadSourcePlugins
+9月 25, 2025 6:40:54 下午 editorx.plugin.PluginManager scanAndLoadSourcePlugins
 信息: 发现插件类: editorx.plugins.explorer.ExplorerPlugin
 Explorer插件已启动
-9月 25, 2025 4:08:31 下午 editorx.plugin.PluginManager loadSourcePluginClass
+9月 25, 2025 6:40:54 下午 editorx.plugin.PluginManager loadSourcePluginClass
 信息: 源码插件加载成功: ExplorerPlugin-dev vdev (类: editorx.plugins.explorer.ExplorerPlugin)
-9月 25, 2025 4:08:31 下午 editorx.plugin.PluginManager scanAndLoadSourcePlugins
+9月 25, 2025 6:40:54 下午 editorx.plugin.PluginManager scanAndLoadSourcePlugins
+信息: 发现插件类: editorx.plugins.testplugin.TestPlugin
+9月 25, 2025 6:40:54 下午 editorx.plugin.PluginManager loadSourcePluginClass
+信息: 源码插件加载成功: TestPlugin-dev vdev (类: editorx.plugins.testplugin.TestPlugin)
+9月 25, 2025 6:40:54 下午 editorx.plugin.PluginManager scanAndLoadSourcePlugins
 信息: 源码插件扫描完成，共发现 2 个插件类
-9月 25, 2025 4:08:31 下午 editorx.plugin.PluginManager loadPlugins
+9月 25, 2025 6:40:54 下午 editorx.plugin.PluginManager loadPlugins
 信息: 插件加载完成，共加载 2 个插件
-2025-09-25 16:09:14.500 java[47205:385908] TSM AdjustCapsLockLEDForKeyTransitionHandling - _ISSetPhysicalKeyboardCapsLockLED Inhibit
