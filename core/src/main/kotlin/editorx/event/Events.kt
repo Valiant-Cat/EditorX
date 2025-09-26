@@ -21,3 +21,15 @@ data class FileOpened(val path: String) : EditorXEvent
 data class FileSaved(val path: String) : EditorXEvent
 data class ActiveFileChanged(val path: String?) : EditorXEvent
 
+// Syntax plugin events
+data class SyntaxPluginLoaded(
+    val id: String,
+    val name: String,
+    val version: String
+) : EditorXEvent
+
+data class SyntaxPluginUnloaded(
+    val id: String,
+    val name: String
+) : EditorXEvent
+

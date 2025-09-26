@@ -7,6 +7,8 @@ import editorx.gui.main.MainWindow
 import editorx.plugin.LoadedPlugin
 import editorx.plugin.PluginContext
 import editorx.settings.SettingsStore
+import editorx.syntax.SyntaxHighlighterManager
+import editorx.syntax.SyntaxHighlighterProvider
 import editorx.workspace.WorkspaceManager
 import java.io.File
 import java.util.logging.Logger
@@ -39,4 +41,8 @@ class GuiPluginContext(
     override fun eventBus(): EventBus = mainWindow.services.eventBus
     override fun settings(): SettingsStore = mainWindow.services.settings
     override fun workspace(): WorkspaceManager = mainWindow.services.workspace
+
+    override fun registerSyntaxHighlighter(provider: SyntaxHighlighterProvider) {
+        SyntaxHighlighterManager.registerHighlighterProvider(provider)
+    }
 }

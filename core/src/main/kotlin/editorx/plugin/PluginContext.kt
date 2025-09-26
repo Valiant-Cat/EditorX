@@ -4,6 +4,7 @@ import editorx.command.CommandRegistry
 import editorx.event.EventBus
 import editorx.gui.ViewProvider
 import editorx.settings.SettingsStore
+import editorx.syntax.SyntaxHighlighterProvider
 import editorx.workspace.WorkspaceManager
 import java.io.File
 
@@ -43,4 +44,9 @@ interface PluginContext {
      * 获取工作区管理器
      */
     fun workspace(): WorkspaceManager
+
+    /**
+     * 注册语法高亮提供者
+     */
+    fun registerSyntaxHighlighter(provider: SyntaxHighlighterProvider)
 }

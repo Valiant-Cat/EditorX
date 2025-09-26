@@ -24,7 +24,7 @@
             <option value="$PROJECT_DIR$/core" />
             <option value="$PROJECT_DIR$/gui" />
             <option value="$PROJECT_DIR$/plugins" />
-            <option value="$PROJECT_DIR$/plugins/testplugin" />
+            <option value="$PROJECT_DIR$/plugins/smali" />
           </set>
         </option>
       </GradleProjectSettings>

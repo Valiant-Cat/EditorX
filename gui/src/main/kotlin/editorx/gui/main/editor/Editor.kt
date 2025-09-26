@@ -19,12 +19,13 @@ import java.io.File
 import java.nio.file.Files
 import javax.swing.*
 import editorx.gui.ui.theme.ThemeManager
+import editorx.syntax.SyntaxHighlighterManager
 
 class Editor(private val mainWindow: MainWindow) : JPanel() {
     private val fileToTab = mutableMapOf<File, Int>()
     private val tabToFile = mutableMapOf<Int, File>()
     private val tabbedPane = JTabbedPane()
-    private val tabTextAreas = mutableMapOf<Int, RSyntaxTextArea>()
+    private val tabTextAreas = mutableMapOf<Int, CustomSyntaxTextArea>()
     private val dirtyTabs = mutableSetOf<Int>()
 
     init {
@@ -44,15 +45,15 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                 override fun getTabRunCount(tabPane: javax.swing.JTabbedPane): Int {
                     return 1 // 强制单行显示
                 }
-                
+
                 override fun getTabRunOverlay(placement: Int): Int {
                     return 0 // 无重叠
                 }
-                
+
                 override fun getTabInsets(placement: Int, tabIndex: Int): java.awt.Insets {
                     return java.awt.Insets(3, 6, 3, 6) // 调整标签页内边距
                 }
-                
+
                 override fun getTabAreaInsets(placement: Int): java.awt.Insets {
                     return java.awt.Insets(0, 0, 0, 0) // 移除标签区域边距
                 }
@@ -73,44 +74,44 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             mainWindow.services.eventBus.publish(ActiveFileChanged(file?.absolutePath))
             updateTabHeaderStyles()
         }
-        
+
         // 设置拖放支持 - 确保整个Editor区域都支持拖放
         enableDropTarget()
         // 同时在 tabbedPane 表面也安装 DropTarget，避免已有文件时事件落到子组件而丢失
         installFileDropTarget(tabbedPane)
-        
+
         // 设置TransferHandler来处理拖放
         transferHandler = object : javax.swing.TransferHandler() {
             override fun canImport(support: javax.swing.TransferHandler.TransferSupport): Boolean {
                 return support.isDataFlavorSupported(java.awt.datatransfer.DataFlavor.javaFileListFlavor)
             }
-            
+
             override fun importData(support: javax.swing.TransferHandler.TransferSupport): Boolean {
                 if (!canImport(support)) {
                     return false
                 }
-                
+
                 try {
                     val transferable = support.transferable
                     val dataFlavor = java.awt.datatransfer.DataFlavor.javaFileListFlavor
-                    
+
                     if (transferable.isDataFlavorSupported(dataFlavor)) {
                         @Suppress("UNCHECKED_CAST")
                         val fileList = transferable.getTransferData(dataFlavor) as List<File>
-                        
+
                         // 打开所有拖入的文件
                         for (file in fileList) {
                             if (file.isFile && file.canRead()) {
                                 openFile(file)
                             }
                         }
-                        
+
                         return true
                     }
                 } catch (e: Exception) {
                     e.printStackTrace()
                 }
-                
+
                 return false
             }
         }
@@ -133,14 +134,19 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                 if (highlight) {
                     val g2 = g.create() as java.awt.Graphics2D
                     try {
-                        g2.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON)
+                        g2.setRenderingHint(
+                            java.awt.RenderingHints.KEY_ANTIALIASING,
+                            java.awt.RenderingHints.VALUE_ANTIALIAS_ON
+                        )
                         // 极淡的白色半透明填充 + 细描边，避免出现深色块
                         g2.color = java.awt.Color(255, 255, 255, 20)
                         g2.fillRoundRect(0, 0, width, height, 6, 6)
                         g2.color = ThemeManager.separator
                         g2.stroke = java.awt.BasicStroke(1f)
                         g2.drawRoundRect(1, 1, width - 2, height - 2, 6, 6)
-                    } finally { g2.dispose() }
+                    } finally {
+                        g2.dispose()
+                    }
                 }
                 super.paintComponent(g)
             }
@@ -164,22 +170,27 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                     foreground = ThemeManager.editorTabCloseSelected
                     cursor = java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)
                 }
+
                 override fun mouseExited(e: MouseEvent) {
                     closeSlot.highlight = false
                     closeSlot.repaint()
                     hovering = false
                     val idxLocal = tabbedPane.indexOfTabComponent(header)
                     val selected = (idxLocal == tabbedPane.selectedIndex)
-                    foreground = if (selected) ThemeManager.editorTabCloseSelected else ThemeManager.editorTabCloseDefault
+                    foreground =
+                        if (selected) ThemeManager.editorTabCloseSelected else ThemeManager.editorTabCloseDefault
                     cursor = java.awt.Cursor.getDefaultCursor()
                     val inside = header.mousePosition != null
                     if (idxLocal >= 0 && idxLocal != tabbedPane.selectedIndex && !inside && !hovering) {
                         (closeSlot.layout as CardLayout).show(closeSlot, "empty")
                     }
                 }
+
                 override fun mousePressed(e: MouseEvent) {
                     val idx3 = tabbedPane.indexOfTabComponent(header)
-                    if (idx3 >= 0) { closeTab(idx3); e.consume() }
+                    if (idx3 >= 0) {
+                        closeTab(idx3); e.consume()
+                    }
                 }
             })
         }
@@ -193,10 +204,21 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             override fun mousePressed(e: MouseEvent) {
                 if (closeBtn.isShowing) {
                     val idx = tabbedPane.indexOfTabComponent(header)
-                    if (idx >= 0) { closeTab(idx); e.consume() }
+                    if (idx >= 0) {
+                        closeTab(idx); e.consume()
+                    }
                 }
             }
-            override fun mouseEntered(e: MouseEvent) { hovering = true; val idx = tabbedPane.indexOfTabComponent(header); if (idx >= 0 && idx != tabbedPane.selectedIndex) (closeSlot.layout as CardLayout).show(closeSlot, "btn"); closeSlot.highlight = true; closeSlot.repaint() }
+
+            override fun mouseEntered(e: MouseEvent) {
+                hovering = true;
+                val idx =
+                    tabbedPane.indexOfTabComponent(header); if (idx >= 0 && idx != tabbedPane.selectedIndex) (closeSlot.layout as CardLayout).show(
+                    closeSlot,
+                    "btn"
+                ); closeSlot.highlight = true; closeSlot.repaint()
+            }
+
             override fun mouseExited(e: MouseEvent) {
                 hovering = false
                 closeSlot.highlight = false; closeSlot.repaint()
@@ -218,6 +240,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                 val idx = tabbedPane.indexOfTabComponent(header)
                 if (idx >= 0 && idx != tabbedPane.selectedIndex) (closeSlot.layout as CardLayout).show(closeSlot, "btn")
             }
+
             override fun mouseExited(e: MouseEvent) {
                 hovering = false
                 val idx = tabbedPane.indexOfTabComponent(header)
@@ -226,6 +249,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                     (closeSlot.layout as CardLayout).show(closeSlot, "empty")
                 }
             }
+
             override fun mousePressed(e: MouseEvent) {
                 val idx = tabbedPane.indexOfTabComponent(header)
                 if (idx >= 0) tabbedPane.selectedIndex = idx
@@ -246,16 +270,21 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                 val idx = tabbedPane.indexOfTabComponent(header)
                 if (idx >= 0) tabbedPane.selectedIndex = idx
             }
+
             override fun mouseEntered(e: MouseEvent) {
                 hovering = true
                 val idx = tabbedPane.indexOfTabComponent(header)
                 if (idx >= 0 && idx != tabbedPane.selectedIndex) (closeSlot.layout as CardLayout).show(closeSlot, "btn")
             }
+
             override fun mouseExited(e: MouseEvent) {
                 hovering = false
                 val idx = tabbedPane.indexOfTabComponent(header)
                 val inside = header.mousePosition != null
-                if (idx >= 0 && idx != tabbedPane.selectedIndex && !inside && !hovering) (closeSlot.layout as CardLayout).show(closeSlot, "empty")
+                if (idx >= 0 && idx != tabbedPane.selectedIndex && !inside && !hovering) (closeSlot.layout as CardLayout).show(
+                    closeSlot,
+                    "empty"
+                )
             }
         })
 
@@ -270,16 +299,19 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
     }
 
     fun openFile(file: File) {
-        if (fileToTab.containsKey(file)) { 
+        if (fileToTab.containsKey(file)) {
             tabbedPane.selectedIndex = fileToTab[file]!!
-            return 
+            return
         }
-        val textArea = RSyntaxTextArea().apply {
-            syntaxEditingStyle = detectSyntax(file)
+        val textArea = CustomSyntaxTextArea().apply {
             font = Font("Consolas", Font.PLAIN, 14)
             addCaretListener {
                 val caretPos = caretPosition
-                val line = try { getLineOfOffset(caretPos) + 1 } catch (_: Exception) { 1 }
+                val line = try {
+                    getLineOfOffset(caretPos) + 1
+                } catch (_: Exception) {
+                    1
+                }
                 val col = caretPos - getLineStartOffsetOfCurrentLine(this) + 1
                 mainWindow.statusBar.setLineColumn(line, col)
             }
@@ -304,6 +336,11 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             mainWindow.statusBar.setFileInfo(file.name, Files.size(file.toPath()).toString() + " B")
             mainWindow.services.workspace.addRecentFile(file)
             mainWindow.services.eventBus.publish(FileOpened(file.absolutePath))
+            
+            // 在文本加载完成后应用语法高亮
+            javax.swing.SwingUtilities.invokeLater {
+                textArea.setFile(file)
+            }
         } catch (e: Exception) {
             textArea.text = "无法读取文件: ${e.message}"
             textArea.isEditable = false
@@ -357,14 +394,17 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                     foreground = ThemeManager.editorTabCloseSelected
                     cursor = java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)
                 }
+
                 override fun mouseExited(e: MouseEvent) {
                     closeSlot.isOpaque = false
                     closeSlot.background = null
                     val idx = tabbedPane.indexOfTabComponent(this@apply)
                     val selected = (idx == tabbedPane.selectedIndex)
-                    foreground = if (selected) ThemeManager.editorTabCloseSelected else ThemeManager.editorTabCloseDefault
+                    foreground =
+                        if (selected) ThemeManager.editorTabCloseSelected else ThemeManager.editorTabCloseDefault
                     cursor = java.awt.Cursor.getDefaultCursor()
                 }
+
                 override fun mousePressed(e: MouseEvent) {
                     val idx = tabbedPane.indexOfTabComponent(this@apply)
                     if (idx >= 0) closeTab(idx)
@@ -390,12 +430,14 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                     (closeSlot.layout as CardLayout).show(closeSlot, "btn")
                 }
             }
+
             override fun mouseExited(e: MouseEvent) {
                 val idx = tabbedPane.indexOfTabComponent(this@apply)
                 if (idx >= 0 && idx != tabbedPane.selectedIndex) {
                     (closeSlot.layout as CardLayout).show(closeSlot, "empty")
                 }
             }
+
             override fun mousePressed(e: MouseEvent) {
                 val idx = tabbedPane.indexOfTabComponent(this@apply)
                 if (idx >= 0) tabbedPane.selectedIndex = idx
@@ -420,8 +462,10 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
 
             // 文本颜色区分选中与未选中
             val label = comp.getClientProperty("titleLabel") as? JLabel
-            label?.foreground = if (isSelected) ThemeManager.editorTabSelectedForeground else ThemeManager.editorTabForeground
-            label?.font = (label?.font ?: Font("Dialog", Font.PLAIN, 12)).deriveFont(if (isSelected) Font.BOLD else Font.PLAIN)
+            label?.foreground =
+                if (isSelected) ThemeManager.editorTabSelectedForeground else ThemeManager.editorTabForeground
+            label?.font =
+                (label?.font ?: Font("Dialog", Font.PLAIN, 12)).deriveFont(if (isSelected) Font.BOLD else Font.PLAIN)
 
             // 关闭按钮显示策略（CardLayout 切换保持占位）
             val slot = comp.getClientProperty("closeSlot") as? JPanel
@@ -464,10 +508,12 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             dirtyTabs.remove(index)
             val newTabToFile = mutableMapOf<Int, File>()
             val newFileToTab = mutableMapOf<File, Int>()
-            val newTabTextAreas = mutableMapOf<Int, RSyntaxTextArea>()
+            val newTabTextAreas = mutableMapOf<Int, CustomSyntaxTextArea>()
             for (i in 0 until tabbedPane.tabCount) {
                 val f = tabToFile[i]
-                if (f != null) { newTabToFile[i] = f; newFileToTab[f] = i }
+                if (f != null) {
+                    newTabToFile[i] = f; newFileToTab[f] = i
+                }
                 tabTextAreas[i]?.let { newTabTextAreas[i] = it }
             }
             tabToFile.clear(); tabToFile.putAll(newTabToFile)
@@ -475,20 +521,9 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             tabTextAreas.clear(); tabTextAreas.putAll(newTabTextAreas)
         }
     }
-
-    private fun detectSyntax(file: File): String = when {
-        file.name.endsWith(".smali") -> "text/smali"
-        file.name.endsWith(".xml") -> SyntaxConstants.SYNTAX_STYLE_XML
-        file.name.endsWith(".java") -> SyntaxConstants.SYNTAX_STYLE_JAVA
-        file.name.endsWith(".kt") -> SyntaxConstants.SYNTAX_STYLE_KOTLIN
-        file.name.endsWith(".js") -> SyntaxConstants.SYNTAX_STYLE_JAVASCRIPT
-        file.name.endsWith(".css") -> SyntaxConstants.SYNTAX_STYLE_CSS
-        file.name.endsWith(".html") -> SyntaxConstants.SYNTAX_STYLE_HTML
-        file.name.endsWith(".json") -> SyntaxConstants.SYNTAX_STYLE_JSON
-        else -> SyntaxConstants.SYNTAX_STYLE_NONE
-    }
-
+    
     fun getCurrentFile(): File? = if (tabbedPane.selectedIndex >= 0) tabToFile[tabbedPane.selectedIndex] else null
+
     fun hasUnsavedChanges(): Boolean = dirtyTabs.isNotEmpty()
 
     fun saveCurrent() {
@@ -540,7 +575,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         }
     }
 
-    private fun getLineStartOffsetOfCurrentLine(area: RSyntaxTextArea): Int {
+    private fun getLineStartOffsetOfCurrentLine(area: CustomSyntaxTextArea): Int {
         val caretPos = area.caretPosition
         val line = area.getLineOfOffset(caretPos)
         return area.getLineStartOffset(line)
@@ -621,15 +656,20 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                 override fun dragEnter(dtde: DropTargetDragEvent) {
                     if (isDragAcceptable(dtde)) dtde.acceptDrag(DnDConstants.ACTION_COPY) else dtde.rejectDrag()
                 }
+
                 override fun dragOver(dtde: DropTargetDragEvent) {
                     if (isDragAcceptable(dtde)) dtde.acceptDrag(DnDConstants.ACTION_COPY) else dtde.rejectDrag()
                 }
+
                 override fun dropActionChanged(dtde: DropTargetDragEvent) {
                     if (isDragAcceptable(dtde)) dtde.acceptDrag(DnDConstants.ACTION_COPY) else dtde.rejectDrag()
                 }
+
                 override fun dragExit(dtde: DropTargetEvent) {}
                 override fun drop(dtde: DropTargetDropEvent) {
-                    if (!isDragAcceptable(dtde)) { dtde.rejectDrop(); return }
+                    if (!isDragAcceptable(dtde)) {
+                        dtde.rejectDrop(); return
+                    }
                     dtde.acceptDrop(DnDConstants.ACTION_COPY)
                     try {
                         val transferable = dtde.transferable
