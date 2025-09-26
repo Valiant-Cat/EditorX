@@ -1,15 +1,15 @@
 # EditorX
 
-EditorX 是一个基于 Kotlin/JVM 的可扩展桌面编辑器，采用模块化与插件化架构，内置命令面板、活动栏、侧边栏以及插件系统（源码插件与 JAR 插件）。
+EditorX 是一个基于 Kotlin/JVM 的可扩展桌面编辑器，采用模块化与插件化架构，内置命令面板、活动栏、侧边栏以及插件系统（源码插件与 JAR 插件）。插件体系参考了 PF4J 的思想，并结合本项目的 UI/交互做了精简实现。
 
 ## 构建与运行
 
 - 启动 GUI：`./gradlew :gui:run`
 - 构建所有模块：`./gradlew build`
 
-运行后会自动扫描并加载：
-- 源码插件：类路径下包前缀 `editorx` 实现 `editorx.plugin.Plugin` 的类
-- JAR 插件：放入运行目录 `plugins/`，自动扫描实现 `Plugin` 接口的类
+运行后会自动发现并加载：
+- 源码插件（同进程类路径）：使用 `ServiceLoader<editorx.plugin.Plugin>` 发现，并按包前缀 `editorx.` 过滤。
+- JAR 插件（隔离类加载）：读取运行目录 `plugins/` 下的 JAR，优先使用 Manifest 的 `Main-Class` 作为插件主类；若缺失则回退扫描 JAR 内实现了 `Plugin` 的具体类。
 
 ## 主要特性
 
@@ -27,10 +27,10 @@ EditorX 是一个基于 Kotlin/JVM 的可扩展桌面编辑器，采用模块化
 - **TitleBar**：顶部菜单栏
 
 ### 插件系统
-- **自动类发现**：JAR插件自动扫描实现`Plugin`接口的类
-- **统一接口**：所有插件通过`getInfo()`方法提供元信息
-- **生命周期管理**：插件的激活、禁用和卸载
-- **资源隔离**：每个插件有独立的类加载器和资源路径
+- **ID 唯一**：以 `PluginInfo.id` 作为唯一标识进行索引与卸载。
+- **发现与加载**：源码通过 `ServiceLoader`；JAR 在 `plugins/` 目录，Manifest-first，类扫描兜底。
+- **生命周期与事件**：基础状态参考 PF4J（`CREATED/LOADED/STARTED/STOPPED/FAILED`）；通过事件总线发布 `PluginLoaded/PluginUnloaded`。
+- **资源隔离**：JAR 插件使用独立 `URLClassLoader`；源码插件复用应用类加载器。
 
 ### 编辑器功能
 - **多标签页**：支持多个文件同时编辑
@@ -63,7 +63,8 @@ EditorX
 
 ## 插件开发
 
-### 源码插件
+### 源码插件（ServiceLoader）
+1) 编写插件类并实现 `editorx.plugin.Plugin`
 ```kotlin
 class MyPlugin : Plugin {
     override fun getInfo(): PluginInfo {
@@ -83,12 +84,32 @@ class MyPlugin : Plugin {
     }
 }
 ```
+2) 在插件模块的资源目录添加服务声明文件：`META-INF/services/editorx.plugin.Plugin`
+   内容为实现类的完全限定名，例如：
+```
+editorx.plugins.myplugin.MyPlugin
+```
+3) 包名需以 `editorx.` 开头方会被加载器接受（用于限制加载范围）。
 
-### JAR插件
-1. 实现`Plugin`接口
-2. 打包为JAR文件
-3. 放入`plugins/`目录
-4. 系统自动扫描并加载
+### JAR 插件（Manifest-first）
+1) 实现 `Plugin` 接口并提供无参构造函数。
+2) JAR 的 Manifest 建议设置 `Main-Class` 指向该实现类（如缺失将回退扫描，建议显式设置）：
+```
+Main-Class: editorx.plugins.explorer.ExplorerPlugin
+```
+3) 将 JAR 放入应用运行目录的 `plugins/` 文件夹。
+4) 插件的名称、版本等元信息来自 `Plugin.getInfo()`，Manifest 中可保留其他元数据供将来扩展。
+
+### UI 扩展（ActivityBar → SideBar）
+在 `activate()` 中通过 `PluginContext.addActivityBarItem` 注册入口，提供一个 `ViewProvider` 或 `CachedViewProvider`：
+```kotlin
+context.addActivityBarItem(
+    iconPath = "icons/my.svg",
+    viewProvider = object : CachedViewProvider() {
+        override fun createView(): JComponent = JPanel()
+    }
+)
+```
 
 ## 技术栈
 
@@ -101,6 +122,9 @@ class MyPlugin : Plugin {
 ## 开发规范
 
 更多协作规范见 `AGENTS.md`。
+
+## 注意事项
+- 主类设置：`gui/build.gradle.kts` 中应用入口配置为 `editorx.gui.EditorGuiKt`。若运行失败，请确认包含 `main()` 的 Kotlin 文件名与入口类名一致（Kotlin 顶级函数生成的类名通常为 `文件名Kt`）。
 
 ## 许可证
 
