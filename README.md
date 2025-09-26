@@ -1,6 +1,6 @@
 # EditorX
 
-EditorX 是一个基于 Kotlin/JVM 的可扩展桌面编辑器，采用模块化与插件化架构，内置命令面板、活动栏、侧边栏以及插件系统（源码插件与 JAR 插件）。插件体系参考了 PF4J 的思想，并结合本项目的 UI/交互做了精简实现。
+EditorX 是一个基于 Kotlin/JVM 的可扩展桌面编辑器，采用模块化与插件化架构，内置活动栏、侧边栏以及插件系统（源码插件与 JAR 插件）。插件体系参考了 PF4J 的思想，并结合本项目的 UI/交互做了精简实现。
 
 ## 构建与运行
 
@@ -16,8 +16,7 @@ EditorX 是一个基于 Kotlin/JVM 的可扩展桌面编辑器，采用模块化
 ### 核心架构
 - **模块化设计**：`core`、`gui`、`plugins` 模块分离
 - **插件系统**：支持源码插件和JAR插件，自动类发现
-- **事件驱动**：基于事件总线的松耦合架构
-- **命令系统**：统一的命令注册和执行机制
+- **事件总线（可选）**：core 提供事件总线实现，但默认 GUI 未注入使用
 
 ### 用户界面
 - **ActivityBar**：左侧活动栏，包含Explorer等工具
@@ -29,7 +28,7 @@ EditorX 是一个基于 Kotlin/JVM 的可扩展桌面编辑器，采用模块化
 ### 插件系统
 - **ID 唯一**：以 `PluginInfo.id` 作为唯一标识进行索引与卸载。
 - **发现与加载**：源码通过 `ServiceLoader`；JAR 在 `plugins/` 目录，Manifest-first，类扫描兜底。
-- **生命周期与事件**：基础状态参考 PF4J（`CREATED/LOADED/STARTED/STOPPED/FAILED`）；通过事件总线发布 `PluginLoaded/PluginUnloaded`。
+- **生命周期与事件**：基础状态参考 PF4J（`CREATED/LOADED/STARTED/STOPPED/FAILED`）。如需要事件通知，可在创建 `PluginManager` 时注入事件总线以发布 `PluginLoaded/PluginUnloaded`。
 - **资源隔离**：JAR 插件使用独立 `URLClassLoader`；源码插件复用应用类加载器。
 
 ### 编辑器功能
@@ -44,8 +43,7 @@ EditorX 是一个基于 Kotlin/JVM 的可扩展桌面编辑器，采用模块化
 EditorX
 ├── core/                    # 核心模块
 │   ├── plugin/             # 插件API
-│   ├── command/            # 命令系统
-│   ├── event/              # 事件总线
+│   ├── event/              # 事件总线（可选）
 │   ├── settings/           # 设置管理
 │   └── workspace/          # 工作区管理
 ├── gui/                    # GUI模块

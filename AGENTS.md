@@ -35,7 +35,7 @@
 - 标识与状态：
   - 插件以 `PluginInfo.id` 为唯一键（全局唯一且稳定），重复 ID 会被拒绝加载。
   - 维护基础生命周期状态：`CREATED` → `LOADED` → `STARTED`（失败则 `FAILED`；卸载为 `STOPPED`）。
-  - 通过事件总线发布 `PluginLoaded` / `PluginUnloaded` 事件。
+  - 如需事件通知，可在创建 `PluginManager` 时注入事件总线以发布 `PluginLoaded` / `PluginUnloaded` 事件（GUI 默认未启用）。
 - 卸载：
   - 使用 `PluginManager.unloadPlugin(pluginId: String)`（以 ID 卸载）。
 - 插件上下文与交互：

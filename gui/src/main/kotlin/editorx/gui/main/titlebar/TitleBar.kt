@@ -6,7 +6,6 @@ import java.awt.event.ActionEvent
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import javax.swing.*
-import javax.swing.filechooser.FileNameExtensionFilter
 
 class TitleBar(private val mainWindow: MainWindow) : JMenuBar() {
     init {
@@ -14,136 +13,144 @@ class TitleBar(private val mainWindow: MainWindow) : JMenuBar() {
     }
 
     private fun setupMenus() {
-        add(createFileMenu()); add(createEditMenu()); add(createViewMenu()); add(createToolsMenu()); add(createHelpMenu())
+        add(createFileMenu())
+        add(createEditMenu())
+        add(createPluginMenu())
+        add(createHelpMenu())
     }
 
     private fun createFileMenu(): JMenu {
-        val fileMenu = JMenu("文件").apply { mnemonic = KeyEvent.VK_F }
-        val openFileItem = JMenuItem("打开文件...").apply {
-            mnemonic = KeyEvent.VK_O
-            accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_O, InputEvent.CTRL_DOWN_MASK)
-            addActionListener { mainWindow.openFileChooserAndOpen() }
-        }
-        val openApkItem = JMenuItem("打开 APK...").apply { addActionListener { openApkFile() } }
-        val openFolderItem = JMenuItem("打开文件夹...").apply {
-            mnemonic = KeyEvent.VK_D
-            accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_D, InputEvent.CTRL_DOWN_MASK)
-            addActionListener { openFolder() }
-        }
-        val saveItem = JMenuItem("保存").apply {
-            mnemonic = KeyEvent.VK_S
-            accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_S, InputEvent.CTRL_DOWN_MASK)
-            addActionListener { mainWindow.editor.saveCurrent() }
-        }
-        val saveAsItem = JMenuItem("另存为...").apply {
-            accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_S, InputEvent.CTRL_DOWN_MASK or InputEvent.SHIFT_DOWN_MASK)
-            addActionListener { mainWindow.editor.saveCurrentAs() }
-        }
-        fileMenu.add(openFileItem); fileMenu.add(openApkItem); fileMenu.add(openFolderItem); fileMenu.addSeparator()
-        fileMenu.add(saveItem); fileMenu.add(saveAsItem); fileMenu.addSeparator()
-        val recentFilesMenu = JMenu("最近打开")
-        recentFilesMenu.addMenuListener(object : javax.swing.event.MenuListener {
-            override fun menuSelected(e: javax.swing.event.MenuEvent) {
-                recentFilesMenu.removeAll()
-                val recents = mainWindow.guiControl.workspace.recentFiles()
-                if (recents.isEmpty()) {
-                    recentFilesMenu.add(JMenuItem("(无)"))
-                } else {
-                    recents.forEach { file ->
-                        val item = JMenuItem(file.name)
-                        item.toolTipText = file.absolutePath
-                        item.addActionListener { mainWindow.editor.openFile(file) }
-                        recentFilesMenu.add(item)
-                    }
-                }
-            }
+        return JMenu("文件").apply {
+            mnemonic = KeyEvent.VK_F
 
-            override fun menuDeselected(e: javax.swing.event.MenuEvent) {}
-            override fun menuCanceled(e: javax.swing.event.MenuEvent) {}
-        })
-        fileMenu.add(recentFilesMenu); fileMenu.addSeparator()
-        val exitItem = JMenuItem("退出").apply {
-            mnemonic = KeyEvent.VK_X
-            accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_Q, InputEvent.CTRL_DOWN_MASK)
-            addActionListener { System.exit(0) }
+            add(JMenuItem("打开文件...").apply {
+                mnemonic = KeyEvent.VK_O
+                accelerator =
+                    KeyStroke.getKeyStroke(KeyEvent.VK_O, InputEvent.CTRL_DOWN_MASK)
+                addActionListener { mainWindow.openFileChooserAndOpen() }
+            })
+            add(JMenuItem("打开文件夹...").apply {
+                mnemonic = KeyEvent.VK_D
+                accelerator =
+                    KeyStroke.getKeyStroke(KeyEvent.VK_D, InputEvent.CTRL_DOWN_MASK)
+                addActionListener { openFolder() }
+            })
+
+            add(JMenu("最近打开").apply {
+                addMenuListener(
+                    object : javax.swing.event.MenuListener {
+                        override fun menuSelected(e: javax.swing.event.MenuEvent) {
+                            this@apply.removeAll()
+                            val recents = mainWindow.guiControl.workspace.recentFiles()
+                            if (recents.isEmpty()) {
+                                this@apply.add(JMenuItem("(无)"))
+                            } else {
+                                recents.forEach { file ->
+                                    val item = JMenuItem(file.name)
+                                    item.toolTipText = file.absolutePath
+                                    item.addActionListener { mainWindow.editor.openFile(file) }
+                                    this@apply.add(item)
+                                }
+                            }
+                        }
+
+                        override fun menuDeselected(e: javax.swing.event.MenuEvent) {}
+                        override fun menuCanceled(e: javax.swing.event.MenuEvent) {}
+                    }
+                )
+            })
+
+            addSeparator()
+
+            add(JMenuItem("保存").apply {
+                mnemonic = KeyEvent.VK_S
+                accelerator =
+                    KeyStroke.getKeyStroke(KeyEvent.VK_S, InputEvent.CTRL_DOWN_MASK)
+                addActionListener { mainWindow.editor.saveCurrent() }
+            })
+            add(JMenuItem("另存为...").apply {
+                accelerator =
+                    KeyStroke.getKeyStroke(
+                        KeyEvent.VK_S,
+                        InputEvent.CTRL_DOWN_MASK or InputEvent.SHIFT_DOWN_MASK
+                    )
+                addActionListener { mainWindow.editor.saveCurrentAs() }
+            })
+
+            addSeparator()
+
+            add(JMenuItem("退出").apply {
+                mnemonic = KeyEvent.VK_X
+                accelerator =
+                    KeyStroke.getKeyStroke(KeyEvent.VK_Q, InputEvent.CTRL_DOWN_MASK)
+                addActionListener { System.exit(0) }
+            })
         }
-        fileMenu.add(exitItem)
-        return fileMenu
     }
 
     private fun createEditMenu(): JMenu {
-        val editMenu = JMenu("编辑").apply { mnemonic = KeyEvent.VK_E }
-        val undoItem = JMenuItem("撤销").apply {
-            mnemonic = KeyEvent.VK_Z; accelerator =
-            KeyStroke.getKeyStroke(KeyEvent.VK_Z, ActionEvent.CTRL_MASK); isEnabled = false
+        return JMenu("编辑").apply {
+            mnemonic = KeyEvent.VK_E
+
+            add(JMenuItem("撤销").apply {
+                mnemonic = KeyEvent.VK_Z
+                accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_Z, ActionEvent.CTRL_MASK)
+                isEnabled = false
+            })
+            add(JMenuItem("重做").apply {
+                mnemonic = KeyEvent.VK_Y
+                accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_Y, ActionEvent.CTRL_MASK)
+                isEnabled = false
+            })
+
+            addSeparator()
+
+            add(JMenuItem("查找...").apply {
+                mnemonic = KeyEvent.VK_F
+                accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_F, InputEvent.CTRL_DOWN_MASK)
+                addActionListener { showFindDialog() }
+            })
+            add(JMenuItem("替换...").apply {
+                mnemonic = KeyEvent.VK_H
+                accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_H, InputEvent.CTRL_DOWN_MASK)
+                addActionListener { showReplaceDialog() }
+            })
         }
-        val redoItem = JMenuItem("重做").apply {
-            mnemonic = KeyEvent.VK_Y; accelerator =
-            KeyStroke.getKeyStroke(KeyEvent.VK_Y, ActionEvent.CTRL_MASK); isEnabled = false
-        }
-        editMenu.add(undoItem); editMenu.add(redoItem); editMenu.addSeparator()
-        val findItem = JMenuItem("查找...").apply {
-            mnemonic = KeyEvent.VK_F; accelerator =
-            KeyStroke.getKeyStroke(KeyEvent.VK_F, InputEvent.CTRL_DOWN_MASK); addActionListener { showFindDialog() }
-        }
-        val replaceItem = JMenuItem("替换...").apply {
-            mnemonic = KeyEvent.VK_H; accelerator =
-            KeyStroke.getKeyStroke(KeyEvent.VK_H, InputEvent.CTRL_DOWN_MASK); addActionListener { showReplaceDialog() }
-        }
-        editMenu.add(findItem); editMenu.add(replaceItem)
-        return editMenu
     }
 
-    private fun createViewMenu(): JMenu {
-        val viewMenu = JMenu("视图").apply { mnemonic = KeyEvent.VK_V }
-        val toggleSidebarItem = JMenuItem("切换侧边栏").apply {
-            mnemonic = KeyEvent.VK_B; accelerator =
-            KeyStroke.getKeyStroke(KeyEvent.VK_B, InputEvent.CTRL_DOWN_MASK); addActionListener { toggleSidebar() }
-        }
-        // 暂时注释掉panel相关菜单项
-        // val togglePanelItem = JMenuItem("切换底部面板").apply { mnemonic = KeyEvent.VK_P; accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_P, InputEvent.CTRL_DOWN_MASK); addActionListener { toggleBottomPanel() } }
-        viewMenu.add(toggleSidebarItem); // viewMenu.add(togglePanelItem)
-        return viewMenu
-    }
-
-    private fun createToolsMenu(): JMenu {
-        return JMenu("工具").apply {
+    private fun createPluginMenu(): JMenu {
+        return JMenu("插件").apply {
             mnemonic = KeyEvent.VK_T
 
-            val pluginManagerItem = JMenuItem("插件管理...").apply { addActionListener { showPluginManager() } }
-            val settingsItem =
-                JMenuItem("设置...").apply { mnemonic = KeyEvent.VK_S; addActionListener { showSettings() } }
+            val pluginManagerItem =
+                JMenuItem("插件管理").apply { addActionListener { showPluginManager() } }
 
             add(pluginManagerItem)
-            addSeparator()
-            add(settingsItem)
         }
     }
 
     private fun createHelpMenu(): JMenu {
-        val helpMenu = JMenu("帮助").apply { mnemonic = KeyEvent.VK_H }
-        val aboutItem = JMenuItem("关于").apply { addActionListener { showAbout() } }
-        val helpItem = JMenuItem("帮助文档").apply {
-            mnemonic = KeyEvent.VK_F1; accelerator =
-            KeyStroke.getKeyStroke(KeyEvent.VK_F1, 0); addActionListener { showHelp() }
-        }
-        helpMenu.add(helpItem); helpMenu.addSeparator(); helpMenu.add(aboutItem)
-        return helpMenu
-    }
+        return JMenu("帮助").apply {
+            mnemonic = KeyEvent.VK_H
 
-    private fun openApkFile() {
-        val fileChooser = JFileChooser().apply {
-            fileFilter = FileNameExtensionFilter("APK Files", "apk"); dialogTitle = "选择APK文件"
-        }
-        if (fileChooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
-            val selectedFile = fileChooser.selectedFile
-            mainWindow.statusBar.setMessage("已加载: ${selectedFile.name}")
+            add(JMenuItem("关于").apply { addActionListener { showAbout() } })
+
+            helpMenu.addSeparator()
+
+            add(JMenuItem("帮助文档").apply {
+                mnemonic = KeyEvent.VK_F1
+                accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_F1, 0)
+                addActionListener { showHelp() }
+            })
         }
     }
 
     private fun openFolder() {
         val fileChooser =
-            JFileChooser().apply { fileSelectionMode = JFileChooser.DIRECTORIES_ONLY; dialogTitle = "选择文件夹" }
+            JFileChooser().apply {
+                fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
+                dialogTitle = "选择文件夹"
+            }
         if (fileChooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
             val selectedFolder = fileChooser.selectedFile
             mainWindow.statusBar.setMessage("已打开文件夹: ${selectedFolder.name}")
@@ -160,14 +167,15 @@ class TitleBar(private val mainWindow: MainWindow) : JMenuBar() {
 
     private fun toggleSidebar() {
         val sidebar = mainWindow.sideBar
-        if (sidebar.isSideBarVisible()) sidebar.hideSideBar() else sidebar.getCurrentViewId()
-            ?.let { sidebar.showView(it) }
+        if (sidebar.isSideBarVisible()) sidebar.hideSideBar()
+        else sidebar.getCurrentViewId()?.let { sidebar.showView(it) }
     }
 
     // 暂时注释掉panel相关方法
     // private fun toggleBottomPanel() {
     //     val panel = mainWindow.panel
-    //     if (panel.isPanelVisible()) panel.hidePanel() else panel.getCurrentViewId()?.let { panel.showView(it) }
+    //     if (panel.isPanelVisible()) panel.hidePanel() else panel.getCurrentViewId()?.let {
+    // panel.showView(it) }
     // }
     private fun showPluginManager() {
         val pm = mainWindow.pluginManager ?: return
@@ -179,7 +187,8 @@ class TitleBar(private val mainWindow: MainWindow) : JMenuBar() {
     }
 
     private fun showAbout() {
-        val aboutMessage = """
+        val aboutMessage =
+            """
             EditorX v1.0
 
             一个用于编辑APK文件的工具
@@ -192,7 +201,12 @@ class TitleBar(private val mainWindow: MainWindow) : JMenuBar() {
 
             开发：XiaMao Tools
         """.trimIndent()
-        JOptionPane.showMessageDialog(this, aboutMessage, "关于 EditorX", JOptionPane.INFORMATION_MESSAGE)
+        JOptionPane.showMessageDialog(
+            this,
+            aboutMessage,
+            "关于 EditorX",
+            JOptionPane.INFORMATION_MESSAGE
+        )
     }
 
     private fun showHelp() {
