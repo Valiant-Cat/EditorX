@@ -1,6 +1,8 @@
 package editorx.plugins.smali
 
 import editorx.syntax.SyntaxHighlighter
+import editorx.syntax.HighlightSpan
+import java.awt.Color
 
 /**
  * Smali 语法高亮器（Kotlin 实现）
@@ -11,9 +13,11 @@ import editorx.syntax.SyntaxHighlighter
  */
 class SmaliSyntaxHighlighter : SyntaxHighlighter {
 
-    override fun highlight(line: String): String {
-        if (line.isEmpty()) return line
+    override fun highlight(line: String): List<HighlightSpan> {
+        if (line.isEmpty()) return emptyList()
 
+        val spans = mutableListOf<HighlightSpan>()
+        
         // === 1. 分离代码与注释 ===
         val commentIndex = line.indexOf('#')
         val (codePart, commentPart) = if (commentIndex >= 0) {
@@ -22,7 +26,6 @@ class SmaliSyntaxHighlighter : SyntaxHighlighter {
             line to ""
         }
 
-        val result = StringBuilder()
         var pos = 0
         val code = codePart
 
@@ -31,7 +34,6 @@ class SmaliSyntaxHighlighter : SyntaxHighlighter {
 
             // 跳过空白
             if (c.isWhitespace()) {
-                result.append(c)
                 pos++
                 continue
             }
@@ -51,8 +53,7 @@ class SmaliSyntaxHighlighter : SyntaxHighlighter {
                     i++
                 }
                 if (i < code.length && code[i] == '"') {
-                    val str = code.substring(pos, i + 1)
-                    result.append(tag("STRING", str))
+                    spans.add(HighlightSpan(pos, i + 1, STRING_COLOR))
                     pos = i + 1
                     matched = true
                 }
@@ -62,7 +63,7 @@ class SmaliSyntaxHighlighter : SyntaxHighlighter {
             if (!matched) {
                 for (inst in INSTRUCTIONS) {
                     if (code.startsWith(inst, pos)) {
-                        result.append(tag("INSTRUCTION", inst))
+                        spans.add(HighlightSpan(pos, pos + inst.length, INSTRUCTION_COLOR))
                         pos += inst.length
                         matched = true
                         break
@@ -74,7 +75,7 @@ class SmaliSyntaxHighlighter : SyntaxHighlighter {
             if (!matched) {
                 for (dir in DIRECTIVES) {
                     if (code.startsWith(dir, pos)) {
-                        result.append(tag("DIRECTIVE", dir))
+                        spans.add(HighlightSpan(pos, pos + dir.length, DIRECTIVE_COLOR))
                         pos += dir.length
                         matched = true
                         break
@@ -86,7 +87,7 @@ class SmaliSyntaxHighlighter : SyntaxHighlighter {
             if (!matched) {
                 for (flag in ACCESS_FLAGS) {
                     if (code.startsWith(flag, pos) && (pos + flag.length == code.length || !code[pos + flag.length].isLetterOrDigit())) {
-                        result.append(tag("KEYWORD", flag))
+                        spans.add(HighlightSpan(pos, pos + flag.length, KEYWORD_COLOR))
                         pos += flag.length
                         matched = true
                         break
@@ -101,8 +102,7 @@ class SmaliSyntaxHighlighter : SyntaxHighlighter {
                     while (i < code.length) {
                         val ch = code[i]
                         if (ch == ';') {
-                            val type = code.substring(pos, i + 1)
-                            result.append(tag("TYPE", type))
+                            spans.add(HighlightSpan(pos, i + 1, TYPE_COLOR))
                             pos = i + 1
                             matched = true
                             break
@@ -118,8 +118,7 @@ class SmaliSyntaxHighlighter : SyntaxHighlighter {
                 var i = pos + 1
                 while (i < code.length && code[i].isDigit()) i++
                 if (i > pos + 1) {
-                    val reg = code.substring(pos, i)
-                    result.append(tag("REGISTER", reg))
+                    spans.add(HighlightSpan(pos, i, REGISTER_COLOR))
                     pos = i
                     matched = true
                 }
@@ -130,8 +129,7 @@ class SmaliSyntaxHighlighter : SyntaxHighlighter {
                 var i = pos + 2
                 while (i < code.length && code[i].let { it in "0123456789abcdefABCDEF" }) i++
                 if (i > pos + 2) {
-                    val hex = code.substring(pos, i)
-                    result.append(tag("NUMBER", hex))
+                    spans.add(HighlightSpan(pos, i, NUMBER_COLOR))
                     pos = i
                     matched = true
                 }
@@ -141,32 +139,36 @@ class SmaliSyntaxHighlighter : SyntaxHighlighter {
             if (!matched && (c.isDigit() || (c == '-' && pos + 1 < code.length && code[pos + 1].isDigit()))) {
                 var i = if (c == '-') pos + 1 else pos
                 while (i < code.length && code[i].isDigit()) i++
-                val num = code.substring(pos, i)
-                result.append(tag("NUMBER", num))
+                spans.add(HighlightSpan(pos, i, NUMBER_COLOR))
                 pos = i
                 matched = true
             }
 
-            // --- 9. 未识别 token：原样输出 ---
+            // --- 9. 未识别 token：跳过 ---
             if (!matched) {
-                result.append(c)
                 pos++
             }
         }
 
-        // 拼接注释（如果有）
+        // 处理注释（如果有）
         if (commentPart.isNotEmpty()) {
-            result.append(tag("COMMENT", commentPart))
+            spans.add(HighlightSpan(commentIndex, line.length, COMMENT_COLOR))
         }
 
-        return result.toString()
+        return spans
     }
 
-    private fun tag(type: String, content: String): String = "【$type:$content】"
-
-    // =============== Smali 语法元素定义 ===============
-
+    // =============== 颜色定义 ===============
     companion object {
+        // 颜色常量
+        private val COMMENT_COLOR = Color(128, 128, 128)      // 灰色
+        private val STRING_COLOR = Color(0, 128, 0)           // 绿色
+        private val INSTRUCTION_COLOR = Color(0, 0, 255)      // 蓝色
+        private val DIRECTIVE_COLOR = Color(128, 0, 128)      // 紫色
+        private val KEYWORD_COLOR = Color(128, 128, 0)        // 黄色
+        private val TYPE_COLOR = Color(0, 128, 128)           // 青色
+        private val REGISTER_COLOR = Color(255, 0, 0)         // 红色
+        private val NUMBER_COLOR = Color(255, 165, 0)         // 橙色
         // Directives（伪指令）— 官方术语
         private val DIRECTIVES = setOf(
             ".class", ".super", ".source", ".implements", ".field", ".end field",

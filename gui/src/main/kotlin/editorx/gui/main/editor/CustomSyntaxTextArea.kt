@@ -8,27 +8,22 @@ import java.awt.Font
 import java.io.File
 import javax.swing.text.BadLocationException
 import javax.swing.text.DefaultHighlighter
-import javax.swing.text.Highlighter
 
 /**
  * 支持自定义语法高亮的文本区域
  */
 class CustomSyntaxTextArea : RSyntaxTextArea() {
-    
+
     private var customHighlighter: SyntaxHighlighter? = null
-    private var highlighter: Highlighter? = null
-    
+
     init {
         // 设置默认字体
         font = Font("Consolas", Font.PLAIN, 14)
-        
+
         // 设置默认语法样式
-        syntaxEditingStyle = SyntaxConstants.SYNTAX_STYLE_NONE
-        
-        // 获取高亮器
-        highlighter = getHighlighter()
+//        syntaxEditingStyle = SyntaxConstants.SYNTAX_STYLE_NONE
     }
-    
+
     /**
      * 设置文件并应用自定义语法高亮
      */
@@ -48,36 +43,55 @@ class CustomSyntaxTextArea : RSyntaxTextArea() {
             syntaxEditingStyle = detectDefaultSyntax(file)
         }
     }
-    
+
     /**
      * 应用自定义语法高亮
      */
     private fun applyCustomSyntaxHighlighting() {
         val highlighter = this.highlighter ?: return
         val customHighlighter = this.customHighlighter ?: return
-        
+
         // 清除现有高亮
         highlighter.removeAllHighlights()
-        
+
         try {
             val text = getText()
-            if (text.isEmpty()) {
-                println("文本为空，跳过高亮")
-                return
+            val lines = text.split("\n")
+            var offset = 0
+
+            for (line in lines) {
+                val spans = customHighlighter.highlight(line)
+                if (spans.isNotEmpty()) {
+                    // 应用高亮片段
+                    applyLineSpans(offset, spans)
+                }
+                offset += line.length + 1 // +1 for newline
             }
-            
-            println("开始应用高亮，文本长度: ${text.length}")
-            
-            // 应用简单的黄色高亮作为测试
-            val painter = DefaultHighlighter.DefaultHighlightPainter(java.awt.Color.YELLOW)
-            highlighter.addHighlight(0, text.length, painter)
-            
-            println("高亮应用完成")
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
-    
+
+    /**
+     * 应用行高亮片段
+     */
+    private fun applyLineSpans(lineOffset: Int, spans: List<editorx.syntax.HighlightSpan>) {
+        val highlighter = this.highlighter ?: return
+
+        try {
+            for (span in spans) {
+                val painter = DefaultHighlighter.DefaultHighlightPainter(span.color)
+                val actualStart = lineOffset + span.start
+                val actualEnd = lineOffset + span.end
+                if (actualStart < actualEnd && actualEnd <= getText().length) {
+                    highlighter.addHighlight(actualStart, actualEnd, painter)
+                }
+            }
+        } catch (e: BadLocationException) {
+            e.printStackTrace()
+        }
+    }
+
     /**
      * 检测默认语法
      */

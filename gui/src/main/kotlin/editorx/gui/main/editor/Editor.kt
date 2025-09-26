@@ -4,22 +4,19 @@ import editorx.event.ActiveFileChanged
 import editorx.event.FileOpened
 import editorx.event.FileSaved
 import editorx.gui.main.MainWindow
-import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea
-import org.fife.ui.rsyntaxtextarea.SyntaxConstants
+import editorx.gui.ui.theme.ThemeManager
 import org.fife.ui.rtextarea.RTextScrollPane
-import java.awt.Color
 import java.awt.CardLayout
+import java.awt.Color
 import java.awt.Dimension
 import java.awt.Font
 import java.awt.dnd.*
 import java.awt.event.MouseAdapter
-import java.awt.event.MouseMotionAdapter
 import java.awt.event.MouseEvent
+import java.awt.event.MouseMotionAdapter
 import java.io.File
 import java.nio.file.Files
 import javax.swing.*
-import editorx.gui.ui.theme.ThemeManager
-import editorx.syntax.SyntaxHighlighterManager
 
 class Editor(private val mainWindow: MainWindow) : JPanel() {
     private val fileToTab = mutableMapOf<File, Int>()
@@ -336,9 +333,9 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             mainWindow.statusBar.setFileInfo(file.name, Files.size(file.toPath()).toString() + " B")
             mainWindow.services.workspace.addRecentFile(file)
             mainWindow.services.eventBus.publish(FileOpened(file.absolutePath))
-            
+
             // 在文本加载完成后应用语法高亮
-            javax.swing.SwingUtilities.invokeLater {
+            SwingUtilities.invokeLater {
                 textArea.setFile(file)
             }
         } catch (e: Exception) {
@@ -521,7 +518,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             tabTextAreas.clear(); tabTextAreas.putAll(newTabTextAreas)
         }
     }
-    
+
     fun getCurrentFile(): File? = if (tabbedPane.selectedIndex >= 0) tabToFile[tabbedPane.selectedIndex] else null
 
     fun hasUnsavedChanges(): Boolean = dirtyTabs.isNotEmpty()
