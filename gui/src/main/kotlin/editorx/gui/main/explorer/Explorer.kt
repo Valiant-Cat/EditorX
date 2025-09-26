@@ -72,7 +72,8 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
 
         tree.isRootVisible = true
         tree.showsRootHandles = true
-        tree.toggleClickCount = 1
+        // 单击只选中；双击才展开/收起。点击左侧的展开图标仍然是单击生效（JTree 默认行为）
+        tree.toggleClickCount = 2
         add(JScrollPane(tree), BorderLayout.CENTER)
     }
 
@@ -96,10 +97,17 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
 
         tree.addMouseListener(object : MouseAdapter() {
             override fun mouseClicked(e: MouseEvent) {
-                val path = tree.getPathForLocation(e.x, e.y) ?: return
+                val row = tree.getClosestRowForLocation(e.x, e.y)
+                if (row == -1) return
+                val bounds = tree.getRowBounds(row) ?: return
+                // 仅当点击发生在该行的垂直范围内才认为命中（横向不做限制，实现整行可点击）
+                if (e.y < bounds.y || e.y >= bounds.y + bounds.height) return
+                val path = tree.getPathForRow(row) ?: return
                 val node = path.lastPathComponent as? FileNode ?: return
-                if (e.clickCount == 2) {
-                    if (node.file.isFile) openFile(node.file) else togglePath(path)
+
+                if (SwingUtilities.isLeftMouseButton(e) && e.clickCount == 2) {
+                    // 文件：双击打开；目录：交给 JTree 自身处理展开/收起，避免重复切换
+                    if (node.file.isFile) openFile(node.file)
                 }
                 if (SwingUtilities.isRightMouseButton(e)) {
                     showContextMenu(node, e.x, e.y)
@@ -108,7 +116,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         })
 
         tree.addKeyListener(object : KeyAdapter() {
-            override fun keyPressed(e: KeyEvent) {
+                override fun keyPressed(e: KeyEvent) {
                 val node = (tree.lastSelectedPathComponent as? FileNode) ?: return
                 when (e.keyCode) {
                     KeyEvent.VK_ENTER -> if (node.file.isFile) openFile(node.file)
