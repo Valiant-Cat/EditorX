@@ -4,7 +4,6 @@ import editorx.gui.ui.widget.NoLineSplitPaneUI
 import editorx.gui.workbench.activitybar.ActivityBar
 import editorx.gui.workbench.editor.Editor
 import editorx.gui.workbench.explorer.Explorer
-import editorx.gui.workbench.panel.Panel
 import editorx.gui.workbench.sidebar.SideBar
 import editorx.gui.workbench.statusbar.StatusBar
 import editorx.gui.workbench.titlebar.TitleBar
@@ -23,8 +22,6 @@ class MainWindow(val guiControl: GuiControl) : JFrame() {
     val activityBar by lazy { ActivityBar(this) }
     val sideBar by lazy { SideBar(this) }
     val editor by lazy { Editor(this) }
-
-    val panel by lazy { Panel(this) }
     val statusBar by lazy { StatusBar(this) }
 
     var pluginManager: PluginManager? = null
@@ -32,14 +29,6 @@ class MainWindow(val guiControl: GuiControl) : JFrame() {
     private val horizontalSplit by lazy {
         JSplitPane(JSplitPane.HORIZONTAL_SPLIT, sideBar, editor).apply {
             dividerLocation = 0  // 初始时隐藏SideBar
-            isOneTouchExpandable = false
-            dividerSize = 8
-        }
-    }
-
-    private val verticalSplit by lazy {
-        JSplitPane(JSplitPane.VERTICAL_SPLIT, horizontalSplit, panel).apply {
-            dividerLocation = Int.MAX_VALUE  // 初始时隐藏Panel
             isOneTouchExpandable = false
             dividerSize = 8
         }
@@ -74,12 +63,9 @@ class MainWindow(val guiControl: GuiControl) : JFrame() {
 
     private fun tuneSplitPanes() {
         horizontalSplit.setUI(NoLineSplitPaneUI())
-        verticalSplit.setUI(NoLineSplitPaneUI())
         horizontalSplit.border = javax.swing.BorderFactory.createEmptyBorder()
-        verticalSplit.border = javax.swing.BorderFactory.createEmptyBorder()
         // 启用连续布局，减少布局跳动
         horizontalSplit.isContinuousLayout = true
-        verticalSplit.isContinuousLayout = true
     }
 
     private fun setupActivityBarDefaultItems() {
