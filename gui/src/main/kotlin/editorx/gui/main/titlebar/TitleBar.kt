@@ -135,7 +135,7 @@ class TitleBar(private val mainWindow: MainWindow) : JMenuBar() {
 
             add(JMenuItem("关于").apply { addActionListener { showAbout() } })
 
-            helpMenu.addSeparator()
+            addSeparator()
 
             add(JMenuItem("帮助文档").apply {
                 mnemonic = KeyEvent.VK_F1
