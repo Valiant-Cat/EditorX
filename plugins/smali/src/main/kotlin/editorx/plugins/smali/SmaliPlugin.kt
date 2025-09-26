@@ -3,9 +3,9 @@ package editorx.plugins.smali
 import editorx.plugin.Plugin
 import editorx.plugin.PluginContext
 import editorx.plugin.PluginInfo
-import editorx.syntax.DocumentSelector
-import editorx.syntax.SyntaxHighlighter
-import editorx.syntax.SyntaxHighlighterProvider
+import editorx.syntax.SyntaxAdapter
+import editorx.syntax.TokenMakerProvider
+import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea
 
 class SmaliPlugin : Plugin {
     override fun getInfo(): PluginInfo {
@@ -18,15 +18,23 @@ class SmaliPlugin : Plugin {
 
     override fun activate(context: PluginContext) {
         // 注册 Smali 语法高亮提供者
-        context.registerSyntaxHighlighter(object : SyntaxHighlighterProvider {
-            override fun getSelector(): DocumentSelector {
-                return DocumentSelector.forExtensions(".smali")
+        context.registerSyntaxAdapter(object : SyntaxAdapter {
+            override val languageId: String = "text/smali"
+            override val fileExtensions: Set<String> = setOf("smali")
+
+            override fun getTokenMakerProvider(): TokenMakerProvider {
+                return object : TokenMakerProvider {
+                    override fun getTokenMakerClassName(): String {
+                        return SmaliTokenMaker::class.java.name
+                    }
+                }
             }
 
-            override fun createHighlighter(): SyntaxHighlighter {
-                return SmaliSyntaxHighlighter()
+            override fun configureTextArea(textArea: RSyntaxTextArea) {
+                textArea.isCodeFoldingEnabled = true
+                textArea.isBracketMatchingEnabled = true
+                textArea.syntaxEditingStyle = languageId
             }
-
         })
     }
 }

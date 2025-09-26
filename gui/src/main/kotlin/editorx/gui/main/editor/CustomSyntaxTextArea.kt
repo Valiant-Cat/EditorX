@@ -1,27 +1,19 @@
 package editorx.gui.main.editor
 
-import editorx.syntax.SyntaxHighlighter
-import editorx.syntax.SyntaxHighlighterManager
+import editorx.syntax.SyntaxManager
 import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea
 import org.fife.ui.rsyntaxtextarea.SyntaxConstants
 import java.awt.Font
 import java.io.File
-import javax.swing.text.BadLocationException
-import javax.swing.text.DefaultHighlighter
 
 /**
  * 支持自定义语法高亮的文本区域
  */
 class CustomSyntaxTextArea : RSyntaxTextArea() {
 
-    private var customHighlighter: SyntaxHighlighter? = null
-
     init {
         // 设置默认字体
         font = Font("Consolas", Font.PLAIN, 14)
-
-        // 设置默认语法样式
-//        syntaxEditingStyle = SyntaxConstants.SYNTAX_STYLE_NONE
     }
 
     /**
@@ -29,66 +21,14 @@ class CustomSyntaxTextArea : RSyntaxTextArea() {
      */
     fun setFile(file: File) {
         // 检测是否有自定义语法高亮器
-        val customHighlighter = SyntaxHighlighterManager.getHighlighterForFile(file)
-        if (customHighlighter != null) {
-            this.customHighlighter = customHighlighter
-            println("找到自定义语法高亮器: ${customHighlighter::class.simpleName}")
-            // 延迟应用高亮，等待文本加载完成
-            javax.swing.SwingUtilities.invokeLater {
-                applyCustomSyntaxHighlighting()
-            }
+        val syntaxAdapter = SyntaxManager.getAdapterForFile(file)
+        if (syntaxAdapter != null) {
+            println("找到自定义语法适配器: ${syntaxAdapter::class.simpleName}")
+            syntaxAdapter.configureTextArea(this)
         } else {
             println("未找到自定义语法高亮器，使用默认语法")
             // 使用默认的语法检测
             syntaxEditingStyle = detectDefaultSyntax(file)
-        }
-    }
-
-    /**
-     * 应用自定义语法高亮
-     */
-    private fun applyCustomSyntaxHighlighting() {
-        val highlighter = this.highlighter ?: return
-        val customHighlighter = this.customHighlighter ?: return
-
-        // 清除现有高亮
-        highlighter.removeAllHighlights()
-
-        try {
-            val text = getText()
-            val lines = text.split("\n")
-            var offset = 0
-
-            for (line in lines) {
-                val spans = customHighlighter.highlight(line)
-                if (spans.isNotEmpty()) {
-                    // 应用高亮片段
-                    applyLineSpans(offset, spans)
-                }
-                offset += line.length + 1 // +1 for newline
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    /**
-     * 应用行高亮片段
-     */
-    private fun applyLineSpans(lineOffset: Int, spans: List<editorx.syntax.HighlightSpan>) {
-        val highlighter = this.highlighter ?: return
-
-        try {
-            for (span in spans) {
-                val painter = DefaultHighlighter.DefaultHighlightPainter(span.color)
-                val actualStart = lineOffset + span.start
-                val actualEnd = lineOffset + span.end
-                if (actualStart < actualEnd && actualEnd <= getText().length) {
-                    highlighter.addHighlight(actualStart, actualEnd, painter)
-                }
-            }
-        } catch (e: BadLocationException) {
-            e.printStackTrace()
         }
     }
 
