@@ -9,6 +9,9 @@ import javax.swing.Icon
 object IconUtils {
 
     fun resizeIcon(icon: Icon, width: Int, height: Int): Icon {
+        // 若尺寸一致，直接返回原图标，避免不必要的绘制与 hint 处理
+        if (icon.iconWidth == width && icon.iconHeight == height) return icon
+
         return object : Icon {
             override fun getIconWidth(): Int = width
             override fun getIconHeight(): Int = height
@@ -35,9 +38,13 @@ object IconUtils {
                     icon.paintIcon(c, g2, scaledX.toInt(), scaledY.toInt())
 
                     g2.transform = oldTx
-                    g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, oldInterp)
-                    g2.setRenderingHint(RenderingHints.KEY_RENDERING, oldRender)
-                    g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, oldAA)
+                    // 恢复渲染 hint：老值可能为 null，不能直接 setRenderingHint(null)
+                    if (oldInterp != null) g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, oldInterp)
+                    else g2.getRenderingHints().remove(RenderingHints.KEY_INTERPOLATION)
+                    if (oldRender != null) g2.setRenderingHint(RenderingHints.KEY_RENDERING, oldRender)
+                    else g2.getRenderingHints().remove(RenderingHints.KEY_RENDERING)
+                    if (oldAA != null) g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, oldAA)
+                    else g2.getRenderingHints().remove(RenderingHints.KEY_ANTIALIASING)
                 } finally {
                     g2.dispose()
                 }

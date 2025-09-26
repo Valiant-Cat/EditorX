@@ -25,6 +25,8 @@ import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeModel
 import javax.swing.tree.TreePath
 import javax.swing.border.EmptyBorder
+import javax.swing.filechooser.FileSystemView
+import editorx.gui.util.IconUtils
 
 class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
 
@@ -74,6 +76,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         tree.showsRootHandles = true
         // 单击只选中；双击才展开/收起。点击左侧的展开图标仍然是单击生效（JTree 默认行为）
         tree.toggleClickCount = 2
+        tree.cellRenderer = FileTreeCellRenderer()
         add(JScrollPane(tree), BorderLayout.CENTER)
     }
 
@@ -289,6 +292,64 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         }
 
         override fun toString(): String = file.name.ifEmpty { file.absolutePath }
+    }
+
+    /**
+     * 自定义渲染：为目录和常见后缀的文件展示系统图标（带缓存）。
+     */
+    private class FileTreeCellRenderer : javax.swing.tree.DefaultTreeCellRenderer() {
+        private val fs = FileSystemView.getFileSystemView()
+        private val fileIconCache = mutableMapOf<String, Icon>()
+        private val folderClosed: Icon? = UIManager.getIcon("Tree.closedIcon")
+        private val folderOpen: Icon? = UIManager.getIcon("Tree.openIcon")
+        private val defaultFile: Icon? = UIManager.getIcon("FileView.fileIcon")
+
+        override fun getTreeCellRendererComponent(
+            tree: JTree,
+            value: Any?,
+            sel: Boolean,
+            expanded: Boolean,
+            leaf: Boolean,
+            row: Int,
+            hasFocus: Boolean
+        ): java.awt.Component {
+            val c = super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row, hasFocus)
+            val node = value as? DefaultMutableTreeNode
+            val file = (node as? FileNode)?.file
+            if (file != null) {
+                icon = when {
+                    file.isDirectory -> if (expanded) folderOpen ?: icon else folderClosed ?: icon
+                    else -> getIconForFile(file)
+                }
+                text = file.name.ifEmpty { file.absolutePath }
+            }
+            return c
+        }
+
+        private fun getIconForFile(file: File): Icon {
+            val ext = file.extension.lowercase()
+            val key = if (ext.isBlank()) "__noext__" else ext
+            return fileIconCache.getOrPut(key) {
+                val base: Icon = (fs.getSystemIcon(file)
+                    ?: defaultFile
+                    ?: UIManager.getIcon("Tree.leafIcon")
+                    ?: createDefaultIcon())
+                // 统一 16x16 尺寸
+                IconUtils.resizeIcon(base, 16, 16)
+            }
+        }
+
+        private fun createDefaultIcon(): Icon = object : Icon {
+            override fun getIconWidth(): Int = 16
+            override fun getIconHeight(): Int = 16
+            override fun paintIcon(c: java.awt.Component?, g: java.awt.Graphics, x: Int, y: Int) {
+                val g2 = g.create() as java.awt.Graphics2D
+                try {
+                    g2.color = java.awt.Color(120, 120, 120)
+                    g2.drawRect(x + 2, y + 2, 12, 12)
+                } finally { g2.dispose() }
+            }
+        }
     }
 
     // DnD: allow dropping a folder to set workspace root
