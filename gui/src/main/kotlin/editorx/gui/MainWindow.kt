@@ -1,16 +1,14 @@
-package editorx.gui.main
+package editorx.gui
 
-import editorx.gui.CachedViewProvider
-import editorx.gui.main.activitybar.ActivityBar
-import editorx.gui.main.editor.Editor
-import editorx.gui.main.explorer.Explorer
-// import editorx.gui.main.panel.Panel
-import editorx.gui.main.sidebar.SideBar
-import editorx.gui.main.statusbar.StatusBar
-import editorx.gui.main.titlebar.TitleBar
-import editorx.plugin.PluginManager
-import editorx.gui.services.GuiServices
 import editorx.gui.ui.widget.NoLineSplitPaneUI
+import editorx.gui.workbench.activitybar.ActivityBar
+import editorx.gui.workbench.editor.Editor
+import editorx.gui.workbench.explorer.Explorer
+import editorx.gui.workbench.panel.Panel
+import editorx.gui.workbench.sidebar.SideBar
+import editorx.gui.workbench.statusbar.StatusBar
+import editorx.gui.workbench.titlebar.TitleBar
+import editorx.plugin.PluginManager
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.io.File
@@ -18,22 +16,17 @@ import javax.swing.JFileChooser
 import javax.swing.JFrame
 import javax.swing.JSplitPane
 
-/**
- * EditorX 主窗口
- * - 解耦 UI 构建与插件加载
- * - 提供显式的 showWindow()/loadPluginsSafely()
- */
-class MainWindow(val services: GuiServices) : JFrame() {
+class MainWindow(val guiControl: GuiControl) : JFrame() {
 
     // UI 组件
     val titleBar by lazy { TitleBar(this) }
     val activityBar by lazy { ActivityBar(this) }
     val sideBar by lazy { SideBar(this) }
     val editor by lazy { Editor(this) }
-    // val panel by lazy { Panel(this) }
+
+    val panel by lazy { Panel(this) }
     val statusBar by lazy { StatusBar(this) }
 
-    // Plugin Manager reference for UI integrations
     var pluginManager: PluginManager? = null
 
     private val horizontalSplit by lazy {
@@ -44,14 +37,13 @@ class MainWindow(val services: GuiServices) : JFrame() {
         }
     }
 
-    // 暂时注释掉垂直分割面板（Panel相关）
-    // private val verticalSplit by lazy {
-    //     JSplitPane(JSplitPane.VERTICAL_SPLIT, horizontalSplit, panel).apply {
-    //         dividerLocation = Int.MAX_VALUE  // 初始时隐藏Panel
-    //         isOneTouchExpandable = false
-    //         dividerSize = 8
-    //     }
-    // }
+    private val verticalSplit by lazy {
+        JSplitPane(JSplitPane.VERTICAL_SPLIT, horizontalSplit, panel).apply {
+            dividerLocation = Int.MAX_VALUE  // 初始时隐藏Panel
+            isOneTouchExpandable = false
+            dividerSize = 8
+        }
+    }
 
     init {
         setupWindow()
@@ -81,18 +73,13 @@ class MainWindow(val services: GuiServices) : JFrame() {
     }
 
     private fun tuneSplitPanes() {
-        // 使用不绘制边线的分割条 UI
-        val customUI = NoLineSplitPaneUI()
-        horizontalSplit.setUI(customUI)
-        // 暂时注释掉垂直分割面板的UI设置
-        // verticalSplit.setUI(NoLineSplitPaneUI())
+        horizontalSplit.setUI(NoLineSplitPaneUI())
+        verticalSplit.setUI(NoLineSplitPaneUI())
         horizontalSplit.border = javax.swing.BorderFactory.createEmptyBorder()
-        // verticalSplit.border = javax.swing.BorderFactory.createEmptyBorder()
+        verticalSplit.border = javax.swing.BorderFactory.createEmptyBorder()
         // 启用连续布局，减少布局跳动
         horizontalSplit.isContinuousLayout = true
-        // verticalSplit.isContinuousLayout = true
-        // 始终保留一个可拖拽的分割条（8px），隐藏时配合 Panel 逻辑将其贴底
-        // verticalSplit.dividerSize = 8
+        verticalSplit.isContinuousLayout = true
     }
 
     private fun setupActivityBarDefaultItems() {
@@ -112,7 +99,7 @@ class MainWindow(val services: GuiServices) : JFrame() {
         if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
             val file: File = chooser.selectedFile
             editor.openFile(file)
-            services.workspace.addRecentFile(file)
+            guiControl.workspace.addRecentFile(file)
         }
     }
 }

@@ -1,4 +1,4 @@
-package editorx.gui.main.editor
+package editorx.gui.workbench.editor
 
 import editorx.syntax.SyntaxManager
 import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea
@@ -9,7 +9,7 @@ import java.io.File
 /**
  * 支持自定义语法高亮的文本区域
  */
-class CustomSyntaxTextArea : RSyntaxTextArea() {
+class TextArea : RSyntaxTextArea() {
 
     init {
         // 设置默认字体
@@ -19,7 +19,7 @@ class CustomSyntaxTextArea : RSyntaxTextArea() {
     /**
      * 设置文件并应用自定义语法高亮
      */
-    fun setFile(file: File) {
+    fun detectSyntax(file: File) {
         // 检测是否有自定义语法高亮器
         val syntaxAdapter = SyntaxManager.getAdapterForFile(file)
         if (syntaxAdapter != null) {

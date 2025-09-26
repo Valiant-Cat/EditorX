@@ -1,7 +1,5 @@
 package editorx.plugin
 
-import editorx.event.EventBus
-import editorx.event.PluginLoaded
 import java.util.logging.Logger
 
 /**
@@ -9,7 +7,6 @@ import java.util.logging.Logger
  */
 class SourcePluginScanner(
     private val contextFactory: PluginContextFactory,
-    private val eventBus: EventBus? = null
 ) : PluginScanner {
 
     private val logger = Logger.getLogger(SourcePluginScanner::class.java.name)
@@ -33,7 +30,6 @@ class SourcePluginScanner(
                     plugin.activate(context)
 
                     loadedPlugins.add(loadedPlugin)
-                    eventBus?.publish(PluginLoaded(loadedPlugin.id, loadedPlugin.name, loadedPlugin.version))
 
                     logger.info("源码插件加载成功: ${loadedPlugin.name} v${loadedPlugin.version}")
                 } catch (e: Exception) {

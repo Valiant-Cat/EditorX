@@ -1,16 +1,9 @@
 package editorx.gui
 
-import editorx.gui.plugin.GuiPluginContextFactory
 import com.formdev.flatlaf.FlatLightLaf
-import editorx.command.CommandMeta
-import editorx.plugin.LoadedPlugin
-import editorx.plugin.PluginContextFactory
-import editorx.plugin.PluginManager
-import editorx.gui.services.GuiServices
+import editorx.gui.plugin.GuiPluginContextFactory
 import editorx.gui.ui.theme.ThemeManager
-import editorx.gui.command.CommandPalette
-import editorx.gui.main.MainWindow
-import editorx.plugin.PluginContext
+import editorx.plugin.PluginManager
 import java.io.File
 import java.util.logging.Level
 import java.util.logging.Logger
@@ -57,36 +50,17 @@ private fun initializeApplication() {
 }
 
 private fun initializeMainWindow() {
-    val appDir = File(System.getProperty("user.home"), ".editorx")
-    val services = GuiServices(appDir)
+    val dir = File(System.getProperty("user.home"), ".editorx")
+    val guiControl = GuiControl(dir)
 
-    val mv = MainWindow(services)
+    val mv = MainWindow(guiControl)
 
     // 显示主窗口
     mv.isVisible = true
 
     // 初始化插件
     val pluginContextFactory = GuiPluginContextFactory(mv)
-    val pluginManager = PluginManager(pluginContextFactory, services.eventBus)
-    mv.pluginManager = pluginManager
+    val pluginManager = PluginManager(pluginContextFactory)
     pluginManager.loadPlugins()
-
-    // Bind builtin command handlers that need GUI components
-    val commands = services.commands
-    commands.register(CommandMeta("help.commandPalette", "打开命令面板")) {
-        CommandPalette.show(mv, services.commands)
-    }
-    commands.register(CommandMeta("app.about", "关于 EditorX")) {
-        javax.swing.JOptionPane.showMessageDialog(
-            mv,
-            "EditorX – 可扩展插件化编辑器",
-            "关于",
-            javax.swing.JOptionPane.INFORMATION_MESSAGE
-        )
-    }
-    commands.register(CommandMeta("view.toggleSidebar", "切换侧边栏")) { mv.sideBar.isVisible = !mv.sideBar.isVisible }
-//    commands.register(CommandMeta("view.togglePanel", "切换底部面板")) { mv.panel.isVisible = !mv.panel.isVisible }
-    commands.register(CommandMeta("file.open", "打开文件")) { mv.openFileChooserAndOpen() }
-    commands.register(CommandMeta("file.save", "保存文件")) { mv.editor.saveCurrent() }
-    commands.register(CommandMeta("file.saveAs", "另存为...")) { mv.editor.saveCurrentAs() }
+    mv.pluginManager = pluginManager
 }

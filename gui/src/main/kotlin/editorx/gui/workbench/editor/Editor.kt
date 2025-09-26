@@ -1,9 +1,6 @@
-package editorx.gui.main.editor
+package editorx.gui.workbench.editor
 
-import editorx.event.ActiveFileChanged
-import editorx.event.FileOpened
-import editorx.event.FileSaved
-import editorx.gui.main.MainWindow
+import editorx.gui.MainWindow
 import editorx.gui.ui.theme.ThemeManager
 import org.fife.ui.rtextarea.RTextScrollPane
 import java.awt.CardLayout
@@ -22,7 +19,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
     private val fileToTab = mutableMapOf<File, Int>()
     private val tabToFile = mutableMapOf<Int, File>()
     private val tabbedPane = JTabbedPane()
-    private val tabTextAreas = mutableMapOf<Int, CustomSyntaxTextArea>()
+    private val tabTextAreas = mutableMapOf<Int, TextArea>()
     private val dirtyTabs = mutableSetOf<Int>()
 
     init {
@@ -68,7 +65,6 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         tabbedPane.addChangeListener {
             val file = getCurrentFile()
             mainWindow.statusBar.setFileInfo(file?.name ?: "", file?.let { it.length().toString() + " B" })
-            mainWindow.services.eventBus.publish(ActiveFileChanged(file?.absolutePath))
             updateTabHeaderStyles()
         }
 
@@ -300,7 +296,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             tabbedPane.selectedIndex = fileToTab[file]!!
             return
         }
-        val textArea = CustomSyntaxTextArea().apply {
+        val textArea = TextArea().apply {
             font = Font("Consolas", Font.PLAIN, 14)
             addCaretListener {
                 val caretPos = caretPosition
@@ -331,12 +327,11 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             textArea.text = Files.readString(file.toPath())
             textArea.discardAllEdits()
             mainWindow.statusBar.setFileInfo(file.name, Files.size(file.toPath()).toString() + " B")
-            mainWindow.services.workspace.addRecentFile(file)
-            mainWindow.services.eventBus.publish(FileOpened(file.absolutePath))
+            mainWindow.guiControl.workspace.addRecentFile(file)
 
             // 在文本加载完成后应用语法高亮
             SwingUtilities.invokeLater {
-                textArea.setFile(file)
+                textArea.detectSyntax(file)
             }
         } catch (e: Exception) {
             textArea.text = "无法读取文件: ${e.message}"
@@ -505,7 +500,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             dirtyTabs.remove(index)
             val newTabToFile = mutableMapOf<Int, File>()
             val newFileToTab = mutableMapOf<File, Int>()
-            val newTabTextAreas = mutableMapOf<Int, CustomSyntaxTextArea>()
+            val newTabTextAreas = mutableMapOf<Int, TextArea>()
             for (i in 0 until tabbedPane.tabCount) {
                 val f = tabToFile[i]
                 if (f != null) {
@@ -533,7 +528,6 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             dirtyTabs.remove(idx)
             updateTabTitle(idx)
             mainWindow.statusBar.showSuccess("已保存: ${file.name}")
-            mainWindow.services.eventBus.publish(FileSaved(file.absolutePath))
         } else {
             saveCurrentAs()
         }
@@ -553,9 +547,8 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             fileToTab[file] = idx
             updateTabTitle(idx)
             dirtyTabs.remove(idx)
-            mainWindow.services.workspace.addRecentFile(file)
+            mainWindow.guiControl.workspace.addRecentFile(file)
             mainWindow.statusBar.showSuccess("已保存: ${file.name}")
-            mainWindow.services.eventBus.publish(FileSaved(file.absolutePath))
         }
     }
 
@@ -572,7 +565,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         }
     }
 
-    private fun getLineStartOffsetOfCurrentLine(area: CustomSyntaxTextArea): Int {
+    private fun getLineStartOffsetOfCurrentLine(area: TextArea): Int {
         val caretPos = area.caretPosition
         val line = area.getLineOfOffset(caretPos)
         return area.getLineStartOffset(line)

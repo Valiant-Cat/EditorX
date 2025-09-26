@@ -1,14 +1,12 @@
 package editorx.gui.plugin
 
-import editorx.command.CommandRegistry
-import editorx.event.EventBus
+import editorx.gui.MainWindow
 import editorx.gui.ViewProvider
-import editorx.gui.main.MainWindow
 import editorx.plugin.LoadedPlugin
 import editorx.plugin.PluginContext
 import editorx.settings.SettingsStore
-import editorx.syntax.SyntaxManager
 import editorx.syntax.SyntaxAdapter
+import editorx.syntax.SyntaxManager
 import editorx.workspace.WorkspaceManager
 import java.io.File
 import java.util.logging.Logger
@@ -25,22 +23,13 @@ class GuiPluginContext(
     private val logger =
         Logger.getLogger("${GuiPluginContext::class.java.name}[${loadedPlugin.name}-${loadedPlugin.version}]")
 
+    override fun settings(): SettingsStore = mainWindow.guiControl.settings
+
+    override fun workspace(): WorkspaceManager = mainWindow.guiControl.workspace
+
     override fun addActivityBarItem(iconPath: String, viewProvider: ViewProvider) {
         mainWindow.activityBar.addItem(loadedPlugin.id, loadedPlugin.name, iconPath, viewProvider)
     }
-
-    override fun openFile(file: File) {
-        try {
-            mainWindow.editor.openFile(file)
-        } catch (e: Exception) {
-            logger.warning("打开文件失败: ${file.name}, 错误: ${e.message}")
-        }
-    }
-
-    override fun commands(): CommandRegistry = mainWindow.services.commands
-    override fun eventBus(): EventBus = mainWindow.services.eventBus
-    override fun settings(): SettingsStore = mainWindow.services.settings
-    override fun workspace(): WorkspaceManager = mainWindow.services.workspace
 
     override fun registerSyntaxAdapter(syntaxAdapter: SyntaxAdapter) {
         SyntaxManager.registerAdapter(syntaxAdapter)

@@ -1,7 +1,7 @@
-package editorx.gui.main.statusbar
+package editorx.gui.workbench.statusbar
 
 import java.awt.Color
-import editorx.gui.main.MainWindow
+import editorx.gui.MainWindow
 import java.awt.Dimension
 import java.awt.FlowLayout
 import java.awt.Font

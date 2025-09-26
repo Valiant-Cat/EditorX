@@ -1,8 +1,8 @@
-package editorx.gui.main.activitybar
+package editorx.gui.workbench.activitybar
 
 import editorx.gui.Constants
 import editorx.gui.ViewProvider
-import editorx.gui.main.MainWindow
+import editorx.gui.MainWindow
 import editorx.gui.ui.theme.ThemeManager
 import editorx.gui.ui.widget.SvgIcon
 import editorx.gui.util.IconUtils

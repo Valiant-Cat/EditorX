@@ -1,7 +1,5 @@
 package editorx.plugin
 
-import editorx.event.EventBus
-import editorx.event.PluginUnloaded
 import java.util.concurrent.ConcurrentHashMap
 import java.util.logging.Logger
 
@@ -10,15 +8,14 @@ import java.util.logging.Logger
  * 负责插件的加载、卸载和生命周期管理
  */
 class PluginManager(
-    private val contextFactory: PluginContextFactory,
-    private val eventBus: EventBus? = null
+    contextFactory: PluginContextFactory,
 ) {
     private val logger = Logger.getLogger(PluginManager::class.java.name)
     private val loadedPlugins = ConcurrentHashMap<String, LoadedPlugin>()
-    
+
     // 插件加载器
-    private val sourcePluginSanner = SourcePluginScanner(contextFactory, eventBus)
-    private val jarPluginSanner = JarPluginScanner(contextFactory, eventBus)
+    private val sourcePluginSanner = SourcePluginScanner(contextFactory)
+    private val jarPluginSanner = JarPluginScanner(contextFactory)
 
     fun loadPlugins() {
         logger.info("开始加载插件...")
@@ -48,7 +45,6 @@ class PluginManager(
                 runCatching { loadedPlugin.plugin.deactivate() }
                 loadedPlugin.classLoader?.close()
                 loadedPlugins.remove(pluginName)
-                eventBus?.publish(PluginUnloaded(loadedPlugin.id, pluginName))
                 logger.info("插件卸载成功: $pluginName")
             } catch (e: Exception) {
                 logger.severe("卸载插件失败: $pluginName, 错误: ${e.message}")

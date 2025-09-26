@@ -1,7 +1,5 @@
 package editorx.plugin
 
-import editorx.event.EventBus
-import editorx.event.PluginLoaded
 import java.io.File
 import java.net.URLClassLoader
 import java.util.logging.Logger
@@ -11,7 +9,6 @@ import java.util.logging.Logger
  */
 class JarPluginScanner(
     private val contextFactory: PluginContextFactory,
-    private val eventBus: EventBus? = null
 ) : PluginScanner {
 
     private val logger = Logger.getLogger(JarPluginScanner::class.java.name)
@@ -49,7 +46,6 @@ class JarPluginScanner(
 
                     plugin.activate(context)
                     loadedPlugins.add(loadedPlugin)
-                    eventBus?.publish(PluginLoaded(loadedPlugin.id, loadedPlugin.name, loadedPlugin.version))
 
                     logger.info("JAR插件加载成功: ${loadedPlugin.name} v${loadedPlugin.version}")
                 } catch (e: Exception) {
