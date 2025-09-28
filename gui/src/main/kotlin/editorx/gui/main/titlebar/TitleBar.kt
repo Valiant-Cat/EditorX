@@ -64,6 +64,7 @@ class TitleBar(private val mainWindow: MainWindow) : JMenuBar() {
 
     private fun createEditMenu(): JMenu {
         return JMenu("编辑").apply {
+            val shortcut = java.awt.Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx
             mnemonic = KeyEvent.VK_E
 
             add(JMenuItem("撤销").apply {
