@@ -26,7 +26,10 @@ import javax.swing.event.TreeWillExpandListener
 import javax.swing.filechooser.FileSystemView
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeModel
+import javax.swing.tree.DefaultTreeCellRenderer
+import javax.swing.tree.TreeCellRenderer
 import javax.swing.tree.TreePath
+import java.awt.Component
 
 class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
     companion object {
@@ -39,6 +42,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
     private val treeRoot = DefaultMutableTreeNode()
     private val treeModel = DefaultTreeModel(treeRoot)
     private val tree = JTree(treeModel)
+    private var customRenderer: CustomFileTreeCellRenderer? = null
 
     // 任务取消机制
     private var currentTask: Thread? = null
@@ -116,18 +120,81 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
             addActionListener { refreshRootPreserveSelection() }
         })
 
-        add(toolBar, BorderLayout.NORTH)
+//        add(toolBar, BorderLayout.NORTH)
 
         tree.isRootVisible = true
         tree.showsRootHandles = true
         // 单击只选中；双击才展开/收起。点击左侧的展开图标仍然是单击生效（JTree 默认行为）
         tree.toggleClickCount = 2
-        tree.cellRenderer = FileTreeCellRenderer()
+        
+        // 创建并设置自定义渲染器
+        customRenderer = CustomFileTreeCellRenderer()
+        tree.cellRenderer = customRenderer!! as TreeCellRenderer
+        
+        // 设置按钮事件处理
+        setupRootNodeButtonEvents()
         val scrollPane = JScrollPane(tree)
         scrollPane.border = null
         add(scrollPane, BorderLayout.CENTER)
     }
-
+    
+    private fun setupRootNodeButtonEvents() {
+        // 为树添加鼠标监听器来处理按钮点击
+        tree.addMouseListener(object : MouseAdapter() {
+            override fun mousePressed(e: MouseEvent) {
+                handleRootNodeClick(e)
+            }
+            
+            override fun mouseReleased(e: MouseEvent) {
+                handleRootNodeClick(e)
+            }
+        })
+    }
+    
+    private fun handleRootNodeClick(e: MouseEvent) {
+        val path = tree.getPathForLocation(e.x, e.y)
+        if (path != null && path.pathCount > 0) {
+            val node = path.lastPathComponent as? DefaultMutableTreeNode
+            if (node?.parent == null) { // 根节点
+                val row = tree.getRowForLocation(e.x, e.y)
+                if (row >= 0) {
+                    val bounds = tree.getRowBounds(row)
+                    
+                    // 计算右侧按钮区域的起始位置（更精确的计算）
+                    val rightPanelWidth = 66 // 3个按钮 * 20px + 2个间距 * 2px + 2px边距
+                    val rightPanelX = bounds.x + bounds.width - rightPanelWidth
+                    
+                    // 检查是否点击在右侧按钮区域
+                    if (e.x >= rightPanelX) {
+                        val buttonWidth = 20
+                        val buttonSpacing = 2
+                        val relativeX = e.x - rightPanelX
+                        
+                        when {
+                            relativeX < buttonWidth -> {
+                                // 新建文件按钮
+                                e.consume() // 阻止事件传播
+                                mainWindow.openFileChooserAndOpen()
+                                return
+                            }
+                            relativeX < buttonWidth + buttonSpacing + buttonWidth -> {
+                                // 新建文件夹按钮
+                                e.consume() // 阻止事件传播
+                                openFolder()
+                                return
+                            }
+                            relativeX < buttonWidth + buttonSpacing + buttonWidth + buttonSpacing + buttonWidth -> {
+                                // 刷新按钮
+                                e.consume() // 阻止事件传播
+                                refreshRootPreserveSelection()
+                                return
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     private fun openFolder() {
         val chooser = JFileChooser().apply {
@@ -912,4 +979,143 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         return true
     }
 
+}
+
+/**
+ * 自定义文件树单元格渲染器，支持根节点显示操作按钮（不包含展开/收起按钮）
+ */
+class CustomFileTreeCellRenderer : DefaultTreeCellRenderer() {
+    private val rootPanel = JPanel(BorderLayout())
+    private val leftPanel = JPanel(java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 0, 0))
+    private val rightPanel = JPanel(java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 2, 0))
+    
+    private val projectIcon = JLabel()
+    private val projectLabel = JLabel()
+    
+    val addFileButton = JButton()
+    val addDirButton = JButton()
+    val refreshButton = JButton()
+    
+    init {
+        setupRootPanel()
+        setupButtons()
+    }
+    
+    private fun setupRootPanel() {
+        rootPanel.isOpaque = true
+        leftPanel.isOpaque = true
+        rightPanel.isOpaque = true
+        
+        // 设置项目图标和标签
+        projectIcon.preferredSize = java.awt.Dimension(16, 16)
+        projectLabel.font = UIManager.getFont("Tree.font")
+        projectLabel.foreground = UIManager.getColor("Tree.foreground")
+
+        leftPanel.add(projectIcon)
+        leftPanel.add(Box.createHorizontalStrut(4)) // 添加8像素的固定间距
+        leftPanel.add(projectLabel)
+        
+        rootPanel.add(leftPanel, BorderLayout.WEST)
+        rootPanel.add(rightPanel, BorderLayout.EAST)
+    }
+    
+    private fun setupButtons() {
+        val iconSize = 16
+
+        addFileButton.apply {
+            icon = IconLoader.getIcon(IconRef("icons/addFile.svg"), iconSize)
+            toolTipText = "新建文件..."
+            isFocusable = false
+            margin = Insets(1, 2, 1, 2)
+            preferredSize = java.awt.Dimension(20, 18)
+            background = UIManager.getColor("Tree.background")
+            isOpaque = false
+        }
+
+        addDirButton.apply {
+            icon = IconLoader.getIcon(IconRef("icons/addDirectory.svg"), iconSize)
+            toolTipText = "新建文件夹..."
+            isFocusable = false
+            margin = Insets(1, 2, 1, 2)
+            preferredSize = java.awt.Dimension(20, 18)
+            background = UIManager.getColor("Tree.background")
+            isOpaque = false
+        }
+
+        refreshButton.apply {
+            icon = IconLoader.getIcon(IconRef("icons/refresh.svg"), iconSize)
+            toolTipText = "从磁盘重新加载"
+            isFocusable = false
+            margin = Insets(1, 2, 1, 2)
+            preferredSize = java.awt.Dimension(20, 18)
+            background = UIManager.getColor("Tree.background")
+            isOpaque = false
+        }
+
+        rightPanel.add(addFileButton)
+        rightPanel.add(addDirButton)
+        rightPanel.add(refreshButton)
+    }
+
+    override fun getTreeCellRendererComponent(
+        tree: JTree,
+        value: Any?,
+        selected: Boolean,
+        expanded: Boolean,
+        leaf: Boolean,
+        row: Int,
+        hasFocus: Boolean
+    ): Component {
+        val node = value as? DefaultMutableTreeNode ?: return super.getTreeCellRendererComponent(tree, value, selected, expanded, leaf, row, hasFocus)
+        
+        // 如果是根节点，返回自定义面板
+        if (node.parent == null) {
+            updateRootNodeAppearance(selected, expanded)
+            return rootPanel
+        }
+        
+        // 其他节点使用默认渲染器，但需要正确处理图标
+        val component = super.getTreeCellRendererComponent(tree, value, selected, expanded, leaf, row, hasFocus)
+        
+        // 检查是否是 FileNode 类型
+        if (node.userObject is File) {
+            val file = node.userObject as File
+            (component as DefaultTreeCellRenderer).icon = getIconForFile(file)
+            (component as DefaultTreeCellRenderer).text = file.name.ifEmpty { file.absolutePath }
+        }
+        return component
+    }
+    
+    private fun getIconForFile(file: File): Icon? {
+        return if (file.isDirectory) {
+            IconLoader.getIcon(IconRef("icons/folder.svg"), 16)
+        } else {
+            // 使用默认文件图标
+            IconLoader.getIcon(IconRef("icons/anyType.svg"), 16)
+        }
+    }
+    
+    private fun updateRootNodeAppearance(selected: Boolean, expanded: Boolean) {
+        val background = if (selected) {
+            UIManager.getColor("Tree.selectionBackground")
+        } else {
+            UIManager.getColor("Tree.background")
+        }
+        
+        val foreground = if (selected) {
+            UIManager.getColor("Tree.selectionForeground")
+        } else {
+            UIManager.getColor("Tree.foreground")
+        }
+        
+        rootPanel.background = background
+        leftPanel.background = background
+        rightPanel.background = background
+        
+        projectLabel.foreground = foreground
+        projectLabel.text = "项目根目录" // 这里可以动态设置项目名称
+        
+        // 更新项目图标
+        projectIcon.icon = IconLoader.getIcon(IconRef("icons/folder.svg"), 16)
+    }
 }
