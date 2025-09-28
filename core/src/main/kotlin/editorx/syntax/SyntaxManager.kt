@@ -20,10 +20,8 @@ object SyntaxManager {
         adapters.add(adapter)
 
         // 注册 TokenMaker
-        adapter.getSyntaxHighlighter().let { syntaxHighlighter ->
-            val tmf = TokenMakerFactory.getDefaultInstance() as AbstractTokenMakerFactory
-            tmf.putMapping(adapter.syntaxStyleKey, syntaxHighlighter.getTokenMakerClassName())
-        }
+        val tmf = TokenMakerFactory.getDefaultInstance() as AbstractTokenMakerFactory
+        tmf.putMapping(adapter.syntaxStyleKey, adapter.getTokenMakerClassName())
     }
 
     /**

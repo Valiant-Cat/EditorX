@@ -2,24 +2,20 @@ package editorx.syntax
 
 interface SyntaxProvider {
     val syntaxStyleKey: String           // e.g., "text/smali"
-    val fileExtensions: Set<String>  // e.g., setOf(".smali")
+    val fileExtensions: Set<String>      // e.g., setOf(".smali")
 
-    fun getSyntaxHighlighter(): SyntaxHighlighter
-}
+    /**
+     * 是否支持代码折叠
+     */
+    val isCodeFoldingEnabled: Boolean
 
-abstract class CachedSyntaxProvider : SyntaxProvider {
-    private var cachedSyntaxHighlighter: SyntaxHighlighter? = null
+    /**
+     * 是否启用括号匹配
+     */
+    val isBracketMatchingEnabled: Boolean
 
-    override fun getSyntaxHighlighter(): SyntaxHighlighter {
-        if (cachedSyntaxHighlighter == null) {
-            synchronized(this) {
-                if (cachedSyntaxHighlighter == null) {
-                    cachedSyntaxHighlighter = createSyntaxHighlighter()
-                }
-            }
-        }
-        return cachedSyntaxHighlighter!!
-    }
-
-    abstract fun createSyntaxHighlighter(): SyntaxHighlighter
+    /**
+     * 获取 TokenMaker 类名
+     */
+    fun getTokenMakerClassName(): String
 }

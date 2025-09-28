@@ -1,12 +1,12 @@
 package editorx.gui.plugin
 
-import editorx.gui.CachedViewProvider
+import editorx.gui.ViewProvider
 import editorx.gui.main.MainWindow
 import editorx.plugin.LoadedPlugin
 import editorx.plugin.PluginContext
 import editorx.settings.SettingsStore
-import editorx.syntax.CachedSyntaxProvider
 import editorx.syntax.SyntaxManager
+import editorx.syntax.SyntaxProvider
 import editorx.workspace.WorkspaceManager
 import java.util.logging.Logger
 
@@ -26,11 +26,11 @@ class GuiPluginContext(
 
     override fun workspace(): WorkspaceManager = mainWindow.guiControl.workspace
 
-    override fun addActivityBarItem(iconPath: String, viewProvider: CachedViewProvider) {
+    override fun addActivityBarItem(iconPath: String, viewProvider: ViewProvider) {
         mainWindow.activityBar.addItem(loadedPlugin.id, loadedPlugin.name, iconPath, viewProvider)
     }
 
-    override fun registerSyntaxAdapter(syntaxProvider: CachedSyntaxProvider) {
+    override fun registerSyntaxAdapter(syntaxProvider: SyntaxProvider) {
         SyntaxManager.registerAdapter(syntaxProvider)
     }
 }

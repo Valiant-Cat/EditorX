@@ -24,12 +24,11 @@ class TextArea : RSyntaxTextArea() {
         val syntaxAdapter = SyntaxManager.getAdapterForFile(file)
         if (syntaxAdapter != null) {
             println("找到自定义语法适配器: ${syntaxAdapter::class.simpleName}")
-            this.isCodeFoldingEnabled = syntaxAdapter.getSyntaxHighlighter().supportsFolding()
-            this.isBracketMatchingEnabled = syntaxAdapter.getSyntaxHighlighter().isBracketMatchingEnabled()
             this.syntaxEditingStyle = syntaxAdapter.syntaxStyleKey
+            this.isCodeFoldingEnabled = syntaxAdapter.isCodeFoldingEnabled
+            this.isBracketMatchingEnabled = syntaxAdapter.isBracketMatchingEnabled
         } else {
             println("未找到自定义语法高亮器，使用默认语法")
-            // 使用默认的语法检测
             syntaxEditingStyle = detectDefaultSyntax(file)
         }
     }
