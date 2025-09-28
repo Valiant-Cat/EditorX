@@ -1,4 +1,4 @@
-package editorx.gui.ui.dialog
+package editorx.gui.dialog
 
 import editorx.plugin.PluginManager
 import java.awt.BorderLayout

@@ -1,4 +1,4 @@
-package editorx.gui.ui.widget
+package editorx.gui.widget
 
 import java.awt.*
 import java.awt.geom.*

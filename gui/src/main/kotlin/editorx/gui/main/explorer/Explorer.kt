@@ -26,7 +26,7 @@ import javax.swing.tree.DefaultTreeModel
 import javax.swing.tree.TreePath
 import javax.swing.border.EmptyBorder
 import javax.swing.filechooser.FileSystemView
-import editorx.gui.util.IconUtils
+import editorx.gui.utils.IconUtil
 
 class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
 
@@ -335,7 +335,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                     ?: UIManager.getIcon("Tree.leafIcon")
                     ?: createDefaultIcon())
                 // 统一 16x16 尺寸
-                IconUtils.resizeIcon(base, 16, 16)
+                IconUtil.resizeIcon(base, 16, 16)
             }
         }
 

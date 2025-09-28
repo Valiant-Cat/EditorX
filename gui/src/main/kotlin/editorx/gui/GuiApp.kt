@@ -2,7 +2,7 @@ package editorx.gui
 
 import com.formdev.flatlaf.FlatLightLaf
 import editorx.gui.plugin.GuiPluginContextFactory
-import editorx.gui.ui.theme.ThemeManager
+import editorx.gui.core.theme.ThemeManager
 import editorx.gui.main.MainWindow
 import editorx.plugin.PluginManager
 import java.io.File

@@ -2,7 +2,7 @@ package editorx.gui.main.titlebar
 
 import editorx.gui.main.MainWindow
 import editorx.gui.main.explorer.Explorer
-import editorx.gui.ui.dialog.PluginManagerDialog
+import editorx.gui.dialog.PluginManagerDialog
 import java.awt.event.ActionEvent
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
@@ -39,27 +39,7 @@ class TitleBar(private val mainWindow: MainWindow) : JMenuBar() {
             })
 
             add(JMenu("最近打开").apply {
-                addMenuListener(
-                    object : javax.swing.event.MenuListener {
-                        override fun menuSelected(e: javax.swing.event.MenuEvent) {
-                            this@apply.removeAll()
-                            val recents = mainWindow.guiControl.workspace.recentFiles()
-                            if (recents.isEmpty()) {
-                                this@apply.add(JMenuItem("(无)"))
-                            } else {
-                                recents.forEach { file ->
-                                    val item = JMenuItem(file.name)
-                                    item.toolTipText = file.absolutePath
-                                    item.addActionListener { mainWindow.editor.openFile(file) }
-                                    this@apply.add(item)
-                                }
-                            }
-                        }
-
-                        override fun menuDeselected(e: javax.swing.event.MenuEvent) {}
-                        override fun menuCanceled(e: javax.swing.event.MenuEvent) {}
-                    }
-                )
+                addMenuListener(RecentFilesMenuListener(this, mainWindow))
             })
 
             addSeparator()
@@ -212,4 +192,27 @@ class TitleBar(private val mainWindow: MainWindow) : JMenuBar() {
     private fun showHelp() {
         JOptionPane.showMessageDialog(this, "帮助文档待实现", "提示", JOptionPane.INFORMATION_MESSAGE)
     }
+}
+
+private class RecentFilesMenuListener(
+    private val menu: JMenu,
+    private val mainWindow: MainWindow
+) : javax.swing.event.MenuListener {
+    override fun menuSelected(e: javax.swing.event.MenuEvent) {
+        menu.removeAll()
+        val recents = mainWindow.guiControl.workspace.recentFiles()
+        if (recents.isEmpty()) {
+            menu.add(JMenuItem("(无)"))
+        } else {
+            recents.forEach { file ->
+                val item = JMenuItem(file.name)
+                item.toolTipText = file.absolutePath
+                item.addActionListener { mainWindow.editor.openFile(file) }
+                menu.add(item)
+            }
+        }
+    }
+
+    override fun menuDeselected(e: javax.swing.event.MenuEvent) {}
+    override fun menuCanceled(e: javax.swing.event.MenuEvent) {}
 }

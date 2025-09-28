@@ -1,11 +1,11 @@
 package editorx.gui.main.activitybar
 
-import editorx.gui.Constants
+import editorx.gui.core.Constants
 import editorx.gui.ViewProvider
 import editorx.gui.main.MainWindow
-import editorx.gui.ui.theme.ThemeManager
-import editorx.gui.ui.widget.SvgIcon
-import editorx.gui.util.IconUtils
+import editorx.gui.core.theme.ThemeManager
+import editorx.gui.widget.SvgIcon
+import editorx.gui.utils.IconUtil
 import java.awt.*
 import java.awt.geom.RoundRectangle2D
 import javax.swing.*
@@ -22,8 +22,9 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
     private var autoSelected: Boolean = false
 
     private val backgroundColor = ThemeManager.activityBarBackground
-    private val selectedColor = ThemeManager.activityBarItemSelected
-    private val hoverColor = ThemeManager.activityBarItemHover
+    private val itemNormalBackgroundColor = backgroundColor
+    private val itemSelectedBackgroundColor = ThemeManager.activityBarItemSelectedBackground
+    private val hoverColor = ThemeManager.activityBarItemHoverBackground
 
     init {
         setupActivityBar()
@@ -97,7 +98,7 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
                     val resource = javaClass.getResource("/$iconPath")
                     if (resource != null) {
                         val originalIcon = ImageIcon(resource)
-                        IconUtils.resizeIcon(originalIcon, ICON_SIZE, ICON_SIZE)
+                        IconUtil.resizeIcon(originalIcon, ICON_SIZE, ICON_SIZE)
                     } else {
                         createDefaultIcon()
                     }
@@ -153,7 +154,7 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
             isFocusPainted = false
             isBorderPainted = false
             isOpaque = false  // 设置为false，因为我们自定义绘制背景
-            background = backgroundColor
+            background = itemNormalBackgroundColor
             foreground = Color.WHITE
             alignmentX = Component.CENTER_ALIGNMENT
             addMouseListener(object : java.awt.event.MouseAdapter() {
@@ -163,7 +164,7 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
                 }
 
                 override fun mouseExited(e: java.awt.event.MouseEvent) {
-                    if (activeId != viewId) background = backgroundColor
+                    if (activeId != viewId) background = itemNormalBackgroundColor
                     repaint()
                 }
             })
@@ -224,7 +225,7 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
 
     private fun updateAllButtonStates() {
         buttonMap.forEach { (id, btn) ->
-            btn.background = if (activeId == id) selectedColor else backgroundColor
+            btn.background = if (activeId == id) itemSelectedBackgroundColor else itemNormalBackgroundColor
             btn.repaint()
         }
     }

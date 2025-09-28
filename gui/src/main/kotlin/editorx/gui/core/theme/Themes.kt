@@ -1,4 +1,4 @@
-package editorx.gui.ui.theme
+package editorx.gui.core.theme
 
 import java.awt.Color
 import javax.swing.BorderFactory
@@ -74,8 +74,8 @@ object ThemeManager {
     // Design tokens centralized here
     val separator: Color get() = Color(0xDE, 0xDE, 0xDE)
     val activityBarBackground: Color get() = Color(0xF2, 0xF2, 0xF2)
-    val activityBarItemSelected: Color get() = currentTheme.primaryContainer
-    val activityBarItemHover: Color get() = Color(0, 0, 0, 20) // very light overlay
+    val activityBarItemSelectedBackground: Color get() = Color(62, 115, 185,0x88)
+    val activityBarItemHoverBackground: Color get() = Color(0, 0, 0, 0x20) // very light overlay
 
     // Editor tabs
     val editorTabSelectedUnderline: Color get() = currentTheme.primary

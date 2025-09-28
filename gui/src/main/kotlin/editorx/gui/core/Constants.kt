@@ -1,4 +1,4 @@
-package editorx.gui
+package editorx.gui.core
 
 object Constants {
 

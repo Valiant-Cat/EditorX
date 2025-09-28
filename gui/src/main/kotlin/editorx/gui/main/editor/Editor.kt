@@ -1,7 +1,7 @@
 package editorx.gui.main.editor
 
 import editorx.gui.main.MainWindow
-import editorx.gui.ui.theme.ThemeManager
+import editorx.gui.core.theme.ThemeManager
 import org.fife.ui.rtextarea.RTextScrollPane
 import java.awt.CardLayout
 import java.awt.Color
