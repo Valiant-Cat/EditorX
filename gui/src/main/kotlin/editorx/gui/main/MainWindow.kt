@@ -92,7 +92,7 @@ class MainWindow(val guiControl: GuiControl) : JFrame() {
         activityBar.addItem(
             "explorer",
             "Explorer",
-            "icons/explorer.svg",
+            "icons/folder.svg",
             object : CachedViewProvider() {
                 override fun createView() = Explorer(this@MainWindow)
             }

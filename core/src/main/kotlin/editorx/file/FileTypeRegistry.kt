@@ -25,8 +25,7 @@ object FileTypeRegistry {
     fun getByExtension(ext: String?): FileType? =
         ext?.trim()?.removePrefix(".")?.lowercase()?.let { byExt[it] }
 
-    fun getByFile(file: VirtualFile): FileType? =
-        getByExtension(file.extension) ?: byId.values.firstOrNull { it.isMyFile(file) }
+    fun getByFile(file: VirtualFile): FileType? = getByExtension(file.extension)
 
     fun all(): List<FileType> = byId.values.toList()
 }

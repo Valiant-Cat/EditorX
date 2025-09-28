@@ -1,20 +1,13 @@
 import editorx.gui.IconRef
 import editorx.lang.LanguageFileType
+import editorx.plugins.yaml.YamlIcons
 
 class YamlFileType : LanguageFileType(YamlLanguage.getInstance()) {
-    override fun getName(): String {
-        return "yaml"
-    }
+    override fun getName(): String = "yaml"
 
-    override fun getDescription(): String {
-        return "YAML files"
-    }
+    override fun getDescription(): String = "YAML files"
 
-    override fun getExtensions(): Set<String> {
-        return setOf("yaml", "yml")
-    }
+    override fun getExtensions(): Set<String> = setOf("yaml", "yml")
 
-    override fun getIcon(): IconRef {
-        return IconRef("icons/yaml.svg", YamlFileType::class.java.classLoader)
-    }
+    override fun getIcon(): IconRef = YamlIcons.YamlFile
 }

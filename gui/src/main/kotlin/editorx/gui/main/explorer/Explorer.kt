@@ -1,7 +1,6 @@
 package editorx.gui.main.explorer
 
 import editorx.file.FileTypeRegistry
-import editorx.gui.IconRef
 import editorx.gui.main.MainWindow
 import editorx.util.IconLoader
 import editorx.util.IconUtil
@@ -591,9 +590,6 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
     private class FileTreeCellRenderer : javax.swing.tree.DefaultTreeCellRenderer() {
         private val fs = FileSystemView.getFileSystemView()
         private val fileIconCache = mutableMapOf<String, Icon>()
-        private val folderClosed: Icon? = UIManager.getIcon("Tree.closedIcon")
-        private val folderOpen: Icon? = UIManager.getIcon("Tree.openIcon")
-        private val defaultFile: Icon? = UIManager.getIcon("FileView.fileIcon")
 
         override fun getTreeCellRendererComponent(
             tree: JTree,
@@ -617,19 +613,20 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
             val node = value as? DefaultMutableTreeNode
             val file = (node as? FileNode)?.file
             if (file != null) {
-                icon =
-                    when {
-                        file.isDirectory ->
-                            if (expanded) folderOpen ?: icon else folderClosed ?: icon
-
-                        else -> getIconForFile(file)
-                    }
+                icon = getIconForFile(file)
                 text = file.name.ifEmpty { file.absolutePath }
             }
             return c
         }
 
         private fun getIconForFile(file: File): Icon {
+            if (file.isDirectory) {
+                return fileIconCache.getOrPut("folder") {
+                    val base: Icon = ExplorerIcons.Folder ?: createDefaultIcon()
+                    IconUtil.resizeIcon(base, 16, 16)
+                }
+            }
+
             val ext = file.extension.lowercase()
             val key = if (ext.isBlank()) "__noext__" else ext
 
@@ -638,32 +635,13 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
             val ft = FileTypeRegistry.getByFile(vt)
             if (ft != null) {
                 val ref = ft.getIcon()
-                if (ref != null) {
-                    val ico = IconLoader.getIcon(ref, 16)
-                    if (ico != null) return ico
-                }
+                val ico = IconLoader.getIcon(ref, 16)
+                if (ico != null) return ico
             }
 
-            // Built-in mappings for common extensions
-            iconForExtension(ext)?.let { return it }
-
             return fileIconCache.getOrPut(key) {
-                val base: Icon =
-                    (fs.getSystemIcon(file)
-                        ?: defaultFile ?: UIManager.getIcon("Tree.leafIcon")
-                        ?: createDefaultIcon())
+                val base: Icon = ExplorerIcons.AnyType ?: createDefaultIcon()
                 IconUtil.resizeIcon(base, 16, 16)
-            }
-        }
-
-        private fun iconForExtension(ext: String): Icon? {
-            val key = if (ext.isBlank()) "__noext__" else ext
-            return fileIconCache.getOrPut(key) {
-                val path = when (ext) {
-                    else -> null
-                }
-                val icon = path?.let { IconLoader.getIcon(IconRef(it), 16) }
-                icon ?: return IconLoader.getIcon(IconRef("icons/file-anyType.svg"),16)
             }
         }
 

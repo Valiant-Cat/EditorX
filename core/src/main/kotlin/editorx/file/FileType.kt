@@ -1,7 +1,6 @@
 package editorx.file
 
 import editorx.gui.IconRef
-import editorx.vfs.VirtualFile
 
 
 /**
@@ -43,12 +42,6 @@ interface FileType {
      */
     fun isReadOnly(): Boolean {
         return false
-    }
-
-    /** Default implementation matches by extension (case-insensitive, without dot). */
-    fun isMyFile(file: VirtualFile): Boolean {
-        val ext = file.extension.lowercase()
-        return ext.isNotBlank() && getExtensions().any { it.equals(ext, ignoreCase = true) }
     }
 }
 
