@@ -92,13 +92,13 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
             toolTipText = "新建文件..."
             isFocusable = false
             margin = Insets(2, 6, 2, 6)
-            addActionListener { mainWindow.openFileChooserAndOpen() }
+            addActionListener { createNewFile() }
         })
         toolBar.add(JButton(IconLoader.getIcon(IconRef("icons/addDirectory.svg"), TOP_BAR_ICON_SIZE)).apply {
             toolTipText = "新建文件夹..."
             isFocusable = false
             margin = Insets(2, 6, 2, 6)
-            addActionListener { openFolder() }
+            addActionListener { createNewFolder() }
         })
         toolBar.add(JButton(IconLoader.getIcon(IconRef("icons/refresh.svg"), TOP_BAR_ICON_SIZE)).apply {
             toolTipText = "从磁盘重新加载"
@@ -130,6 +130,92 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
             mainWindow.guiControl.workspace.openWorkspace(selected)
             (mainWindow.sideBar.getView("explorer") as? Explorer)?.refreshRoot()
         }
+    }
+
+    private fun createNewFile() {
+        val targetDir = getCurrentSelectedDirectory()
+        if (targetDir == null) {
+            JOptionPane.showMessageDialog(this, "请先选择一个目录", "提示", JOptionPane.INFORMATION_MESSAGE)
+            return
+        }
+
+        val fileName = JOptionPane.showInputDialog(this, "请输入文件名:", "新建文件", JOptionPane.QUESTION_MESSAGE)
+        if (fileName != null && fileName.isNotBlank()) {
+            val newFile = File(targetDir, fileName.trim())
+            try {
+                if (newFile.createNewFile()) {
+                    refreshRootPreserveSelection()
+                    // 选中新创建的文件
+                    selectFileInTree(newFile)
+                } else {
+                    JOptionPane.showMessageDialog(this, "文件已存在或创建失败", "错误", JOptionPane.ERROR_MESSAGE)
+                }
+            } catch (e: Exception) {
+                JOptionPane.showMessageDialog(this, "创建文件失败: ${e.message}", "错误", JOptionPane.ERROR_MESSAGE)
+            }
+        }
+    }
+
+    private fun createNewFolder() {
+        val targetDir = getCurrentSelectedDirectory()
+        if (targetDir == null) {
+            JOptionPane.showMessageDialog(this, "请先选择一个目录", "提示", JOptionPane.INFORMATION_MESSAGE)
+            return
+        }
+
+        val folderName = JOptionPane.showInputDialog(this, "请输入文件夹名:", "新建文件夹", JOptionPane.QUESTION_MESSAGE)
+        if (folderName != null && folderName.isNotBlank()) {
+            val newFolder = File(targetDir, folderName.trim())
+            try {
+                if (newFolder.mkdirs()) {
+                    refreshRootPreserveSelection()
+                    // 选中新创建的文件夹
+                    selectFileInTree(newFolder)
+                } else {
+                    JOptionPane.showMessageDialog(this, "文件夹已存在或创建失败", "错误", JOptionPane.ERROR_MESSAGE)
+                }
+            } catch (e: Exception) {
+                JOptionPane.showMessageDialog(this, "创建文件夹失败: ${e.message}", "错误", JOptionPane.ERROR_MESSAGE)
+            }
+        }
+    }
+
+    private fun getCurrentSelectedDirectory(): File? {
+        val selectedPath = tree.selectionPath
+        if (selectedPath != null) {
+            val selectedNode = selectedPath.lastPathComponent as? DefaultMutableTreeNode
+            if (selectedNode?.userObject is File) {
+                val selectedFile = selectedNode.userObject as File
+                return if (selectedFile.isDirectory) selectedFile else selectedFile.parentFile
+            }
+        }
+        // 如果没有选中任何节点，使用工作区根目录
+        return mainWindow.guiControl.workspace.getWorkspaceRoot()
+    }
+
+    private fun selectFileInTree(file: File) {
+        // 在树中查找并选中指定的文件
+        val root = treeModel.root as? DefaultMutableTreeNode ?: return
+        val targetPath = findNodeForFile(root, file)
+        if (targetPath != null) {
+            tree.selectionPath = TreePath(targetPath)
+            tree.scrollPathToVisible(TreePath(targetPath))
+        }
+    }
+
+    private fun findNodeForFile(root: DefaultMutableTreeNode, targetFile: File): Array<Any>? {
+        if (root.userObject is File && (root.userObject as File).absolutePath == targetFile.absolutePath) {
+            return root.path as Array<Any>
+        }
+        
+        for (i in 0 until root.childCount) {
+            val child = root.getChildAt(i) as? DefaultMutableTreeNode
+            if (child != null) {
+                val result = findNodeForFile(child, targetFile)
+                if (result != null) return result
+            }
+        }
+        return null
     }
 
     private fun installListeners() {
