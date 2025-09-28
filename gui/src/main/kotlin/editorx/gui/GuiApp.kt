@@ -40,9 +40,11 @@ private fun initializeApplication() {
         Logger.getLogger("").warning("无法设置系统外观: ${e.message}")
     }
 
-    // 使用 FlatLaf 时在 macOS 上避免启用原生屏幕菜单栏，以防 Aqua 与 FlatLaf 冲突
-    System.setProperty("apple.laf.useScreenMenuBar", "false")
-    System.setProperty("com.apple.mrj.application.apple.menu.about.name", "EditorX")
+    // 在 macOS 上将菜单集成到系统顶栏；其他平台保留在窗口内
+    if (System.getProperty("os.name").lowercase().contains("mac")) {
+        System.setProperty("apple.laf.useScreenMenuBar", "true")
+        System.setProperty("com.apple.mrj.application.apple.menu.about.name", "EditorX")
+    }
 
     // 安装 Material3 主题到 Swing 默认，确保面板/滚动/标签等遵循统一色板
     ThemeManager.installToSwing()

@@ -27,14 +27,12 @@ class TitleBar(private val mainWindow: MainWindow) : JMenuBar() {
 
             add(JMenuItem("打开文件...").apply {
                 mnemonic = KeyEvent.VK_O
-                accelerator =
-                    KeyStroke.getKeyStroke(KeyEvent.VK_O, InputEvent.CTRL_DOWN_MASK)
+                accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_O, shortcut)
                 addActionListener { mainWindow.openFileChooserAndOpen() }
             })
             add(JMenuItem("打开文件夹...").apply {
                 mnemonic = KeyEvent.VK_D
-                accelerator =
-                    KeyStroke.getKeyStroke(KeyEvent.VK_D, InputEvent.CTRL_DOWN_MASK)
+                accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_D, shortcut)
                 addActionListener { openFolder() }
             })
 
@@ -58,8 +56,7 @@ class TitleBar(private val mainWindow: MainWindow) : JMenuBar() {
 
             add(JMenuItem("退出").apply {
                 mnemonic = KeyEvent.VK_X
-                accelerator =
-                    KeyStroke.getKeyStroke(KeyEvent.VK_Q, InputEvent.CTRL_DOWN_MASK)
+                accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_Q, shortcut)
                 addActionListener { System.exit(0) }
             })
         }
@@ -71,12 +68,12 @@ class TitleBar(private val mainWindow: MainWindow) : JMenuBar() {
 
             add(JMenuItem("撤销").apply {
                 mnemonic = KeyEvent.VK_Z
-                accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_Z, ActionEvent.CTRL_MASK)
+                accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_Z, shortcut)
                 isEnabled = false
             })
             add(JMenuItem("重做").apply {
                 mnemonic = KeyEvent.VK_Y
-                accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_Y, ActionEvent.CTRL_MASK)
+                accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_Y, shortcut)
                 isEnabled = false
             })
 
@@ -84,12 +81,12 @@ class TitleBar(private val mainWindow: MainWindow) : JMenuBar() {
 
             add(JMenuItem("查找...").apply {
                 mnemonic = KeyEvent.VK_F
-                accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_F, InputEvent.CTRL_DOWN_MASK)
+                accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_F, shortcut)
                 addActionListener { showFindDialog() }
             })
             add(JMenuItem("替换...").apply {
                 mnemonic = KeyEvent.VK_H
-                accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_H, InputEvent.CTRL_DOWN_MASK)
+                accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_H, shortcut)
                 addActionListener { showReplaceDialog() }
             })
         }
