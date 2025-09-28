@@ -76,15 +76,18 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                 layout = BoxLayout(this, BoxLayout.X_AXIS)
             }
 
-        // Search field with placeholder; stretch horizontally
-        // searchField.columns = 16
-        // searchField.putClientProperty("JTextField.placeholderText", "搜索...")
-        // searchField.maximumSize =
-        //     java.awt.Dimension(Int.MAX_VALUE, searchField.preferredSize.height)
-        // toolBar.add(searchField)
         /*
         左侧按钮
         */
+
+        /*
+        自适应填充
+         */
+        toolBar.add(Box.createHorizontalGlue())
+
+        /*
+        右侧按钮
+         */
         toolBar.add(JButton(IconLoader.getIcon(IconRef("icons/addFile.svg"), TOP_BAR_ICON_SIZE)).apply {
             toolTipText = "新建文件..."
             isFocusable = false
@@ -97,18 +100,6 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
             margin = Insets(2, 6, 2, 6)
             addActionListener { openFolder() }
         })
-
-        toolBar.add(Box.createHorizontalGlue())
-
-        // toolBar.add(Box.createHorizontalStrut(4))
-        // toolBar.addSeparator()
-        // toolBar.add(Box.createHorizontalStrut(4))
-
-        // Right side: options + refresh
-        // showHiddenCheck.text = "显示隐藏文件"
-        // toolBar.add(showHiddenCheck)
-        // refreshBtn.isFocusable = false
-        // refreshBtn.margin = java.awt.Insets(2, 10, 2, 10)
         toolBar.add(JButton(IconLoader.getIcon(IconRef("icons/refresh.svg"), TOP_BAR_ICON_SIZE)).apply {
             toolTipText = "从磁盘重新加载"
             isFocusable = false
