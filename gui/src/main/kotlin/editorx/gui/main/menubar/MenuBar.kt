@@ -1,14 +1,13 @@
-package editorx.gui.main.titlebar
+package editorx.gui.main.menubar
 
 import editorx.gui.main.MainWindow
 import editorx.gui.main.explorer.Explorer
 import editorx.gui.dialog.PluginManagerDialog
-import java.awt.event.ActionEvent
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import javax.swing.*
 
-class TitleBar(private val mainWindow: MainWindow) : JMenuBar() {
+class MenuBar(private val mainWindow: MainWindow) : JMenuBar() {
     init {
         setupMenus()
     }

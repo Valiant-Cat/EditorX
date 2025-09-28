@@ -9,7 +9,7 @@ import editorx.gui.main.editor.Editor
 import editorx.gui.main.explorer.Explorer
 import editorx.gui.main.sidebar.SideBar
 import editorx.gui.main.statusbar.StatusBar
-import editorx.gui.main.titlebar.TitleBar
+import editorx.gui.main.menubar.MenuBar
 import editorx.plugin.PluginManager
 import java.awt.BorderLayout
 import java.awt.Dimension
@@ -21,7 +21,7 @@ import javax.swing.JSplitPane
 class MainWindow(val guiControl: GuiControl) : JFrame() {
 
     // UI 组件
-    val titleBar by lazy { TitleBar(this) }
+    val titleBar by lazy { MenuBar(this) }
     val activityBar by lazy { ActivityBar(this) }
     val sideBar by lazy { SideBar(this) }
     val editor by lazy { Editor(this) }
