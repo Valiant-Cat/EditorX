@@ -10,6 +10,7 @@ import editorx.gui.main.explorer.Explorer
 import editorx.gui.main.sidebar.SideBar
 import editorx.gui.main.statusbar.StatusBar
 import editorx.gui.main.menubar.MenuBar
+import editorx.gui.main.toolbar.ToolBar
 import editorx.plugin.PluginManager
 import java.awt.BorderLayout
 import java.awt.Dimension
@@ -22,6 +23,7 @@ class MainWindow(val guiControl: GuiControl) : JFrame() {
 
     // UI 组件
     val titleBar by lazy { MenuBar(this) }
+    val toolBar by lazy { ToolBar(this) }
     val activityBar by lazy { ActivityBar(this) }
     val sideBar by lazy { SideBar(this) }
     val editor by lazy { Editor(this) }
@@ -58,6 +60,8 @@ class MainWindow(val guiControl: GuiControl) : JFrame() {
         layout = BorderLayout()
         // 正确安装菜单栏，避免某些 LAF 下作为普通组件加入导致不显示
         jMenuBar = titleBar
+        // 顶部工具栏（菜单栏之下）
+        add(toolBar, BorderLayout.NORTH)
         add(activityBar, BorderLayout.WEST)
         // 暂时直接使用水平分割面板，不包含Panel
         add(horizontalSplit, BorderLayout.CENTER)
@@ -73,6 +77,9 @@ class MainWindow(val guiControl: GuiControl) : JFrame() {
         // 当用户手动拖动分割条把 SideBar 拉出时，若尚未有激活视图，则激活默认项
         horizontalSplit.addPropertyChangeListener(javax.swing.JSplitPane.DIVIDER_LOCATION_PROPERTY) { _ ->
             val visible = horizontalSplit.dividerLocation > 0
+            // 同步SideBar内部状态与分割条位置
+            sideBar.syncVisibilityWithDivider()
+
             if (visible && sideBar.getCurrentViewId() == null) {
                 sideBar.preserveNextDividerOnShow()
                 activityBar.activateItem(Constants.ACTIVITY_BAR_DEFAULT_ID, userInitiated = false)
@@ -81,9 +88,10 @@ class MainWindow(val guiControl: GuiControl) : JFrame() {
                 activityBar.highlightOnly(sideBar.getCurrentViewId()!!)
             } else if (!visible) {
                 activityBar.clearActive()
-                // 同步SideBar内部状态为隐藏，避免点击按钮时被误判为已可见
-                sideBar.hideSideBar()
             }
+
+            // 同步更新ToolBar中的侧边栏toggle按钮
+            toolBar.updateSideBarIcon(visible)
         }
     }
 

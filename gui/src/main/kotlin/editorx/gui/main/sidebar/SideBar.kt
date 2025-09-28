@@ -119,6 +119,25 @@ class SideBar(private val mainWindow: MainWindow) : JPanel() {
     fun isSideBarVisible(): Boolean = isVisible
 
     /**
+     * 同步内部状态与分割条位置
+     * 当用户手动拖拽分割条时调用此方法来同步内部状态
+     */
+    fun syncVisibilityWithDivider() {
+        var current = parent
+        while (current != null) {
+            if (current is javax.swing.JSplitPane) {
+                val dividerLocation = current.dividerLocation
+                val shouldBeVisible = dividerLocation > 0
+                if (shouldBeVisible != isVisible) {
+                    isVisible = shouldBeVisible
+                }
+                break
+            }
+            current = current.parent
+        }
+    }
+
+    /**
      * 实际可见性：同时满足内部标记为可见，且分割条位置大于0
      * 用于避免由于异步设置 dividerLocation 导致的短暂不同步
      */

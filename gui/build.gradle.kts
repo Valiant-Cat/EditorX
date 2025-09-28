@@ -18,5 +18,5 @@ dependencies {
 }
 
 application {
-    mainClass.set("editorx.gui.EditorGuiKt")
+    mainClass.set("editorx.gui.GuiAppKt")
 }
