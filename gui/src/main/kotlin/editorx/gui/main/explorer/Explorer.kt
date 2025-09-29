@@ -36,6 +36,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
     private val treeModel = DefaultTreeModel(treeRoot)
     private val tree = JTree(treeModel)
     private var locateButton: JButton? = null
+    private var lastKnownFile: File? = null
 
     // 任务取消机制
     private var currentTask: Thread? = null
@@ -72,8 +73,9 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
 
         // 初始化定位按钮状态
         updateLocateButtonState()
-        
-        // 文件变化时按钮状态会在 openFile 方法中更新
+
+        // 监听编辑器标签页变化
+        setupEditorTabChangeListener()
 
         val scrollPane = JScrollPane(tree)
         scrollPane.border = null
@@ -181,21 +183,21 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
     private fun updateLocateButtonState() {
         val currentFile = mainWindow.editor.getCurrentFile()
         val workspaceRoot = mainWindow.guiControl.workspace.getWorkspaceRoot()
-        
-        val isEnabled = currentFile != null && 
-                        workspaceRoot != null && 
-                        currentFile.absolutePath.startsWith(workspaceRoot.absolutePath)
-        
+
+        val isEnabled = currentFile != null &&
+                workspaceRoot != null &&
+                currentFile.absolutePath.startsWith(workspaceRoot.absolutePath)
+
         locateButton?.isEnabled = isEnabled
     }
 
     private fun collapseAll() {
         // 收起所有展开的节点
         val root = treeModel.root as? DefaultMutableTreeNode ?: return
-        
+
         // 递归收起所有节点
         collapseAllNodes(root)
-        
+
         // 刷新树显示
         treeModel.reload()
     }
@@ -204,7 +206,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         // 收起当前节点
         val path = TreePath(node.path)
         tree.collapsePath(path)
-        
+
         // 递归处理所有子节点
         for (i in 0 until node.childCount) {
             val child = node.getChildAt(i) as? DefaultMutableTreeNode
@@ -214,18 +216,19 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         }
     }
 
-
-
-    private fun openFolder() {
-        val chooser = JFileChooser().apply {
-            fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
-            dialogTitle = "选择文件夹"
+    // 设置编辑器标签页变化监听器
+    private fun setupEditorTabChangeListener() {
+        // 由于无法直接访问编辑器的私有 tabbedPane，我们采用轮询方式
+        // 但使用更智能的轮询策略
+        val timer = Timer(500) { // 每500ms检查一次
+            val currentFile = mainWindow.editor.getCurrentFile()
+            // 只有当文件状态真正发生变化时才通知
+            if (currentFile != lastKnownFile) {
+                lastKnownFile = currentFile
+            }
         }
-        if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
-            val selected = chooser.selectedFile
-            mainWindow.guiControl.workspace.openWorkspace(selected)
-            (mainWindow.sideBar.getView("explorer") as? Explorer)?.refreshRoot()
-        }
+        timer.isRepeats = true
+        timer.start()
     }
 
     private fun createNewFile() {
