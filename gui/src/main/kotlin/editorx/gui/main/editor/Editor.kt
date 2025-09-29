@@ -4,7 +4,6 @@ import editorx.filetype.FileTypeRegistry
 import editorx.gui.main.MainWindow
 import editorx.gui.main.explorer.ExplorerIcons
 import editorx.gui.core.theme.ThemeManager
-import editorx.navigation.NavigationRegistry
 import editorx.util.IconLoader
 import editorx.util.IconUtil
 import editorx.vfs.LocalVirtualFile
@@ -423,41 +422,41 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
     }
 
     private fun attemptNavigate(file: File, textArea: TextArea) {
-        try {
-            val vf = LocalVirtualFile.of(file)
-            val provider = NavigationRegistry.findFirstForFile(vf)
-            if (provider == null) {
-                mainWindow.statusBar.setMessage("无可用跳转处理器")
-                return
-            }
-            val caret = textArea.caretPosition
-            val target = provider.gotoDefinition(vf, caret, textArea.text)
-            if (target == null) {
-                mainWindow.statusBar.setMessage("未找到跳转目标")
-                return
-            }
-            val targetFile = when (target.file) {
-                is LocalVirtualFile -> (target.file as LocalVirtualFile).toFile()
-                else -> null
-            }
-            if (targetFile != null) {
-                openFile(targetFile)
-                val idx = fileToTab[targetFile]
-                if (idx != null) {
-                    val ta = tabTextAreas[idx]
-                    if (ta != null) {
-                        val pos = target.offset.coerceIn(0, ta.document.length)
-                        ta.caretPosition = pos
-                        val r = ta.modelToView2D(pos)
-                        if (r != null) ta.scrollRectToVisible(r.bounds)
-                    }
-                }
-            } else {
-                mainWindow.statusBar.setMessage("跳转目标不可打开")
-            }
-        } catch (e: Exception) {
-            mainWindow.statusBar.setMessage("跳转失败: ${e.message}")
-        }
+//        try {
+//            val vf = LocalVirtualFile.of(file)
+//            val provider = NavigationRegistry.findFirstForFile(vf)
+//            if (provider == null) {
+//                mainWindow.statusBar.setMessage("无可用跳转处理器")
+//                return
+//            }
+//            val caret = textArea.caretPosition
+//            val target = provider.gotoDefinition(vf, caret, textArea.text)
+//            if (target == null) {
+//                mainWindow.statusBar.setMessage("未找到跳转目标")
+//                return
+//            }
+//            val targetFile = when (target.file) {
+//                is LocalVirtualFile -> (target.file as LocalVirtualFile).toFile()
+//                else -> null
+//            }
+//            if (targetFile != null) {
+//                openFile(targetFile)
+//                val idx = fileToTab[targetFile]
+//                if (idx != null) {
+//                    val ta = tabTextAreas[idx]
+//                    if (ta != null) {
+//                        val pos = target.offset.coerceIn(0, ta.document.length)
+//                        ta.caretPosition = pos
+//                        val r = ta.modelToView2D(pos)
+//                        if (r != null) ta.scrollRectToVisible(r.bounds)
+//                    }
+//                }
+//            } else {
+//                mainWindow.statusBar.setMessage("跳转目标不可打开")
+//            }
+//        } catch (e: Exception) {
+//            mainWindow.statusBar.setMessage("跳转失败: ${e.message}")
+//        }
     }
 
     private fun createTabHeader(file: File): JPanel = JPanel().apply {
