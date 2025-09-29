@@ -33,9 +33,9 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
     }
 
     private fun JButton.compact(textLabel: String, l: ActionListener): JButton = apply {
-        text = textLabel
-        margin = Insets(4, 4, 4, 4)
+        toolTipText = textLabel
         isFocusable = false
+        margin = Insets(4, 4, 4, 4)
         addActionListener(l)
     }
 
@@ -50,9 +50,13 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
         /*
          右侧按钮
          */
-        toggleSideBarButton = JButton(getSideBarIcon()).compact("切换侧边栏") { toggleSideBar() }
+        toggleSideBarButton = JButton(getSideBarIcon()).compact("切换侧边栏") {
+            toggleSideBar()
+        }
         add(toggleSideBarButton)
-        add(JButton(getSideBarIcon()).compact("设置") { showSettings() })
+        add(JButton(IconLoader.getIcon(IconRef("icons/settings.svg"), ICON_SIZE)).compact("设置") {
+            showSettings()
+        })
     }
 
     private fun openFolder() {
