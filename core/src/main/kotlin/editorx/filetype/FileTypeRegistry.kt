@@ -1,36 +1,43 @@
 package editorx.filetype
 
 import editorx.lang.Language
-import editorx.vfs.VirtualFile
-import java.util.concurrent.ConcurrentHashMap
+import editorx.util.FileUtil
 
-/**
- * Registry for FileType implementations, typically contributed by plugins.
- */
 object FileTypeRegistry {
-    private val byId = ConcurrentHashMap<String, FileType>()
-    private val byExt = ConcurrentHashMap<String, FileType>() // ext lowercased (no dot)
+    private val myExtensionsMap: HashMap<String, FileType> = hashMapOf()
+    private val myAllFileTypes: ArrayList<FileType> = arrayListOf()
 
-    @Synchronized
     fun registerFileType(fileType: FileType) {
-        if (byId.containsKey(fileType.getName())) return
-        byId[fileType.getName()] = fileType
-        fileType.getDefaultExtension().let { ext ->
-            val key = ext.trim().removePrefix(".").lowercase()
-            if (key.isNotEmpty()) byExt[key] = fileType
+        myAllFileTypes.add(fileType)
+        for (ext in fileType.getExtensions()) {
+            myExtensionsMap[ext] = fileType
         }
     }
 
-    fun getById(id: String): FileType? = byId[id]
-
-    fun getByExtension(ext: String?): FileType? =
-        ext?.trim()?.removePrefix(".")?.lowercase()?.let { byExt[it] }
-
-    fun getByFile(file: VirtualFile): FileType? = getByExtension(file.extension)
-
-    fun all(): List<FileType> = byId.values.toList()
     fun findFileTypeByLanguage(language: Language): LanguageFileType? {
-        TODO("Not yet implemented")
+        return language.findMyFileType(getRegisteredFileTypes())
+    }
+
+    fun getRegisteredFileTypes(): Array<FileType> {
+        return myAllFileTypes.toTypedArray()
+    }
+
+    fun getFileTypeByFileName(fileName: String): FileType? {
+        return getFileTypeByExtension(FileUtil.getExtension(fileName));
+    }
+
+    fun getFileTypeByExtension(extension: String): FileType? {
+        val result = myExtensionsMap[extension]
+        return result
+    }
+
+    fun findFileTypeByName(fileTypeName: String): FileType? {
+        for (type in myAllFileTypes) {
+            if (type.getName() == fileTypeName) {
+                return type
+            }
+        }
+        return null
     }
 }
 

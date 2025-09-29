@@ -2,4 +2,4 @@ package editorx.plugins.json
 
 import editorx.lang.Language
 
-object JsonLanguage : Language("json", "text/json")
+object JsonLanguage : Language("json")

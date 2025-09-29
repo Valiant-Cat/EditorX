@@ -1,11 +1,12 @@
 package editorx.lang
 
+import editorx.filetype.FileType
 import editorx.filetype.FileTypeRegistry
 import editorx.filetype.LanguageFileType
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentMap
 
-abstract class Language(val id: String, vararg val mimeTypes: String) {
+abstract class Language(val id: String) {
 
     init {
         // 确保 ID 全局唯一
@@ -13,13 +14,6 @@ abstract class Language(val id: String, vararg val mimeTypes: String) {
             throw IllegalStateException("Language with id '$id' is already registered: ${registeredIds[id]}")
         }
         registeredIds[id] = this
-
-        // 注册 MIME 类型
-        for (mimeType in mimeTypes) {
-            if (mimeType.isNotBlank()) {
-                registeredMimeTypes.computeIfAbsent(mimeType) { mutableListOf() }.add(this)
-            }
-        }
     }
 
     fun getDisplayName(): String = id
@@ -28,27 +22,26 @@ abstract class Language(val id: String, vararg val mimeTypes: String) {
         return FileTypeRegistry.findFileTypeByLanguage(this)
     }
 
-    override fun toString(): String = "Language: $id"
+    fun findMyFileType(types: Array<FileType>): LanguageFileType? {
+        for (fileType in types) {
+            if (fileType is LanguageFileType) {
+                if (fileType.language === this) {
+                    return fileType
+                }
+            }
+        }
+        return null
+    }
 
     companion object {
         // 注册表：ID -> Language
         private val registeredIds: ConcurrentMap<String, Language> = ConcurrentHashMap()
-
-        // 注册表：MIME -> List<Language>
-        private val registeredMimeTypes: ConcurrentMap<String, MutableList<Language>> = ConcurrentHashMap()
 
         /**
          * 通过语言 ID 查找 Language 实例
          */
         fun findLanguageByID(id: String): Language? {
             return registeredIds[id]
-        }
-
-        /**
-         * 通过 MIME 类型查找所有关联的语言
-         */
-        fun findLanguagesByMimeType(mimeType: String): List<Language> {
-            return registeredMimeTypes[mimeType] ?: emptyList()
         }
 
         /**

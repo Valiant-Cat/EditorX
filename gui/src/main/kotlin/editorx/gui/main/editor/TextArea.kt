@@ -1,8 +1,10 @@
 package editorx.gui.main.editor
 
-import editorx.syntax.SyntaxHighlighterManager
+import editorx.filetype.SyntaxHighlighterRegistry
+import org.fife.ui.rsyntaxtextarea.AbstractTokenMakerFactory
 import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea
 import org.fife.ui.rsyntaxtextarea.SyntaxConstants
+import org.fife.ui.rsyntaxtextarea.TokenMakerFactory
 import java.awt.Font
 import java.io.File
 
@@ -21,12 +23,14 @@ class TextArea : RSyntaxTextArea() {
      */
     fun detectSyntax(file: File) {
         // 检测是否有自定义语法高亮器
-        val syntaxProvider = SyntaxHighlighterManager.getProviderForFile(file)
-        if (syntaxProvider != null) {
-            println("找到自定义语法高亮器: ${syntaxProvider::class.simpleName}")
-            this.syntaxEditingStyle = syntaxProvider.syntaxStyleKey
-            this.isCodeFoldingEnabled = syntaxProvider.isCodeFoldingEnabled
-            this.isBracketMatchingEnabled = syntaxProvider.isBracketMatchingEnabled
+        val syntaxHighlighter = SyntaxHighlighterRegistry.getSyntaxHighlighter(file)
+        if (syntaxHighlighter != null) {
+            println("找到自定义语法高亮器: ${syntaxHighlighter::class.simpleName}")
+            val tmf = TokenMakerFactory.getDefaultInstance() as AbstractTokenMakerFactory
+            tmf.putMapping(syntaxHighlighter.syntaxStyleKey, syntaxHighlighter.getTokenMakerClassName())
+            this.syntaxEditingStyle = syntaxHighlighter.syntaxStyleKey
+            this.isCodeFoldingEnabled = syntaxHighlighter.isCodeFoldingEnabled
+            this.isBracketMatchingEnabled = syntaxHighlighter.isBracketMatchingEnabled
         } else {
             println("未找到自定义语法高亮器，使用默认语法")
             syntaxEditingStyle = detectDefaultSyntax(file)

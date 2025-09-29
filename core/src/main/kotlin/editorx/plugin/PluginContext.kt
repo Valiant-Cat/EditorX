@@ -3,7 +3,8 @@ package editorx.plugin
 import editorx.gui.ViewProvider
 import editorx.filetype.FileType
 import editorx.settings.SettingsStore
-import editorx.syntax.SyntaxHighlighterProvider
+import editorx.filetype.SyntaxHighlighterFactory
+import editorx.lang.Language
 import editorx.workspace.WorkspaceManager
 
 /**
@@ -29,13 +30,12 @@ interface PluginContext {
     fun addActivityBarItem(iconPath: String, viewProvider: ViewProvider)
 
     /**
-     * 注册语法适配器
-     */
-    fun registerSyntaxHighlighterProvider(syntaxHighlighterProvider: SyntaxHighlighterProvider)
-
-    /**
      * 注册文件类型
      */
     fun registerFileType(fileType: FileType)
 
+    /**
+     * 注册语法高亮工厂
+     */
+    fun registerSyntaxHighlighterFactory(language: Language, factory: SyntaxHighlighterFactory)
 }

@@ -5,7 +5,6 @@ import editorx.gui.IconRef
 import editorx.gui.main.MainWindow
 import editorx.util.IconLoader
 import editorx.util.IconUtil
-import editorx.vfs.LocalVirtualFile
 import java.awt.*
 import java.awt.datatransfer.DataFlavor
 import java.awt.dnd.*
@@ -1014,8 +1013,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
             val key = if (ext.isBlank()) "__noext__" else ext
 
             // Prefer plugin-provided file type icons
-            val vt = LocalVirtualFile.of(file)
-            val ft = FileTypeRegistry.getByFile(vt)
+            val ft = FileTypeRegistry.getFileTypeByFileName(file.name)
             if (ft != null) {
                 val ref = ft.getIcon()
                 val ico = IconLoader.getIcon(ref, 16)

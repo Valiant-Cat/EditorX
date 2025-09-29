@@ -1,14 +1,12 @@
 package editorx.gui.plugin
 
-import editorx.filetype.FileType
-import editorx.filetype.FileTypeRegistry
+import editorx.filetype.*
 import editorx.gui.ViewProvider
 import editorx.gui.main.MainWindow
+import editorx.lang.Language
 import editorx.plugin.LoadedPlugin
 import editorx.plugin.PluginContext
 import editorx.settings.SettingsStore
-import editorx.syntax.SyntaxHighlighterManager
-import editorx.syntax.SyntaxHighlighterProvider
 import editorx.workspace.WorkspaceManager
 import java.util.logging.Logger
 
@@ -32,11 +30,11 @@ class GuiPluginContext(
         mainWindow.activityBar.addItem(loadedPlugin.id, loadedPlugin.name, iconPath, viewProvider)
     }
 
-    override fun registerSyntaxHighlighterProvider(syntaxHighlighterProvider: SyntaxHighlighterProvider) {
-        SyntaxHighlighterManager.registerProvider(syntaxHighlighterProvider)
-    }
-
     override fun registerFileType(fileType: FileType) {
         FileTypeRegistry.registerFileType(fileType)
+    }
+
+    override fun registerSyntaxHighlighterFactory(language: Language, factory: SyntaxHighlighterFactory) {
+        SyntaxHighlighterRegistry.registerSyntaxHighlighterFactory(language, factory)
     }
 }

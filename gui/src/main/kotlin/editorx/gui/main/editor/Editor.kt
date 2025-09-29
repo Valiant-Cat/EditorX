@@ -1,18 +1,13 @@
 package editorx.gui.main.editor
 
 import editorx.filetype.FileTypeRegistry
+import editorx.gui.core.theme.ThemeManager
 import editorx.gui.main.MainWindow
 import editorx.gui.main.explorer.ExplorerIcons
-import editorx.gui.core.theme.ThemeManager
 import editorx.util.IconLoader
 import editorx.util.IconUtil
-import editorx.vfs.LocalVirtualFile
 import org.fife.ui.rtextarea.RTextScrollPane
-import java.awt.CardLayout
-import java.awt.Color
-import java.awt.Dimension
-import java.awt.Font
-import java.awt.Rectangle
+import java.awt.*
 import java.awt.dnd.*
 import java.awt.event.KeyEvent
 import java.awt.event.MouseAdapter
@@ -73,7 +68,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         tabbedPane.addChangeListener {
             val file = getCurrentFile()
             mainWindow.statusBar.setFileInfo(file?.name ?: "", file?.let { it.length().toString() + " B" })
-            
+
             // 更新行号和列号显示
             if (file != null) {
                 val textArea = getCurrentTextArea()
@@ -91,7 +86,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                 // 没有文件打开时隐藏行号和列号
                 mainWindow.statusBar.hideLineColumn()
             }
-            
+
             updateTabHeaderStyles()
         }
 
@@ -665,10 +660,8 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         if (target.isDirectory) {
             return ExplorerIcons.Folder?.let { IconUtil.resizeIcon(it, 16, 16) }
         }
-        val virtual = runCatching { LocalVirtualFile.of(target) }.getOrNull()
-        val fileTypeIcon = virtual?.let { vf ->
-            FileTypeRegistry.getByFile(vf)?.getIcon()?.let { IconLoader.getIcon(it, 16) }
-        }
+        val fileTypeIcon =
+            FileTypeRegistry.getFileTypeByFileName(file.name)?.getIcon()?.let { IconLoader.getIcon(it, 16) }
         return fileTypeIcon ?: ExplorerIcons.AnyType?.let { IconUtil.resizeIcon(it, 16, 16) }
     }
 
@@ -707,8 +700,14 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             menu.show(invoker, x, y)
         }
         tabbedPane.addMouseListener(object : MouseAdapter() {
-            override fun mousePressed(e: MouseEvent) { if (e.isPopupTrigger) trigger(e) }
-            override fun mouseReleased(e: MouseEvent) { if (e.isPopupTrigger) trigger(e) }
+            override fun mousePressed(e: MouseEvent) {
+                if (e.isPopupTrigger) trigger(e)
+            }
+
+            override fun mouseReleased(e: MouseEvent) {
+                if (e.isPopupTrigger) trigger(e)
+            }
+
             private fun trigger(e: MouseEvent) {
                 val idx = tabbedPane.indexAtLocation(e.x, e.y)
                 if (idx < 0) return
@@ -721,8 +720,14 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
     // 在任意 Tab Header 组件（含关闭按钮/标题）上安装右键菜单触发
     private fun attachPopupToHeader(header: JComponent) {
         val l = object : MouseAdapter() {
-            override fun mousePressed(e: MouseEvent) { if (e.isPopupTrigger) trigger(e) }
-            override fun mouseReleased(e: MouseEvent) { if (e.isPopupTrigger) trigger(e) }
+            override fun mousePressed(e: MouseEvent) {
+                if (e.isPopupTrigger) trigger(e)
+            }
+
+            override fun mouseReleased(e: MouseEvent) {
+                if (e.isPopupTrigger) trigger(e)
+            }
+
             private fun trigger(e: MouseEvent) {
                 val idx = tabbedPane.indexOfTabComponent(header)
                 if (idx < 0) return
