@@ -15,7 +15,7 @@ import javax.swing.*
  */
 class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
     companion object {
-        private const val ICON_SIZE = 16
+        private const val ICON_SIZE = 20
     }
 
     private var toggleSideBarButton: JButton? = null

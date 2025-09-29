@@ -1,8 +1,12 @@
 package editorx.gui.main.editor
 
+import editorx.file.FileTypeRegistry
 import editorx.gui.main.MainWindow
+import editorx.gui.main.explorer.ExplorerIcons
 import editorx.gui.core.theme.ThemeManager
 import editorx.navigation.NavigationRegistry
+import editorx.util.IconLoader
+import editorx.util.IconUtil
 import editorx.vfs.LocalVirtualFile
 import org.fife.ui.rtextarea.RTextScrollPane
 import java.awt.CardLayout
@@ -145,6 +149,8 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         val titleLabel = JLabel(file.name).apply {
             border = BorderFactory.createEmptyBorder(0, 8, 0, 6)
             horizontalAlignment = JLabel.LEFT
+            icon = resolveTabIcon(file)
+            iconTextGap = 6
         }
         add(titleLabel, java.awt.BorderLayout.CENTER)
 
@@ -391,7 +397,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         installFileDropTarget(scroll)
         installFileDropTarget(textArea)
         val title = file.name
-        tabbedPane.addTab(title, null, scroll, null)
+        tabbedPane.addTab(title, resolveTabIcon(file), scroll, null)
         val index = tabbedPane.tabCount - 1
         fileToTab[file] = index
         tabToFile[index] = file
@@ -459,6 +465,8 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         val titleLabel = JLabel(file.name).apply {
             border = BorderFactory.createEmptyBorder(0, 8, 0, 6)
             horizontalAlignment = JLabel.LEFT
+            icon = resolveTabIcon(file)
+            iconTextGap = 6
         }
         add(titleLabel, java.awt.BorderLayout.CENTER)
 
@@ -653,16 +661,30 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         }
     }
 
+    private fun resolveTabIcon(file: File?): Icon? {
+        val target = file ?: return ExplorerIcons.AnyType?.let { IconUtil.resizeIcon(it, 16, 16) }
+        if (target.isDirectory) {
+            return ExplorerIcons.Folder?.let { IconUtil.resizeIcon(it, 16, 16) }
+        }
+        val virtual = runCatching { LocalVirtualFile.of(target) }.getOrNull()
+        val fileTypeIcon = virtual?.let { vf ->
+            FileTypeRegistry.getByFile(vf)?.getIcon()?.let { IconLoader.getIcon(it, 16) }
+        }
+        return fileTypeIcon ?: ExplorerIcons.AnyType?.let { IconUtil.resizeIcon(it, 16, 16) }
+    }
+
     private fun updateTabTitle(index: Int) {
         val file = tabToFile[index]
         val base = file?.name ?: "Untitled"
         val dirty = if (dirtyTabs.contains(index)) "*" else ""
         val component = tabbedPane.getTabComponentAt(index) as? JPanel
         if (component != null) {
-            val label = (component.getComponent(0) as? JLabel)
+            val label = component.getClientProperty("titleLabel") as? JLabel ?: component.getComponent(0) as? JLabel
             label?.text = dirty + base
+            label?.icon = resolveTabIcon(file)
         } else {
             tabbedPane.setTitleAt(index, dirty + base)
+            tabbedPane.setIconAt(index, resolveTabIcon(file))
         }
     }
 
