@@ -2,7 +2,6 @@ package editorx.filetype
 
 interface SyntaxHighlighter {
     val syntaxStyleKey: String           // e.g., "text/smali"
-    val fileExtensions: Set<String>      // e.g., setOf(".smali")
 
     /**
      * 是否支持代码折叠

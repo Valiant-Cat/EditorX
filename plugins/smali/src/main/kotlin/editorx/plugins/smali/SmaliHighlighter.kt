@@ -2,9 +2,8 @@ package editorx.plugins.smali
 
 import editorx.filetype.SyntaxHighlighter
 
-class SmaliHighlighter : SyntaxHighlighter {
+object SmaliHighlighter : SyntaxHighlighter {
     override val syntaxStyleKey: String = "text/smali"
-    override val fileExtensions: Set<String> = setOf("smali")
     override val isCodeFoldingEnabled: Boolean = true
     override val isBracketMatchingEnabled: Boolean = true
 

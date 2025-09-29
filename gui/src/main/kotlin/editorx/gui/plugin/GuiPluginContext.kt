@@ -34,7 +34,7 @@ class GuiPluginContext(
         FileTypeRegistry.registerFileType(fileType)
     }
 
-    override fun registerSyntaxHighlighterFactory(language: Language, factory: SyntaxHighlighterFactory) {
-        SyntaxHighlighterRegistry.registerSyntaxHighlighterFactory(language, factory)
+    override fun registerSyntaxHighlighter(language: Language, syntaxHighlighter: SyntaxHighlighter) {
+        SyntaxHighlighterRegistry.registerSyntaxHighlighter(language, syntaxHighlighter)
     }
 }

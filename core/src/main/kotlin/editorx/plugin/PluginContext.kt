@@ -2,8 +2,8 @@ package editorx.plugin
 
 import editorx.gui.ViewProvider
 import editorx.filetype.FileType
+import editorx.filetype.SyntaxHighlighter
 import editorx.settings.SettingsStore
-import editorx.filetype.SyntaxHighlighterFactory
 import editorx.lang.Language
 import editorx.workspace.WorkspaceManager
 
@@ -37,5 +37,5 @@ interface PluginContext {
     /**
      * 注册语法高亮工厂
      */
-    fun registerSyntaxHighlighterFactory(language: Language, factory: SyntaxHighlighterFactory)
+    fun registerSyntaxHighlighter(language: Language, syntaxHighlighter: SyntaxHighlighter)
 }

@@ -1,16 +1,22 @@
 package editorx.filetype
 
 import editorx.lang.Language
+import org.fife.ui.rsyntaxtextarea.AbstractTokenMakerFactory
+import org.fife.ui.rsyntaxtextarea.TokenMakerFactory
 import java.io.File
 
 object SyntaxHighlighterRegistry {
-    private val map: MutableMap<Language, SyntaxHighlighterFactory> = mutableMapOf()
+    private val map: MutableMap<Language, SyntaxHighlighter> = mutableMapOf()
 
     /**
      * 注册语法适配器
      */
-    fun registerSyntaxHighlighterFactory(language: Language, factory: SyntaxHighlighterFactory) {
-        map[language] = factory
+    fun registerSyntaxHighlighter(language: Language, syntaxHighlighter: SyntaxHighlighter) {
+        map[language] = syntaxHighlighter
+
+        // 注册 TokenMaker
+        val tmf = TokenMakerFactory.getDefaultInstance() as AbstractTokenMakerFactory
+        tmf.putMapping(syntaxHighlighter.syntaxStyleKey, syntaxHighlighter.getTokenMakerClassName())
     }
 
     /**
@@ -19,7 +25,7 @@ object SyntaxHighlighterRegistry {
     fun getSyntaxHighlighter(file: File): SyntaxHighlighter? {
         val fileType = FileTypeRegistry.getFileTypeByFileName(file.name)
         if (fileType is LanguageFileType) {
-            return map[fileType.language]?.getSyntaxHighlighter(file)
+            return map[fileType.language]
         }
         return null
     }

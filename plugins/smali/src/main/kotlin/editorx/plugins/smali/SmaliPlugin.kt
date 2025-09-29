@@ -1,11 +1,8 @@
 package editorx.plugins.smali
 
-import editorx.filetype.SyntaxHighlighter
-import editorx.filetype.SyntaxHighlighterFactory
 import editorx.plugin.Plugin
 import editorx.plugin.PluginContext
 import editorx.plugin.PluginInfo
-import java.io.File
 
 class SmaliPlugin : Plugin {
     override fun getInfo(): PluginInfo = PluginInfo(
@@ -19,10 +16,6 @@ class SmaliPlugin : Plugin {
         context.registerFileType(SmaliFileType)
 
         // 注册 Smali 语法高亮
-        context.registerSyntaxHighlighterFactory(SmaliLanguage, object : SyntaxHighlighterFactory {
-            override fun getSyntaxHighlighter(file: File?): SyntaxHighlighter {
-                return SmaliHighlighter()
-            }
-        })
+        context.registerSyntaxHighlighter(SmaliLanguage, SmaliHighlighter)
     }
 }
