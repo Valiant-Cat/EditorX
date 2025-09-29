@@ -6,7 +6,7 @@ import editorx.workspace.DefaultWorkspaceManager
 import editorx.workspace.WorkspaceManager
 import java.io.File
 
-class GuiControl(private val appDir: File) {
+class GuiEnvironment(private val appDir: File) {
     val settings: SettingsStore by lazy {
         val settingsFile = File(appDir, "settings.properties")
         PropertiesSettingsStore(settingsFile)

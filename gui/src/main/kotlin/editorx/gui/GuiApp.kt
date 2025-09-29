@@ -54,7 +54,7 @@ private fun initializeApplication() {
 
 private fun initializeMainWindow() {
     val dir = File(System.getProperty("user.home"), ".editorx")
-    val guiControl = GuiControl(dir)
+    val guiControl = GuiEnvironment(dir)
 
     val mv = MainWindow(guiControl)
 
