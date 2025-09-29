@@ -35,6 +35,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
     private val treeRoot = DefaultMutableTreeNode()
     private val treeModel = DefaultTreeModel(treeRoot)
     private val tree = JTree(treeModel)
+    private var locateButton: JButton? = null
 
     // 任务取消机制
     private var currentTask: Thread? = null
@@ -69,6 +70,11 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
 
         initFileTree()
 
+        // 初始化定位按钮状态
+        updateLocateButtonState()
+        
+        // 文件变化时按钮状态会在 openFile 方法中更新
+
         val scrollPane = JScrollPane(tree)
         scrollPane.border = null
         add(scrollPane, BorderLayout.CENTER)
@@ -98,23 +104,36 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         /*
         Right
          */
+        locateButton = JButton(IconLoader.getIcon(IconRef("icons/locate.svg"), TOP_BAR_ICON_SIZE)).apply {
+            toolTipText = "定位打开的文件..."
+            isFocusable = false
+            margin = Insets(4, 4, 4, 4)
+            addActionListener { locateCurrentFile() }
+        }
+        toolBar.add(locateButton!!)
         toolBar.add(JButton(IconLoader.getIcon(IconRef("icons/addFile.svg"), TOP_BAR_ICON_SIZE)).apply {
             toolTipText = "新建文件..."
             isFocusable = false
-            margin = Insets(2, 6, 2, 6)
+            margin = Insets(4, 4, 4, 4)
             addActionListener { createNewFile() }
         })
         toolBar.add(JButton(IconLoader.getIcon(IconRef("icons/addDirectory.svg"), TOP_BAR_ICON_SIZE)).apply {
             toolTipText = "新建文件夹..."
             isFocusable = false
-            margin = Insets(2, 6, 2, 6)
+            margin = Insets(4, 4, 4, 4)
             addActionListener { createNewFolder() }
         })
         toolBar.add(JButton(IconLoader.getIcon(IconRef("icons/refresh.svg"), TOP_BAR_ICON_SIZE)).apply {
-            toolTipText = "从磁盘重新加载"
+            toolTipText = "刷新文件树..."
             isFocusable = false
-            margin = Insets(2, 6, 2, 6)
+            margin = Insets(4, 4, 4, 4)
             addActionListener { refreshRootPreserveSelection() }
+        })
+        toolBar.add(JButton(IconLoader.getIcon(IconRef("icons/collapseAll.svg"), TOP_BAR_ICON_SIZE)).apply {
+            toolTipText = "全部收起..."
+            isFocusable = false
+            margin = Insets(4, 4, 4, 4)
+            addActionListener { collapseAll() }
         })
 
         return toolBar
@@ -134,6 +153,67 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         }
         tree.cellRenderer = FileTreeCellRenderer()
     }
+
+    private fun locateCurrentFile() {
+        // 获取当前编辑器中打开的文件
+        val currentFile = mainWindow.editor.getCurrentFile()
+        if (currentFile == null) {
+            JOptionPane.showMessageDialog(this, "当前没有打开的文件", "提示", JOptionPane.INFORMATION_MESSAGE)
+            return
+        }
+
+        // 检查文件是否在工作区根目录下
+        val workspaceRoot = mainWindow.guiControl.workspace.getWorkspaceRoot()
+        if (workspaceRoot == null) {
+            JOptionPane.showMessageDialog(this, "请先打开工作区", "提示", JOptionPane.INFORMATION_MESSAGE)
+            return
+        }
+
+        if (!currentFile.absolutePath.startsWith(workspaceRoot.absolutePath)) {
+            JOptionPane.showMessageDialog(this, "当前文件不在工作区中", "提示", JOptionPane.INFORMATION_MESSAGE)
+            return
+        }
+
+        // 在文件树中定位并选中该文件
+        selectFileInTree(currentFile)
+    }
+
+    private fun updateLocateButtonState() {
+        val currentFile = mainWindow.editor.getCurrentFile()
+        val workspaceRoot = mainWindow.guiControl.workspace.getWorkspaceRoot()
+        
+        val isEnabled = currentFile != null && 
+                        workspaceRoot != null && 
+                        currentFile.absolutePath.startsWith(workspaceRoot.absolutePath)
+        
+        locateButton?.isEnabled = isEnabled
+    }
+
+    private fun collapseAll() {
+        // 收起所有展开的节点
+        val root = treeModel.root as? DefaultMutableTreeNode ?: return
+        
+        // 递归收起所有节点
+        collapseAllNodes(root)
+        
+        // 刷新树显示
+        treeModel.reload()
+    }
+
+    private fun collapseAllNodes(node: DefaultMutableTreeNode) {
+        // 收起当前节点
+        val path = TreePath(node.path)
+        tree.collapsePath(path)
+        
+        // 递归处理所有子节点
+        for (i in 0 until node.childCount) {
+            val child = node.getChildAt(i) as? DefaultMutableTreeNode
+            if (child != null) {
+                collapseAllNodes(child)
+            }
+        }
+    }
+
 
 
     private fun openFolder() {
@@ -497,6 +577,8 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         try {
             mainWindow.editor.openFile(file)
             mainWindow.guiControl.workspace.addRecentFile(file)
+            // 文件打开后更新定位按钮状态
+            updateLocateButtonState()
         } catch (e: Exception) {
             JOptionPane.showMessageDialog(
                 this,
