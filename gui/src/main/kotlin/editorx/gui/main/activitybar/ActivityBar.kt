@@ -12,7 +12,7 @@ import javax.swing.*
 
 class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
     companion object {
-        private const val ICON_SIZE = 24
+        private const val ICON_SIZE = 20
     }
 
     private val buttonGroup = ButtonGroup()
@@ -32,9 +32,9 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
 
     private fun setupActivityBar() {
         layout = BoxLayout(this, BoxLayout.Y_AXIS)
-        preferredSize = Dimension(44, 0)
-        minimumSize = Dimension(44, 0)
-        maximumSize = Dimension(44, Int.MAX_VALUE)
+        preferredSize = Dimension(38, 0)
+        minimumSize = Dimension(38, 0)
+        maximumSize = Dimension(38, Int.MAX_VALUE)
         // 在靠近可拖拽区域一侧增加一条细分割线以增强层次
         val separator = ThemeManager.separator
         border = BorderFactory.createCompoundBorder(
@@ -122,10 +122,9 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
             }
         }.apply {
             toolTipText = tooltip
-            margin = Insets(2, 2, 2, 2)
-            preferredSize = Dimension(32, 32)
-            minimumSize = Dimension(32, 32)
-            maximumSize = Dimension(32, 32)
+            preferredSize = Dimension(28, 28)
+            minimumSize = Dimension(28, 28)
+            maximumSize = Dimension(28, 28)
             isFocusPainted = false
             isBorderPainted = false
             isOpaque = false  // 设置为false，因为我们自定义绘制背景
