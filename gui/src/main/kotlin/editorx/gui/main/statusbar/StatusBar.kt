@@ -7,6 +7,8 @@ import java.awt.Font
 import java.io.File
 import javax.swing.*
 import editorx.gui.main.navigationbar.NavigationBar
+import java.awt.event.MouseAdapter
+import java.awt.event.MouseEvent
 
 class StatusBar(private val mainWindow: MainWindow) : JPanel() {
     private val navigationBar = NavigationBar(mainWindow)
@@ -59,8 +61,23 @@ class StatusBar(private val mainWindow: MainWindow) : JPanel() {
     private val lineColumnLabel = JLabel("").apply {
         toolTipText = "转到行/列"
         font = font.deriveFont(Font.PLAIN, 12f)
-        foreground = Color.GRAY
+        foreground = Color(99, 99, 99)
         isVisible = false  // 初始状态隐藏
+        verticalAlignment = SwingConstants.CENTER
+
+        // 设置最小高度以填充满状态栏
+        addMouseListener(object : MouseAdapter() {
+            override fun mouseEntered(e: MouseEvent) {
+                this@apply.isOpaque = true
+                this@apply.background = Color(200, 200, 200, 0xef) // 半透明浅灰色
+                this@apply.repaint()
+            }
+
+            override fun mouseExited(e: MouseEvent) {
+                this@apply.isOpaque = false
+                this@apply.repaint()
+            }
+        })
     }
 
     init {

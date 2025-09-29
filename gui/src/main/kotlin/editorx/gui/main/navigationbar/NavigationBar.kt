@@ -103,6 +103,7 @@ class NavigationBar(private val mainWindow: MainWindow) : JPanel() {
         container.add(iconLabel)
         container.add(JLabel(crumb.display).apply {
             font = font.deriveFont(Font.PLAIN, 12f)
+            foreground = Color(99, 99, 99)
             verticalAlignment = SwingConstants.CENTER
         })
         container.addMouseListener(object : MouseAdapter() {
