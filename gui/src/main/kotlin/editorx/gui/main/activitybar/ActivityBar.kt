@@ -1,10 +1,10 @@
 package editorx.gui.main.activitybar
 
-import editorx.gui.core.Constants
-import editorx.gui.ViewProvider
-import editorx.gui.main.MainWindow
-import editorx.gui.core.theme.ThemeManager
 import editorx.gui.IconRef
+import editorx.gui.ViewProvider
+import editorx.gui.core.Constants
+import editorx.gui.core.theme.ThemeManager
+import editorx.gui.main.MainWindow
 import editorx.util.IconLoader
 import java.awt.*
 import java.awt.geom.RoundRectangle2D
@@ -229,7 +229,9 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
 
         // 按照排序顺序添加按钮
         val sortedIds = buttonMap.keys.sortedBy { id ->
-            Constants.getPluginOrderInActivityBar(id)
+            return@sortedBy Constants.ACTIVITY_BAR_ORDER.indexOf(id).let { index ->
+                if (index >= 0) index else Int.MAX_VALUE
+            }
         }
 
         sortedIds.forEach { id ->
