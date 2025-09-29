@@ -225,6 +225,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
             // 只有当文件状态真正发生变化时才通知
             if (currentFile != lastKnownFile) {
                 lastKnownFile = currentFile
+                updateLocateButtonState()
             }
         }
         timer.isRepeats = true
