@@ -1,7 +1,7 @@
 package editorx.gui.main
 
 import editorx.gui.CachedViewProvider
-import editorx.gui.GuiControl
+import editorx.gui.GuiEnvironment
 import editorx.gui.core.Constants
 import editorx.widget.NoLineSplitPaneUI
 import editorx.gui.main.activitybar.ActivityBar
@@ -19,7 +19,7 @@ import javax.swing.JFileChooser
 import javax.swing.JFrame
 import javax.swing.JSplitPane
 
-class MainWindow(val guiControl: GuiControl) : JFrame() {
+class MainWindow(val guiControl: GuiEnvironment) : JFrame() {
 
     // UI 组件
     val titleBar by lazy { MenuBar(this) }

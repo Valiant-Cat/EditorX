@@ -53,10 +53,10 @@ private fun initializeApplication() {
 }
 
 private fun initializeMainWindow() {
-    val dir = File(System.getProperty("user.home"), ".editorx")
-    val guiControl = GuiEnvironment(dir)
+    val appDir = File(System.getProperty("user.home"), ".editorx")
+    val environment = GuiEnvironment(appDir)
 
-    val mv = MainWindow(guiControl)
+    val mv = MainWindow(environment)
 
     // 显示主窗口
     mv.isVisible = true
