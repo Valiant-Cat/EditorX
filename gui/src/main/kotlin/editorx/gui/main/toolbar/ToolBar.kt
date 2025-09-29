@@ -44,12 +44,22 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
          左侧按钮
          */
 
-
+        /*
+         自适应填充
+         */
         add(Box.createHorizontalGlue())
 
         /*
          右侧按钮
          */
+        add(JButton(IconLoader.getIcon(IconRef("icons/build.svg"), ICON_SIZE)).compact("编译") {
+           // TODO 编译功能待实现
+        })
+
+        add(Box.createHorizontalStrut(12))
+        addSeparator()
+        add(Box.createHorizontalStrut(12))
+
         toggleSideBarButton = JButton(getSideBarIcon()).compact("切换侧边栏") {
             toggleSideBar()
         }
