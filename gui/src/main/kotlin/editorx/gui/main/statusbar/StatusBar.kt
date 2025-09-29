@@ -69,7 +69,7 @@ class StatusBar(private val mainWindow: MainWindow) : JPanel() {
                 BorderFactory.createEmptyBorder(2, 5, 2, 5)
             )
         background = Color.decode("#f2f2f2")
-        preferredSize = Dimension(0, 25)
+        preferredSize = Dimension(0, 28)
 
         // 安装子组件
         add(Box.createHorizontalStrut(4))
