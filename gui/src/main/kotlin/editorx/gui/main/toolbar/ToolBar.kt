@@ -54,7 +54,7 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
         add(Box.createHorizontalStrut(8))
         add(Box.createHorizontalGlue())
 
-        add(JButton(IconLoader.getIcon(IconRef("icons/build.svg"), ICON_SIZE)).compact("编译") {
+        add(JButton(IconLoader.getIcon(IconRef("icons/build.svg"), ICON_SIZE)).compact("构建") {
             compileWorkspaceApk()
         })
 
