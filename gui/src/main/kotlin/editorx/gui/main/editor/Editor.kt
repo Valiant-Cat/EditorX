@@ -23,6 +23,10 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
     private val tabTextAreas = mutableMapOf<Int, TextArea>()
     private val dirtyTabs = mutableSetOf<Int>()
     private val originalTextByIndex = mutableMapOf<Int, String>()
+    
+    // AndroidManifest 底部视图
+    private var manifestViewTabs: JTabbedPane? = null
+    private var isManifestMode = false
 
     init {
         // 设置JPanel的布局
@@ -88,6 +92,9 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             }
 
             updateTabHeaderStyles()
+            
+            // 检测是否为 AndroidManifest.xml，显示/隐藏底部视图标签
+            updateManifestViewTabs(file)
         }
 
         // 设置拖放支持 - 确保整个Editor区域都支持拖放
@@ -416,6 +423,9 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         textArea.putClientProperty("suppressDirty", false)
         updateTabHeaderStyles()
         mainWindow.toolBar.updateNavigation(file)
+        
+        // 检测是否为 AndroidManifest.xml，显示/隐藏底部视图标签
+        updateManifestViewTabs(file)
     }
 
     private fun attemptNavigate(file: File, textArea: TextArea) {
@@ -918,4 +928,270 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         val currentIndex = tabbedPane.selectedIndex
         return if (currentIndex >= 0) tabTextAreas[currentIndex] else null
     }
+    
+    // 检测并更新 AndroidManifest 底部视图标签
+    private fun updateManifestViewTabs(file: File?) {
+        val isManifest = file?.name?.equals("AndroidManifest.xml", ignoreCase = true) == true
+        
+        if (isManifest && file != null && file.exists()) {
+            // 显示底部视图标签
+            if (!isManifestMode) {
+                createManifestViewTabs(file)
+            }
+        } else {
+            // 隐藏底部视图标签
+            if (isManifestMode) {
+                removeManifestViewTabs()
+            }
+        }
+    }
+    
+    // 创建 AndroidManifest 底部视图标签
+    private fun createManifestViewTabs(file: File) {
+        try {
+            // 解析 XML 内容
+            val content = Files.readString(file.toPath())
+            val manifestData = parseAndroidManifest(content)
+            
+            // 创建底部标签面板（带样式优化）
+            manifestViewTabs = JTabbedPane().apply {
+                tabPlacement = JTabbedPane.TOP
+                tabLayoutPolicy = JTabbedPane.SCROLL_TAB_LAYOUT
+                border = BorderFactory.createEmptyBorder()
+                background = Color.WHITE
+                
+                // 设置标签页样式
+                setUI(object : javax.swing.plaf.basic.BasicTabbedPaneUI() {
+                    override fun installDefaults() {
+                        super.installDefaults()
+                        tabAreaInsets = java.awt.Insets(2, 4, 0, 4)
+                        tabInsets = java.awt.Insets(6, 12, 6, 12)
+                        selectedTabPadInsets = java.awt.Insets(0, 0, 0, 0)
+                        contentBorderInsets = java.awt.Insets(1, 0, 0, 0)
+                    }
+                    
+                    override fun paintTabBackground(g: Graphics, tabPlacement: Int, tabIndex: Int, x: Int, y: Int, w: Int, h: Int, isSelected: Boolean) {
+                        val g2d = g.create() as Graphics2D
+                        try {
+                            g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+                            
+                            if (isSelected) {
+                                // 选中标签：白色背景
+                                g2d.color = Color.WHITE
+                                g2d.fillRoundRect(x, y, w, h + 2, 6, 6)
+                                
+                                // 底部蓝色线条
+                                g2d.color = Color(0, 122, 204)
+                                g2d.fillRect(x, y + h - 2, w, 3)
+                            } else {
+                                // 未选中标签：浅灰色背景
+                                g2d.color = Color(245, 245, 245)
+                                g2d.fillRoundRect(x, y, w, h, 6, 6)
+                            }
+                        } finally {
+                            g2d.dispose()
+                        }
+                    }
+                    
+                    override fun paintTabBorder(g: Graphics?, tabPlacement: Int, tabIndex: Int, x: Int, y: Int, w: Int, h: Int, isSelected: Boolean) {
+                        // 不绘制边框
+                    }
+                    
+                    override fun paintContentBorder(g: Graphics?, tabPlacement: Int, selectedIndex: Int) {
+                        // 绘制一条细线作为分隔
+                        if (g != null) {
+                            g.color = Color(230, 230, 230)
+                            g.fillRect(0, calculateTabAreaHeight(tabPlacement, runCount, maxTabHeight) - 1, tabPane.width, 1)
+                        }
+                    }
+                    
+                    override fun paintFocusIndicator(g: Graphics?, tabPlacement: Int, rects: Array<out Rectangle>?, tabIndex: Int, iconRect: Rectangle?, textRect: Rectangle?, isSelected: Boolean) {
+                        // 不绘制焦点指示器
+                    }
+                })
+                
+                font = Font("Dialog", Font.PLAIN, 13)
+            }
+            
+            // 添加权限标签 - 只有当存在权限时才显示
+            if (manifestData.permissions.isNotEmpty()) {
+                val permissionsContent = manifestData.permissions.joinToString("\n") { "• $it" }
+                manifestViewTabs!!.addTab("Permission (${manifestData.permissions.size})", createManifestContentArea(permissionsContent))
+            }
+            
+            // 添加 Activity 标签 - 只有当存在Activity时才显示
+            if (manifestData.activities.isNotEmpty()) {
+                val activitiesContent = manifestData.activities.joinToString("\n\n") { it }
+                manifestViewTabs!!.addTab("Activity (${manifestData.activities.size})", createManifestContentArea(activitiesContent))
+            }
+            
+            // 添加 Service 标签 - 只有当存在Service时才显示
+            if (manifestData.services.isNotEmpty()) {
+                val servicesContent = manifestData.services.joinToString("\n\n") { it }
+                manifestViewTabs!!.addTab("Service (${manifestData.services.size})", createManifestContentArea(servicesContent))
+            }
+            
+            // 添加 Provider 标签 - 只有当存在Provider时才显示
+            if (manifestData.providers.isNotEmpty()) {
+                val providersContent = manifestData.providers.joinToString("\n\n") { it }
+                manifestViewTabs!!.addTab("Provider (${manifestData.providers.size})", createManifestContentArea(providersContent))
+            }
+            
+            // 使用 JSplitPane 分割主编辑器和底部视图
+            val splitPane = JSplitPane(JSplitPane.VERTICAL_SPLIT, tabbedPane, manifestViewTabs)
+            splitPane.isOneTouchExpandable = true
+            splitPane.dividerSize = 8
+            
+            // 移除原有的tabbedPane，添加splitPane
+            remove(tabbedPane)
+            add(splitPane, java.awt.BorderLayout.CENTER)
+            
+            // 设置分割器位置（70%给主编辑器，30%给底部视图）
+            SwingUtilities.invokeLater {
+                splitPane.setDividerLocation(0.7)
+            }
+            
+            isManifestMode = true
+            revalidate()
+            repaint()
+            
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+    
+    // 移除 AndroidManifest 底部视图标签
+    private fun removeManifestViewTabs() {
+        if (manifestViewTabs != null) {
+            // 获取当前的分割面板
+            val splitPane = getComponent(0) as? JSplitPane
+            if (splitPane != null) {
+                // 移除分割面板，恢复原始布局
+                remove(splitPane)
+                add(tabbedPane, java.awt.BorderLayout.CENTER)
+                
+                manifestViewTabs = null
+                isManifestMode = false
+                revalidate()
+                repaint()
+            }
+        }
+    }
+    
+    // 创建 AndroidManifest 内容区域
+    private fun createManifestContentArea(content: String): JScrollPane {
+        val textArea = javax.swing.JTextArea(content).apply {
+            isEditable = false
+            font = Font("Consolas", Font.PLAIN, 13)
+            border = BorderFactory.createEmptyBorder(8, 8, 8, 8)
+            lineWrap = false
+            tabSize = 4
+            background = Color.WHITE
+        }
+        return JScrollPane(textArea).apply {
+            border = BorderFactory.createEmptyBorder()
+            background = Color.WHITE
+            viewport.background = Color.WHITE
+        }
+    }
+    
+    // 解析 AndroidManifest.xml 内容
+    private fun parseAndroidManifest(content: String): ManifestData {
+        val permissions = mutableListOf<String>()
+        val activities = mutableListOf<String>()
+        val services = mutableListOf<String>()
+        val providers = mutableListOf<String>()
+        
+        try {
+            // 提取权限
+            val permissionPattern = """<uses-permission\s+android:name="([^"]+)"""".toRegex()
+            permissions.addAll(permissionPattern.findAll(content).map { it.groupValues[1] })
+            
+            // 提取 Activity
+            val activityPattern = """<activity[^>]*android:name="([^"]+)"[^>]*>""".toRegex()
+            for (match in activityPattern.findAll(content)) {
+                val name = match.groupValues[1]
+                val startPos = match.range.first
+                val endPos = content.indexOf("</activity>", startPos).takeIf { it > 0 } ?: (startPos + 200)
+                val activityBlock = content.substring(startPos, endPos.coerceAtMost(content.length))
+                
+                val info = buildString {
+                    append("Activity: $name\n")
+                    
+                    // 检查是否为 LAUNCHER
+                    if (activityBlock.contains("android.intent.action.MAIN") && 
+                        activityBlock.contains("android.intent.category.LAUNCHER")) {
+                        append("  [LAUNCHER]\n")
+                    }
+                    
+                    // 提取 exported
+                    val exportedMatch = """android:exported="([^"]+)"""".toRegex().find(activityBlock)
+                    if (exportedMatch != null) {
+                        append("  exported: ${exportedMatch.groupValues[1]}\n")
+                    }
+                    
+                    // 提取 intent-filter
+                    if (activityBlock.contains("<intent-filter")) {
+                        append("  含有 intent-filter\n")
+                    }
+                }
+                activities.add(info)
+            }
+            
+            // 提取 Service
+            val servicePattern = """<service[^>]*android:name="([^"]+)"[^>]*>""".toRegex()
+            for (match in servicePattern.findAll(content)) {
+                val name = match.groupValues[1]
+                val startPos = match.range.first
+                val endPos = content.indexOf("</service>", startPos).takeIf { it > 0 } ?: (startPos + 200)
+                val serviceBlock = content.substring(startPos, endPos.coerceAtMost(content.length))
+                
+                val info = buildString {
+                    append("Service: $name\n")
+                    val exportedMatch = """android:exported="([^"]+)"""".toRegex().find(serviceBlock)
+                    if (exportedMatch != null) {
+                        append("  exported: ${exportedMatch.groupValues[1]}\n")
+                    }
+                    if (serviceBlock.contains("<intent-filter")) {
+                        append("  含有 intent-filter\n")
+                    }
+                }
+                services.add(info)
+            }
+            
+            // 提取 Provider
+            val providerPattern = """<provider[^>]*android:name="([^"]+)"[^>]*>""".toRegex()
+            for (match in providerPattern.findAll(content)) {
+                val name = match.groupValues[1]
+                val startPos = match.range.first
+                val endPos = content.indexOf("</provider>", startPos).takeIf { it > 0 } ?: (startPos + 200)
+                val providerBlock = content.substring(startPos, endPos.coerceAtMost(content.length))
+                
+                val info = buildString {
+                    append("Provider: $name\n")
+                    val exportedMatch = """android:exported="([^"]+)"""".toRegex().find(providerBlock)
+                    if (exportedMatch != null) {
+                        append("  exported: ${exportedMatch.groupValues[1]}\n")
+                    }
+                    val authMatch = """android:authorities="([^"]+)"""".toRegex().find(providerBlock)
+                    if (authMatch != null) {
+                        append("  authorities: ${authMatch.groupValues[1]}\n")
+                    }
+                }
+                providers.add(info)
+            }
+            
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        
+        return ManifestData(permissions, activities, services, providers)
+    }
+    
+    private data class ManifestData(
+        val permissions: List<String>,
+        val activities: List<String>,
+        val services: List<String>,
+        val providers: List<String>
+    )
 }
