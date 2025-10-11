@@ -38,6 +38,10 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
         buildActions()
     }
 
+    fun updateNavigation(currentFile: File?) {
+        navigationBar.update(currentFile)
+    }
+
     private fun JButton.compact(textLabel: String, l: ActionListener): JButton = apply {
         toolTipText = textLabel
         isFocusable = false

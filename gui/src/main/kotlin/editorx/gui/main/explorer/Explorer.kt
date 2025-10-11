@@ -142,7 +142,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
     }
 
     private fun initFileTree() {
-        tree.isRootVisible = true
+        tree.isRootVisible = false
         tree.showsRootHandles = true
         // 单击只选中；双击才展开/收起。点击左侧的展开图标仍然是单击生效（JTree 默认行为）
         tree.toggleClickCount = 2
@@ -747,11 +747,8 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         // 在后台线程中处理APK反编译
         currentTask = Thread {
             try {
-                showProgress(message = "正在反编译APK...", indeterminate = false, cancellable = true, maximum = 1)
-
                 // 检查是否被取消
                 if (!isTaskCancelled && !Thread.currentThread().isInterrupted) {
-                    updateProgress(1, "正在反编译: ${apkFile.name}")
                     decompileApk(apkFile)
                 }
 
@@ -759,7 +756,6 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                 if (!isTaskCancelled && !Thread.currentThread().isInterrupted) {
                     SwingUtilities.invokeLater {
                         hideProgress()
-                        mainWindow.statusBar.setMessage("APK反编译完成")
                         refreshRoot()
                     }
                 }
@@ -799,7 +795,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
 
             if (isTaskCancelled || Thread.currentThread().isInterrupted) return
 
-            showProgress(message = "正在反编译APK...", indeterminate = true, cancellable = true)
+            showProgress(message = "正在反编译APK...", indeterminate = true, cancellable = false)
             if (outputDir.exists()) deleteRecursively(outputDir)
 
             val result =
@@ -812,7 +808,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                     if (!isTaskCancelled && !Thread.currentThread().isInterrupted) {
                         SwingUtilities.invokeLater {
                             mainWindow.guiControl.workspace.openWorkspace(outputDir)
-                            mainWindow.statusBar.updateNavigation(null)
+                            mainWindow.toolBar.updateNavigation(null)
                             refreshRoot()
                             mainWindow.statusBar.setMessage("APK反编译完成: ${outputDir.name}")
                         }
@@ -1027,7 +1023,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                             val dir = files.firstOrNull { it.isDirectory }
                             if (dir != null) {
                                 mainWindow.guiControl.workspace.openWorkspace(dir)
-                                mainWindow.statusBar.updateNavigation(null)
+                                mainWindow.toolBar.updateNavigation(null)
                                 refreshRoot()
                                 mainWindow.statusBar.setMessage("已打开文件夹: ${dir.name}")
                                 dtde.dropComplete(true)
