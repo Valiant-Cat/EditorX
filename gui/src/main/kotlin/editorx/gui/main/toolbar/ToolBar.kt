@@ -20,12 +20,13 @@ import javax.swing.*
  */
 class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
     companion object {
-        private const val ICON_SIZE = 20
+        private const val ICON_SIZE = 18
     }
 
     private val navigationBar = NavigationBar(mainWindow)
     private var toggleSideBarButton: JButton? = null
     private var compileTask: Thread? = null
+    private var titleLabel: JLabel? = null
 
     init {
         isFloatable = false
@@ -49,6 +50,10 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
             }
         })
     }
+    
+    private fun isMacOS(): Boolean {
+        return System.getProperty("os.name").lowercase().contains("mac")
+    }
 
     fun updateNavigation(currentFile: File?) {
         navigationBar.update(currentFile)
@@ -62,25 +67,60 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
     }
 
     private fun buildActions() {
-        add(navigationBar)
-        add(Box.createHorizontalStrut(8))
-        add(Box.createHorizontalGlue())
+        if (isMacOS()) {
+            // macOS 模式：左侧留空（给系统控制按钮），中间显示标题，右侧显示按钮
+            add(Box.createHorizontalStrut(80)) // 为 macOS 交通灯按钮留空间
+            
+            add(Box.createHorizontalGlue())
+            
+            // 中间标题
+            titleLabel = JLabel("EditorX").apply {
+                font = font.deriveFont(13f)
+                foreground = Color(0x33, 0x33, 0x33)
+            }
+            add(titleLabel)
+            
+            add(Box.createHorizontalGlue())
+            
+            // 右侧按钮
+            add(JButton(IconLoader.getIcon(IconRef("icons/build.svg"), ICON_SIZE)).compact("构建") {
+                compileWorkspaceApk()
+            })
+            
+            add(Box.createHorizontalStrut(8))
+            
+            toggleSideBarButton = JButton(getSideBarIcon()).compact("切换侧边栏") {
+                toggleSideBar()
+            }
+            add(toggleSideBarButton)
+            
+            add(JButton(IconLoader.getIcon(IconRef("icons/settings.svg"), ICON_SIZE)).compact("设置") {
+                showSettings()
+            })
+            
+            add(Box.createHorizontalStrut(8))
+        } else {
+            // 非 macOS 模式：保持原有布局
+            add(navigationBar)
+            add(Box.createHorizontalStrut(8))
+            add(Box.createHorizontalGlue())
 
-        add(JButton(IconLoader.getIcon(IconRef("icons/build.svg"), ICON_SIZE)).compact("构建") {
-            compileWorkspaceApk()
-        })
+            add(JButton(IconLoader.getIcon(IconRef("icons/build.svg"), ICON_SIZE)).compact("构建") {
+                compileWorkspaceApk()
+            })
 
-        add(Box.createHorizontalStrut(12))
-        addSeparator()
-        add(Box.createHorizontalStrut(12))
+            add(Box.createHorizontalStrut(12))
+            addSeparator()
+            add(Box.createHorizontalStrut(12))
 
-        toggleSideBarButton = JButton(getSideBarIcon()).compact("切换侧边栏") {
-            toggleSideBar()
+            toggleSideBarButton = JButton(getSideBarIcon()).compact("切换侧边栏") {
+                toggleSideBar()
+            }
+            add(toggleSideBarButton)
+            add(JButton(IconLoader.getIcon(IconRef("icons/settings.svg"), ICON_SIZE)).compact("设置") {
+                showSettings()
+            })
         }
-        add(toggleSideBarButton)
-        add(JButton(IconLoader.getIcon(IconRef("icons/settings.svg"), ICON_SIZE)).compact("设置") {
-            showSettings()
-        })
     }
 
     private fun openFolder() {

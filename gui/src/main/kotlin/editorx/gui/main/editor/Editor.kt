@@ -27,6 +27,8 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
     // AndroidManifest 底部视图
     private var manifestViewTabs: JTabbedPane? = null
     private var isManifestMode = false
+    private var manifestFile: File? = null
+    private var manifestOriginalContent: String? = null
 
     init {
         // 设置JPanel的布局
@@ -949,44 +951,48 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
     // 创建 AndroidManifest 底部视图标签
     private fun createManifestViewTabs(file: File) {
         try {
-            // 解析 XML 内容
+            // 保存文件引用和原始内容
+            manifestFile = file
             val content = Files.readString(file.toPath())
+            manifestOriginalContent = content
+            
+            // 解析 XML 内容
             val manifestData = parseAndroidManifest(content)
             
-            // 创建底部标签面板（带样式优化）
+            // 创建底部标签面板（简洁样式）
             manifestViewTabs = JTabbedPane().apply {
                 tabPlacement = JTabbedPane.TOP
                 tabLayoutPolicy = JTabbedPane.SCROLL_TAB_LAYOUT
-                border = BorderFactory.createEmptyBorder()
-                background = Color.WHITE
+                border = BorderFactory.createMatteBorder(1, 0, 0, 0, Color(220, 220, 220))
+                background = Color(250, 250, 250)
+                preferredSize = Dimension(0, 36)
+                maximumSize = Dimension(Int.MAX_VALUE, 36)
                 
-                // 设置标签页样式
+                // 设置简洁的标签页样式
                 setUI(object : javax.swing.plaf.basic.BasicTabbedPaneUI() {
                     override fun installDefaults() {
                         super.installDefaults()
-                        tabAreaInsets = java.awt.Insets(2, 4, 0, 4)
+                        tabAreaInsets = java.awt.Insets(2, 4, 2, 4)
                         tabInsets = java.awt.Insets(6, 12, 6, 12)
                         selectedTabPadInsets = java.awt.Insets(0, 0, 0, 0)
-                        contentBorderInsets = java.awt.Insets(1, 0, 0, 0)
+                        contentBorderInsets = java.awt.Insets(0, 0, 0, 0)
                     }
                     
                     override fun paintTabBackground(g: Graphics, tabPlacement: Int, tabIndex: Int, x: Int, y: Int, w: Int, h: Int, isSelected: Boolean) {
                         val g2d = g.create() as Graphics2D
                         try {
-                            g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-                            
                             if (isSelected) {
-                                // 选中标签：白色背景
+                                // 选中状态：白色背景
                                 g2d.color = Color.WHITE
-                                g2d.fillRoundRect(x, y, w, h + 2, 6, 6)
+                                g2d.fillRect(x, y, w, h)
                                 
-                                // 底部蓝色线条
-                                g2d.color = Color(0, 122, 204)
-                                g2d.fillRect(x, y + h - 2, w, 3)
+                                // 蓝色底部边框
+                                g2d.color = Color(0, 120, 212)
+                                g2d.fillRect(x, y + h - 2, w, 2)
                             } else {
-                                // 未选中标签：浅灰色背景
-                                g2d.color = Color(245, 245, 245)
-                                g2d.fillRoundRect(x, y, w, h, 6, 6)
+                                // 未选中状态：透明背景
+                                g2d.color = Color(0, 0, 0, 0)
+                                g2d.fillRect(x, y, w, h)
                             }
                         } finally {
                             g2d.dispose()
@@ -998,11 +1004,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                     }
                     
                     override fun paintContentBorder(g: Graphics?, tabPlacement: Int, selectedIndex: Int) {
-                        // 绘制一条细线作为分隔
-                        if (g != null) {
-                            g.color = Color(230, 230, 230)
-                            g.fillRect(0, calculateTabAreaHeight(tabPlacement, runCount, maxTabHeight) - 1, tabPane.width, 1)
-                        }
+                        // 不绘制内容边框
                     }
                     
                     override fun paintFocusIndicator(g: Graphics?, tabPlacement: Int, rects: Array<out Rectangle>?, tabIndex: Int, iconRect: Rectangle?, textRect: Rectangle?, isSelected: Boolean) {
@@ -1010,47 +1012,47 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                     }
                 })
                 
-                font = Font("Dialog", Font.PLAIN, 13)
+                font = Font("Dialog", Font.PLAIN, 12)
+                
+                // 监听标签切换事件
+                addChangeListener {
+                    val selectedIndex = selectedIndex
+                    if (selectedIndex >= 0) {
+                        switchManifestView(selectedIndex, manifestData)
+                    }
+                }
             }
+            
+            // 添加"全部内容"标签（显示完整源码）
+            manifestViewTabs!!.addTab("全部内容", JPanel())
             
             // 添加权限标签 - 只有当存在权限时才显示
             if (manifestData.permissionsXml.isNotEmpty()) {
-                manifestViewTabs!!.addTab("Permission (${manifestData.permissionsXml.size})", createManifestContentArea(manifestData.permissionsXml.joinToString("\n"), true))
+                manifestViewTabs!!.addTab("Permission (${manifestData.permissionsXml.size})", JPanel())
             }
             
             // 添加 Activity 标签 - 只有当存在Activity时才显示
             if (manifestData.activitiesXml.isNotEmpty()) {
-                manifestViewTabs!!.addTab("Activity (${manifestData.activitiesXml.size})", createManifestContentArea(manifestData.activitiesXml.joinToString("\n\n"), true))
+                manifestViewTabs!!.addTab("Activity (${manifestData.activitiesXml.size})", JPanel())
             }
             
             // 添加 Service 标签 - 只有当存在Service时才显示
             if (manifestData.servicesXml.isNotEmpty()) {
-                manifestViewTabs!!.addTab("Service (${manifestData.servicesXml.size})", createManifestContentArea(manifestData.servicesXml.joinToString("\n\n"), true))
+                manifestViewTabs!!.addTab("Service (${manifestData.servicesXml.size})", JPanel())
             }
             
             // 添加 Receiver 标签 - 只有当存在Receiver时才显示
             if (manifestData.receiversXml.isNotEmpty()) {
-                manifestViewTabs!!.addTab("Receiver (${manifestData.receiversXml.size})", createManifestContentArea(manifestData.receiversXml.joinToString("\n\n"), true))
+                manifestViewTabs!!.addTab("Receiver (${manifestData.receiversXml.size})", JPanel())
             }
             
             // 添加 Provider 标签 - 只有当存在Provider时才显示
             if (manifestData.providersXml.isNotEmpty()) {
-                manifestViewTabs!!.addTab("Provider (${manifestData.providersXml.size})", createManifestContentArea(manifestData.providersXml.joinToString("\n\n"), true))
+                manifestViewTabs!!.addTab("Provider (${manifestData.providersXml.size})", JPanel())
             }
             
-            // 使用 JSplitPane 分割主编辑器和底部视图
-            val splitPane = JSplitPane(JSplitPane.VERTICAL_SPLIT, tabbedPane, manifestViewTabs)
-            splitPane.isOneTouchExpandable = true
-            splitPane.dividerSize = 8
-            
-            // 移除原有的tabbedPane，添加splitPane
-            remove(tabbedPane)
-            add(splitPane, java.awt.BorderLayout.CENTER)
-            
-            // 设置分割器位置（70%给主编辑器，30%给底部视图）
-            SwingUtilities.invokeLater {
-                splitPane.setDividerLocation(0.7)
-            }
+            // 将底部标签面板添加到主面板的南侧
+            add(manifestViewTabs, java.awt.BorderLayout.SOUTH)
             
             isManifestMode = true
             revalidate()
@@ -1061,51 +1063,64 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         }
     }
     
-    // 移除 AndroidManifest 底部视图标签
-    private fun removeManifestViewTabs() {
-        if (manifestViewTabs != null) {
-            // 获取当前的分割面板
-            val splitPane = getComponent(0) as? JSplitPane
-            if (splitPane != null) {
-                // 移除分割面板，恢复原始布局
-                remove(splitPane)
-                add(tabbedPane, java.awt.BorderLayout.CENTER)
-                
-                manifestViewTabs = null
-                isManifestMode = false
-                revalidate()
-                repaint()
+    // 切换 AndroidManifest 视图
+    private fun switchManifestView(tabIndex: Int, manifestData: ManifestData) {
+        // 获取当前 AndroidManifest.xml 文件的编辑器索引
+        val fileIndex = manifestFile?.let { fileToTab[it] } ?: return
+        val textArea = tabTextAreas[fileIndex] ?: return
+        
+        // 暂时禁用脏检测
+        textArea.putClientProperty("suppressDirty", true)
+        
+        try {
+            when (manifestViewTabs!!.getTitleAt(tabIndex)) {
+                "全部内容" -> {
+                    // 显示完整源码
+                    textArea.text = manifestOriginalContent ?: ""
+                    textArea.isEditable = true
+                    textArea.syntaxEditingStyle = org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_XML
+                }
+                else -> {
+                    // 获取标签标题以确定显示哪个部分
+                    val title = manifestViewTabs!!.getTitleAt(tabIndex)
+                    val content = when {
+                        title.startsWith("Permission") -> manifestData.permissionsXml.joinToString("\n")
+                        title.startsWith("Activity") -> manifestData.activitiesXml.joinToString("\n\n")
+                        title.startsWith("Service") -> manifestData.servicesXml.joinToString("\n\n")
+                        title.startsWith("Receiver") -> manifestData.receiversXml.joinToString("\n\n")
+                        title.startsWith("Provider") -> manifestData.providersXml.joinToString("\n\n")
+                        else -> ""
+                    }
+                    
+                    textArea.text = content
+                    textArea.isEditable = false
+                    textArea.syntaxEditingStyle = org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_XML
+                }
             }
+            
+            // 滚动到顶部
+            SwingUtilities.invokeLater {
+                textArea.caretPosition = 0
+                textArea.scrollRectToVisible(Rectangle(0, 0, 1, 1))
+            }
+            
+        } finally {
+            // 恢复脏检测
+            textArea.putClientProperty("suppressDirty", false)
         }
     }
     
-    // 创建 AndroidManifest 内容区域
-    private fun createManifestContentArea(content: String, useXmlHighlight: Boolean = true): RTextScrollPane {
-        val textArea = TextArea().apply {
-            text = content
-            isEditable = false
-            font = Font("Consolas", Font.PLAIN, 13)
-            background = Color.WHITE
-            
-            // 根据参数决定是否应用XML语法高亮
-            if (useXmlHighlight) {
-                syntaxEditingStyle = org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_XML
-            } else {
-                // 纯文本，不使用语法高亮
-                syntaxEditingStyle = org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_NONE
-            }
-        }
-        
-        return RTextScrollPane(textArea).apply {
-            border = BorderFactory.createEmptyBorder()
-            background = Color.WHITE
-            viewport.background = Color.WHITE
-            
-            // 确保文本区域滚动到顶部（1:1位置）
-            javax.swing.SwingUtilities.invokeLater {
-                textArea.caretPosition = 0
-                viewport.viewPosition = java.awt.Point(0, 0)
-            }
+    // 移除 AndroidManifest 底部视图标签
+    private fun removeManifestViewTabs() {
+        if (manifestViewTabs != null) {
+            // 移除底部标签面板
+            remove(manifestViewTabs)
+            manifestViewTabs = null
+            isManifestMode = false
+            manifestFile = null
+            manifestOriginalContent = null
+            revalidate()
+            repaint()
         }
     }
     
