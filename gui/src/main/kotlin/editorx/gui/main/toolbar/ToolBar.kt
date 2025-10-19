@@ -36,6 +36,18 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
         )
         layout = BoxLayout(this, BoxLayout.X_AXIS)
         buildActions()
+        
+        // 添加双击空白处全屏功能
+        addMouseListener(object : java.awt.event.MouseAdapter() {
+            override fun mouseClicked(e: java.awt.event.MouseEvent) {
+                if (e.clickCount == 2 && e.button == java.awt.event.MouseEvent.BUTTON1) {
+                    // 检查是否点击在空白区域（不是按钮上）
+                    if (e.source == this@ToolBar) {
+                        toggleFullScreen()
+                    }
+                }
+            }
+        })
     }
 
     fun updateNavigation(currentFile: File?) {
@@ -116,6 +128,17 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
 
     private fun showSettings() {
         JOptionPane.showMessageDialog(this, "设置界面待实现", "提示", JOptionPane.INFORMATION_MESSAGE)
+    }
+    
+    private fun toggleFullScreen() {
+        val frame = mainWindow
+        if (frame.extendedState and JFrame.MAXIMIZED_BOTH == JFrame.MAXIMIZED_BOTH) {
+            // 当前是全屏状态，退出全屏
+            frame.extendedState = JFrame.NORMAL
+        } else {
+            // 当前不是全屏状态，进入全屏
+            frame.extendedState = JFrame.MAXIMIZED_BOTH
+        }
     }
 
 
