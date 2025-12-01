@@ -69,5 +69,6 @@ private fun initializeMainWindow() {
         pluginContext.setGuiContext(guiContext)
     }
     pluginManager.loadPlugins(PluginLoaderImpl())
+    pluginManager.activeAllPlugins()
     mv.pluginManager = pluginManager
 }

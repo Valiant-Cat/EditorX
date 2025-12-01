@@ -26,7 +26,7 @@ class PluginManager {
     }
 
     private fun addPlugin(plugin: Plugin): PluginContextImpl {
-        logger.debug("Loading plugin: {}", plugin)
+        logger.info("Loading plugin: {}", plugin)
         val pluginContext = PluginContextImpl(plugin)
         require(allPlugins.add(pluginContext)) { "Duplicate plugin id: " + pluginContext + ", class " + plugin::class.java }
         addPluginListeners.forEach(Consumer { l: Consumer<PluginContextImpl> -> l.accept(pluginContext) })
@@ -41,5 +41,11 @@ class PluginManager {
         this.addPluginListeners.add(listener)
         // run for already added plugins
         getAllPluginContexts().forEach(listener)
+    }
+
+    fun activeAllPlugins() {
+        for (pluginContext in allPlugins) {
+            pluginContext.active()
+        }
     }
 }
