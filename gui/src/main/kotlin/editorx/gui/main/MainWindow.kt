@@ -12,6 +12,7 @@ import editorx.gui.main.sidebar.SideBar
 import editorx.gui.main.statusbar.StatusBar
 import editorx.gui.main.toolbar.ToolBar
 import editorx.core.plugin.PluginManager
+import editorx.core.plugin.PluginState
 import editorx.gui.util.NoLineSplitPaneUI
 import java.awt.BorderLayout
 import java.awt.Dimension
@@ -30,7 +31,32 @@ class MainWindow(val guiControl: GuiEnvironment) : JFrame() {
     val editor by lazy { Editor(this) }
     val statusBar by lazy { StatusBar(this) }
 
+    private val pluginListener = object : PluginManager.Listener {
+        override fun onPluginChanged(pluginId: String) {
+            val pm = pluginManager ?: return
+            val state = pm.getPlugin(pluginId)?.state
+            if (state != PluginState.STARTED) {
+                // 插件被停用/失败：移除可能残留的入口与视图
+                sideBar.removeView(pluginId)
+                activityBar.removeViewProvider(pluginId)
+            }
+            editor.refreshSyntaxForOpenTabs()
+        }
+
+        override fun onPluginUnloaded(pluginId: String) {
+            // 插件卸载：无条件移除入口与视图
+            sideBar.removeView(pluginId)
+            activityBar.removeViewProvider(pluginId)
+            editor.refreshSyntaxForOpenTabs()
+        }
+    }
+
     var pluginManager: PluginManager? = null
+        set(value) {
+            field?.removeListener(pluginListener)
+            field = value
+            value?.addListener(pluginListener)
+        }
 
     private val horizontalSplit by lazy {
         JSplitPane(JSplitPane.HORIZONTAL_SPLIT, sideBar, editor).apply {

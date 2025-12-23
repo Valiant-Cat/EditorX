@@ -5,6 +5,7 @@ import java.awt.geom.Path2D
 import java.io.InputStream
 import java.util.regex.Pattern
 import javax.swing.Icon
+import org.slf4j.LoggerFactory
 
 class SvgIcon(
     private val svgContent: String,
@@ -178,6 +179,8 @@ class SvgIcon(
     }
 
     companion object {
+        private val logger = LoggerFactory.getLogger(SvgIcon::class.java)
+
         fun fromResource(resourcePath: String, classLoader: ClassLoader?, width: Int = 16, height: Int = 16): SvgIcon? =
             try {
                 val cl = classLoader ?: SvgIcon::class.java.classLoader
@@ -189,7 +192,7 @@ class SvgIcon(
                     inputStream.close(); SvgIcon(content, width, height)
                 } else null
             } catch (e: Exception) {
-                System.err.println("加载SVG资源失败: $resourcePath, 错误: ${e.message}"); null
+                logger.warn("加载SVG资源失败: {}", resourcePath, e); null
             }
     }
 }

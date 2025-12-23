@@ -45,6 +45,9 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
     }
 
     fun addItem(id: String, tooltip: String, iconPath: String, viewProvider: GuiViewProvider) {
+        // 若重复注册同一 id（例如插件启停/重载），先清理旧项，避免 ButtonGroup 持有多余引用
+        removeViewProvider(id)
+
         val icon = IconLoader.getIcon(IconRef(iconPath), ICON_SIZE) ?: createDefaultIcon()
         val btn = createActivityButton(icon, tooltip, id)
         val wasEmpty = buttonMap.isEmpty()
@@ -205,19 +208,34 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
     }
 
     fun removeviewProvider(id: String) {
-        buttonMap[id]?.let { button ->
-            buttonGroup.remove(button)
-            remove(button)
-            buttonMap.remove(id)
-            guiViewProviderMap.remove(id)
-            if (activeId == id) activeId = null
-            revalidate(); repaint()
-        }
+        // 兼容旧命名（内部委托到 removeViewProvider）
+        removeViewProvider(id)
+    }
+
+    fun removeViewProvider(id: String) {
+        val button = buttonMap.remove(id) ?: return
+        buttonGroup.remove(button)
+        guiViewProviderMap.remove(id)
+        if (activeId == id) activeId = null
+        reorderButtons()
+        updateAllButtonStates()
+        revalidate()
+        repaint()
     }
 
     fun clearviewProviders() {
-        buttonMap.values.forEach { button -> buttonGroup.remove(button); remove(button) }
-        buttonMap.clear(); guiViewProviderMap.clear(); activeId = null; revalidate(); repaint()
+        // 兼容旧命名
+        clearViewProviders()
+    }
+
+    fun clearViewProviders() {
+        buttonMap.values.forEach { button -> buttonGroup.remove(button) }
+        buttonMap.clear()
+        guiViewProviderMap.clear()
+        activeId = null
+        removeAll()
+        revalidate()
+        repaint()
     }
 
     /**

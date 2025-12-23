@@ -23,6 +23,7 @@ class PluginContextImpl(private val plugin: Plugin) : PluginContext, Comparable<
     }
 
     fun active() {
+        if (hasActive) return
         plugin.activate(this)
         hasActive = true
     }
@@ -30,6 +31,7 @@ class PluginContextImpl(private val plugin: Plugin) : PluginContext, Comparable<
     fun deactivate() {
         if (hasActive) {
             plugin.deactivate()
+            hasActive = false
         }
     }
 

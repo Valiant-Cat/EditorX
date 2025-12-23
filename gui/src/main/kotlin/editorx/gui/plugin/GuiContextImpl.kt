@@ -25,11 +25,11 @@ class GuiContextImpl(
     }
 
     override fun registerFileType(fileType: FileType) {
-        FileTypeRegistry.registerFileType(fileType)
+        FileTypeRegistry.registerFileType(fileType, ownerId = pluginContext.pluginId())
     }
 
     override fun registerSyntaxHighlighter(language: Language, syntaxHighlighter: SyntaxHighlighter) {
-        SyntaxHighlighterRegistry.registerSyntaxHighlighter(language, syntaxHighlighter)
+        SyntaxHighlighterRegistry.registerSyntaxHighlighter(language, syntaxHighlighter, ownerId = pluginContext.pluginId())
     }
     
     override fun getWorkspaceRoot(): java.io.File? {

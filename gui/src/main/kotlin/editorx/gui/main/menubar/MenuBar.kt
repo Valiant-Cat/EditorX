@@ -1,59 +1,77 @@
 package editorx.gui.main.menubar
 
+import editorx.core.i18n.I18n
 import editorx.gui.main.MainWindow
 import editorx.gui.main.explorer.Explorer
 import editorx.gui.dialog.PluginManagerDialog
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
+import java.util.Locale
 import javax.swing.*
 
 class MenuBar(private val mainWindow: MainWindow) : JMenuBar() {
+    private val i18nListener: () -> Unit = {
+        SwingUtilities.invokeLater { setupMenus() }
+    }
+
     init {
+        I18n.addListener(i18nListener)
         setupMenus()
     }
 
     private fun setupMenus() {
+        removeAll()
         add(createFileMenu())
         add(createEditMenu())
-//        add(createPluginMenu())
-//        add(createHelpMenu())
+        add(createPluginMenu())
+        add(createLanguageMenu())
+        add(createHelpMenu())
+        revalidate()
+        repaint()
     }
+
+    override fun removeNotify() {
+        super.removeNotify()
+        I18n.removeListener(i18nListener)
+    }
+
+    private fun t(key: String, defaultText: String): String = I18n.t(key, defaultText)
 
     private fun createFileMenu(): JMenu {
         val shortcut = java.awt.Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx
-        return JMenu("文件").apply {
+        return JMenu(t("menu.file", "文件")).apply {
             mnemonic = KeyEvent.VK_F
 
-            add(JMenuItem("打开文件...").apply {
+            add(JMenuItem(t("action.openFile", "打开文件...")).apply {
                 mnemonic = KeyEvent.VK_O
                 accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_O, shortcut)
                 addActionListener { mainWindow.openFileChooserAndOpen() }
             })
-            add(JMenuItem("打开文件夹...").apply {
+            add(JMenuItem(t("action.openFolder", "打开文件夹...")).apply {
                 mnemonic = KeyEvent.VK_D
                 accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_D, shortcut)
                 addActionListener { openFolder() }
             })
 
-            add(JMenu("最近打开").apply {
+            add(JMenu(t("action.recent", "最近打开")).apply {
                 addMenuListener(RecentFilesMenuListener(this, mainWindow))
             })
 
             addSeparator()
 
-            add(JMenuItem("保存").apply {
+            add(JMenuItem(t("action.save", "保存")).apply {
                 mnemonic = KeyEvent.VK_S
                 accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_S, shortcut)
                 addActionListener { mainWindow.editor.saveCurrent() }
             })
-            add(JMenuItem("另存为...").apply {
+            add(JMenuItem(t("action.saveAs", "另存为...")).apply {
                 accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_S, shortcut or InputEvent.SHIFT_DOWN_MASK)
                 addActionListener { mainWindow.editor.saveCurrentAs() }
             })
 
             addSeparator()
 
-            add(JMenuItem("退出").apply {
+            add(JMenuItem(t("action.exit", "退出")).apply {
                 mnemonic = KeyEvent.VK_X
                 accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_Q, shortcut)
                 addActionListener { System.exit(0) }
@@ -62,7 +80,7 @@ class MenuBar(private val mainWindow: MainWindow) : JMenuBar() {
     }
 
     private fun createEditMenu(): JMenu {
-        return JMenu("编辑").apply {
+        return JMenu(t("menu.edit", "编辑")).apply {
             val shortcut = java.awt.Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx
             mnemonic = KeyEvent.VK_E
 
@@ -79,12 +97,12 @@ class MenuBar(private val mainWindow: MainWindow) : JMenuBar() {
 
             addSeparator()
 
-            add(JMenuItem("查找...").apply {
+            add(JMenuItem(t("action.find", "查找...")).apply {
                 mnemonic = KeyEvent.VK_F
                 accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_F, shortcut)
                 addActionListener { showFindDialog() }
             })
-            add(JMenuItem("替换...").apply {
+            add(JMenuItem(t("action.replace", "替换...")).apply {
                 mnemonic = KeyEvent.VK_R
                 accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_R, shortcut)
                 addActionListener { showReplaceDialog() }
@@ -92,7 +110,7 @@ class MenuBar(private val mainWindow: MainWindow) : JMenuBar() {
 
             addSeparator()
 
-            add(JMenuItem("全局搜索...").apply {
+            add(JMenuItem(t("action.globalSearch", "全局搜索...")).apply {
                 mnemonic = KeyEvent.VK_S
                 accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_F, shortcut or InputEvent.SHIFT_DOWN_MASK)
                 addActionListener { mainWindow.showGlobalSearch() }
@@ -101,25 +119,44 @@ class MenuBar(private val mainWindow: MainWindow) : JMenuBar() {
     }
 
     private fun createPluginMenu(): JMenu {
-        return JMenu("插件").apply {
+        return JMenu(t("menu.plugins", "插件")).apply {
             mnemonic = KeyEvent.VK_T
 
             val pluginManagerItem =
-                JMenuItem("插件管理").apply { addActionListener { showPluginManager() } }
+                JMenuItem(t("action.pluginManager", "插件管理")).apply { addActionListener { showPluginManager() } }
 
             add(pluginManagerItem)
         }
     }
 
+    private fun createLanguageMenu(): JMenu {
+        val menu = JMenu(t("menu.language", "语言")).apply {
+            mnemonic = KeyEvent.VK_L
+        }
+
+        val group = ButtonGroup()
+        val zh = JRadioButtonMenuItem(t("lang.zh", "中文")).apply {
+            isSelected = I18n.locale().language == Locale.SIMPLIFIED_CHINESE.language
+            addActionListener { I18n.setLocale(Locale.SIMPLIFIED_CHINESE) }
+        }
+        val en = JRadioButtonMenuItem(t("lang.en", "English")).apply {
+            isSelected = I18n.locale().language == Locale.ENGLISH.language
+            addActionListener { I18n.setLocale(Locale.ENGLISH) }
+        }
+        group.add(zh); group.add(en)
+        menu.add(zh); menu.add(en)
+        return menu
+    }
+
     private fun createHelpMenu(): JMenu {
-        return JMenu("帮助").apply {
+        return JMenu(t("menu.help", "帮助")).apply {
             mnemonic = KeyEvent.VK_H
 
-            add(JMenuItem("关于").apply { addActionListener { showAbout() } })
+            add(JMenuItem(t("action.about", "关于")).apply { addActionListener { showAbout() } })
 
             addSeparator()
 
-            add(JMenuItem("帮助文档").apply {
+            add(JMenuItem(t("action.help", "帮助文档")).apply {
                 mnemonic = KeyEvent.VK_F1
                 accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_F1, 0)
                 addActionListener { showHelp() }

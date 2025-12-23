@@ -3,6 +3,7 @@ package editorx.gui.main.editor
 import editorx.core.filetype.SyntaxHighlighterRegistry
 import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea
 import org.fife.ui.rsyntaxtextarea.SyntaxConstants
+import org.slf4j.LoggerFactory
 import java.awt.Font
 import java.io.File
 
@@ -10,6 +11,10 @@ import java.io.File
  * 支持自定义语法高亮的文本区域
  */
 class TextArea : RSyntaxTextArea() {
+
+    companion object {
+        private val logger = LoggerFactory.getLogger(TextArea::class.java)
+    }
 
     init {
         // 设置默认字体
@@ -23,12 +28,12 @@ class TextArea : RSyntaxTextArea() {
         // 检测是否有自定义语法高亮器
         val syntaxHighlighter = SyntaxHighlighterRegistry.getSyntaxHighlighter(file)
         if (syntaxHighlighter != null) {
-            println("找到自定义语法高亮器: ${syntaxHighlighter::class.simpleName}")
+            logger.debug("找到自定义语法高亮器: {}", syntaxHighlighter::class.simpleName)
             this.syntaxEditingStyle = syntaxHighlighter.syntaxStyleKey
             this.isCodeFoldingEnabled = syntaxHighlighter.isCodeFoldingEnabled
             this.isBracketMatchingEnabled = syntaxHighlighter.isBracketMatchingEnabled
         } else {
-            println("未找到自定义语法高亮器，使用默认语法")
+            logger.debug("未找到自定义语法高亮器，使用默认语法")
             syntaxEditingStyle = detectDefaultSyntax(file)
         }
     }
@@ -38,7 +43,6 @@ class TextArea : RSyntaxTextArea() {
      */
     private fun detectDefaultSyntax(file: File): String {
         return when {
-            file.name.endsWith(".smali") -> "text/smali"
             file.name.endsWith(".xml") -> SyntaxConstants.SYNTAX_STYLE_XML
             file.name.endsWith(".java") -> SyntaxConstants.SYNTAX_STYLE_JAVA
             file.name.endsWith(".kt") -> SyntaxConstants.SYNTAX_STYLE_KOTLIN

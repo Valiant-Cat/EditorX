@@ -4,6 +4,7 @@ import editorx.core.filetype.FileTypeRegistry
 import editorx.core.util.IconRef
 import editorx.gui.main.MainWindow
 import editorx.core.toolchain.ApkTool
+import editorx.core.toolchain.JadxTool
 import editorx.core.util.IconLoader
 import editorx.core.util.IconUtils
 import java.awt.*
@@ -29,6 +30,8 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
     companion object {
         private const val TOP_BAR_ICON_SIZE = 16
     }
+
+    private enum class ApkDecompileMode { APKTOOL, JADX, BOTH }
 
     private val searchField = JTextField()
     private val refreshBtn = JButton("刷新")
@@ -1087,12 +1090,53 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         // 重置取消状态
         isTaskCancelled = false
 
+        val option =
+            JOptionPane.showOptionDialog(
+                this,
+                "请选择反编译方式：\n\n- ApkTool：资源 + Smali（适合编辑/回编译）\n- JADX：Java 源码（适合阅读/搜索）\n- 两者：在 ApkTool 输出目录中额外生成 java_src/ 目录",
+                "反编译 APK",
+                JOptionPane.DEFAULT_OPTION,
+                JOptionPane.QUESTION_MESSAGE,
+                null,
+                arrayOf("ApkTool", "JADX", "两者"),
+                "ApkTool",
+            )
+        if (option < 0) return
+        val mode =
+            when (option) {
+                1 -> ApkDecompileMode.JADX
+                2 -> ApkDecompileMode.BOTH
+                else -> ApkDecompileMode.APKTOOL
+            }
+
         // 在后台线程中处理APK反编译
         currentTask = Thread {
             try {
                 if (!Thread.currentThread().isInterrupted) {
                     setWait(true)
-                    decompileApk(apkFile)
+                    when (mode) {
+                        ApkDecompileMode.APKTOOL -> decompileApk(apkFile)
+                        ApkDecompileMode.JADX -> {
+                            val out = File(apkFile.parentFile, apkFile.nameWithoutExtension + "_jadx")
+                            decompileJavaWithJadx(apkFile, out, openWorkspace = true)
+                        }
+                        ApkDecompileMode.BOTH -> {
+                            decompileApk(apkFile)
+                            val apktoolOut = File(apkFile.parentFile, apkFile.nameWithoutExtension + "_decompiled")
+                            val javaOut = File(apktoolOut, "java_src")
+                            runCatching { decompileJavaWithJadx(apkFile, javaOut, openWorkspace = false) }
+                                .onFailure { e ->
+                                    SwingUtilities.invokeLater {
+                                        JOptionPane.showMessageDialog(
+                                            this,
+                                            "JADX 生成 Java 源码失败: ${e.message}",
+                                            "提示",
+                                            JOptionPane.INFORMATION_MESSAGE
+                                        )
+                                    }
+                                }
+                        }
+                    }
                     setWait(false)
                     SwingUtilities.invokeLater {
                         hideProgress()
@@ -1104,7 +1148,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                     hideProgress()
                     JOptionPane.showMessageDialog(
                         this,
-                        "APK反编译失败: ${e.message}",
+                        "反编译失败: ${e.message}",
                         "错误",
                         JOptionPane.ERROR_MESSAGE
                     )
@@ -1112,6 +1156,55 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
             }
         }
         currentTask?.start()
+    }
+
+    private fun decompileJavaWithJadx(apkFile: File, outputDir: File, openWorkspace: Boolean) {
+        try {
+            if (isTaskCancelled || Thread.currentThread().isInterrupted) return
+
+            if (JadxTool.locate() == null) {
+                throw Exception("未找到 JADX（jadx）。请安装 jadx 或将可执行文件放到 toolchain/jadx/ 下。")
+            }
+
+            if (outputDir.exists()) {
+                val overwrite =
+                    JOptionPane.showConfirmDialog(
+                        this,
+                        "目录 ${outputDir.name} 已存在，是否覆盖？",
+                        "确认覆盖",
+                        JOptionPane.YES_NO_OPTION
+                    ) == JOptionPane.YES_OPTION
+                if (!overwrite) return
+            }
+
+            showProgress(message = "正在使用 JADX 生成 Java 源码…", indeterminate = true, cancellable = true)
+            if (outputDir.exists()) deleteRecursively(outputDir)
+
+            val result =
+                JadxTool.decompile(apkFile, outputDir) {
+                    isTaskCancelled || Thread.currentThread().isInterrupted
+                }
+
+            when (result.status) {
+                JadxTool.Status.SUCCESS ->
+                    if (!isTaskCancelled && !Thread.currentThread().isInterrupted) {
+                        SwingUtilities.invokeLater {
+                            if (openWorkspace) {
+                                mainWindow.guiControl.workspace.openWorkspace(outputDir)
+                                mainWindow.statusBar.updateNavigation(null)
+                                refreshRoot()
+                            }
+                            mainWindow.statusBar.setMessage("JADX 反编译完成: ${outputDir.name}")
+                        }
+                    }
+
+                JadxTool.Status.CANCELLED -> return
+                JadxTool.Status.NOT_FOUND -> throw Exception("未找到 JADX（jadx）")
+                JadxTool.Status.FAILED -> throw Exception("jadx 执行失败: ${result.output}")
+            }
+        } catch (e: Exception) {
+            if (!isTaskCancelled) throw Exception("JADX 反编译失败: ${e.message}")
+        }
     }
 
     private fun decompileApk(apkFile: File) {

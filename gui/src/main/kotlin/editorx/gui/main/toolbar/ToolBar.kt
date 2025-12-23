@@ -7,6 +7,7 @@ import editorx.gui.dialog.PluginManagerDialog
 import editorx.gui.main.navigationbar.NavigationBar
 import editorx.core.toolchain.ApkTool
 import editorx.core.util.IconLoader
+import org.slf4j.LoggerFactory
 import java.awt.Insets
 import java.awt.Color
 import java.awt.event.ActionListener
@@ -20,6 +21,7 @@ import javax.swing.*
  */
 class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
     companion object {
+        private val logger = LoggerFactory.getLogger(ToolBar::class.java)
         private const val ICON_SIZE = 18
     }
 
@@ -368,7 +370,7 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
             if (exitCode == 0 && keystore.exists()) {
                 keystore
             } else {
-                println("keytool 输出: $output")
+                logger.warn("keytool 生成调试签名失败，输出: {}", output)
                 null
             }
         } catch (_: Exception) {

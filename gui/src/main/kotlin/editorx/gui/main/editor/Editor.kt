@@ -6,6 +6,7 @@ import editorx.gui.main.MainWindow
 import editorx.gui.main.explorer.ExplorerIcons
 import editorx.core.util.IconUtils
 import org.fife.ui.rtextarea.RTextScrollPane
+import org.slf4j.LoggerFactory
 import java.awt.*
 import java.awt.dnd.*
 import java.awt.event.KeyEvent
@@ -17,6 +18,10 @@ import java.nio.file.Files
 import javax.swing.*
 
 class Editor(private val mainWindow: MainWindow) : JPanel() {
+    companion object {
+        private val logger = LoggerFactory.getLogger(Editor::class.java)
+    }
+
     private val fileToTab = mutableMapOf<File, Int>()
     private val tabToFile = mutableMapOf<Int, File>()
     private val tabbedPane = JTabbedPane()
@@ -163,7 +168,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                         return true
                     }
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    logger.warn("拖放导入文件失败", e)
                 }
 
                 return false
@@ -495,6 +500,18 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         val initial = getCurrentTextArea()?.selectedText
             ?.takeIf { it.isNotBlank() && !it.contains('\n') && !it.contains('\r') }
         findReplaceBar.open(FindReplaceBar.Mode.REPLACE, initial)
+    }
+
+    /**
+     * 当插件启停/卸载导致文件类型或语法高亮注册变化时，刷新所有已打开标签页的语法样式。
+     */
+    fun refreshSyntaxForOpenTabs() {
+        SwingUtilities.invokeLater {
+            tabTextAreas.forEach { (idx, textArea) ->
+                val file = tabToFile[idx] ?: return@forEach
+                runCatching { textArea.detectSyntax(file) }
+            }
+        }
     }
 
     private fun attachFindReplaceBarToCurrentTab() {
@@ -978,7 +995,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
 
                     dtde.dropComplete(false)
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    logger.warn("拖放打开文件失败", e)
                     dtde.dropComplete(false)
                 }
             }
@@ -1021,7 +1038,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                         }
                         dtde.dropComplete(false)
                     } catch (e: Exception) {
-                        e.printStackTrace(); dtde.dropComplete(false)
+                        logger.warn("拖放打开文件失败", e); dtde.dropComplete(false)
                     }
                 }
             })
@@ -1187,7 +1204,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             repaint()
             
         } catch (e: Exception) {
-            e.printStackTrace()
+            logger.warn("构建 AndroidManifest 视图失败", e)
         }
     }
     
@@ -1278,7 +1295,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             extractComponentXml(content, "provider", providersXml)
             
         } catch (e: Exception) {
-            e.printStackTrace()
+            logger.warn("解析 AndroidManifest 失败", e)
         }
         
         return ManifestData(permissionsXml, activitiesXml, servicesXml, receiversXml, providersXml)

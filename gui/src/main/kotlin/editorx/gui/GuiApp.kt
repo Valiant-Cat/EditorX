@@ -7,19 +7,27 @@ import editorx.core.plugin.PluginManager
 import editorx.core.plugin.loader.PluginLoaderImpl
 import editorx.gui.plugin.GuiContextImpl
 import java.io.File
-import java.util.logging.Level
-import java.util.logging.Logger
+import org.slf4j.LoggerFactory
 import javax.swing.SwingUtilities
 
 /**
  * GUI 主入口点
  */
 fun main() {
-    Logger.getLogger("").level = Level.INFO
+    // 将日志写入用户目录，便于排查问题（slf4j-simple 需在首次获取 Logger 前设置）
+    runCatching {
+        val appDir = File(System.getProperty("user.home"), ".editorx")
+        val logDir = File(appDir, "logs")
+        logDir.mkdirs()
+        System.setProperty("org.slf4j.simpleLogger.logFile", File(logDir, "editorx.log").absolutePath)
+        System.setProperty("org.slf4j.simpleLogger.showDateTime", "true")
+        System.setProperty("org.slf4j.simpleLogger.dateTimeFormat", "yyyy-MM-dd HH:mm:ss.SSS")
+        System.setProperty("org.slf4j.simpleLogger.showThreadName", "true")
+        System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "info")
+    }
 
     Thread.setDefaultUncaughtExceptionHandler { _, exception ->
-        Logger.getLogger("").severe("未捕获的异常: ${exception.message}")
-        exception.printStackTrace()
+        LoggerFactory.getLogger("UncaughtException").error("未捕获的异常", exception)
     }
 
     SwingUtilities.invokeLater {
@@ -27,8 +35,7 @@ fun main() {
             initializeApplication()
             initializeMainWindow()
         } catch (e: Exception) {
-            Logger.getLogger("").severe("应用程序启动失败: ${e.message}")
-            e.printStackTrace()
+            LoggerFactory.getLogger("GuiApp").error("应用程序启动失败", e)
             System.exit(1)
         }
     }
@@ -38,7 +45,7 @@ private fun initializeApplication() {
     try {
         FlatLightLaf.setup()
     } catch (e: Exception) {
-        Logger.getLogger("").warning("无法设置系统外观: ${e.message}")
+        LoggerFactory.getLogger("GuiApp").warn("无法设置系统外观", e)
     }
 
     // 在 macOS 上将菜单集成到系统顶栏；其他平台保留在窗口内
@@ -50,7 +57,7 @@ private fun initializeApplication() {
     // 安装 Material3 主题到 Swing 默认，确保面板/滚动/标签等遵循统一色板
     ThemeManager.installToSwing()
 
-    Logger.getLogger("").info("EditorX 初始化完成")
+    LoggerFactory.getLogger("GuiApp").info("EditorX 初始化完成")
 }
 
 private fun initializeMainWindow() {
@@ -64,11 +71,11 @@ private fun initializeMainWindow() {
 
     // 初始化插件
     val pluginManager = PluginManager()
-    pluginManager.registerAddPluginListener { pluginContext ->
+    pluginManager.registerContextInitializer { pluginContext ->
         val guiContext = GuiContextImpl(mv, pluginContext)
         pluginContext.setGuiContext(guiContext)
     }
-    pluginManager.loadPlugins(PluginLoaderImpl())
-    pluginManager.activeAllPlugins()
+    pluginManager.loadAll(PluginLoaderImpl())
+    pluginManager.startAll()
     mv.pluginManager = pluginManager
 }
