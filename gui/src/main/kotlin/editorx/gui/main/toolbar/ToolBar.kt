@@ -75,20 +75,31 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
     }
 
     private fun setupLeftActions() {
+        if (isMacOS()) {
+            // macOS 模式：左侧留空（给系统控制按钮），中间显示标题，右侧显示按钮
+            add(Box.createHorizontalStrut(80)) // 为 macOS 交通灯按钮留空间
+        }
+
         // Android 项目快速跳转按钮
-        add(JButton("AndroidManifest").compact("跳转到 AndroidManifest.xml") {
-            navigateToAndroidManifest()
-        })
+        add(
+            JButton(
+                IconLoader.getIcon(
+                    IconRef("icons/android-manifest.svg"),
+                    ICON_SIZE
+                )
+            ).compact("跳转到 AndroidManifest.xml") {
+                navigateToAndroidManifest()
+            })
 
         add(Box.createHorizontalStrut(6))
 
-        add(JButton("MainActivity").compact("跳转到 MainActivity") {
+        add(JButton(IconLoader.getIcon(IconRef("icons/main-activity.svg"), ICON_SIZE)).compact("跳转到 MainActivity") {
             navigateToMainActivity()
         })
 
         add(Box.createHorizontalStrut(6))
 
-        add(JButton("Application").compact("跳转到 Application") {
+        add(JButton(IconLoader.getIcon(IconRef("icons/application.svg"), ICON_SIZE)).compact("跳转到 Application") {
             navigateToApplication()
         })
 
@@ -474,7 +485,7 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
         try {
             val manifestContent = Files.readString(manifestFile.toPath())
             val mainActivityClass = findMainActivityClass(manifestContent)
-            
+
             if (mainActivityClass == null) {
                 JOptionPane.showMessageDialog(
                     this,
@@ -531,7 +542,7 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
         try {
             val manifestContent = Files.readString(manifestFile.toPath())
             val applicationClass = findApplicationClass(manifestContent)
-            
+
             if (applicationClass == null) {
                 JOptionPane.showMessageDialog(
                     this,
@@ -572,14 +583,14 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
         try {
             // 获取包名（用于补全相对类名）
             val packageName = extractPackageName(manifestContent)
-            
+
             // 使用更准确的方法查找所有 activity 标签
             val activities = extractActivities(manifestContent)
-            
+
             for (activity in activities) {
                 // 首先提取 activity 的 android:name 属性
                 val activityName = extractAttribute(activity, "android:name") ?: continue
-                
+
                 // 检查该 activity 是否包含标准的启动 intent-filter（MAIN + LAUNCHER）
                 if (hasMainLauncherIntentFilter(activity)) {
                     var className = activityName
@@ -595,7 +606,7 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
         }
         return null
     }
-    
+
     /**
      * 提取 AndroidManifest.xml 中的包名
      */
@@ -604,23 +615,23 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
         val match = pattern.find(manifestContent)
         return match?.groupValues?.get(1)
     }
-    
+
     /**
      * 从 AndroidManifest.xml 中提取所有 activity 标签的完整 XML（包括嵌套内容）
      */
     private fun extractActivities(manifestContent: String): List<String> {
         val activities = mutableListOf<String>()
         var pos = 0
-        
+
         while (pos < manifestContent.length) {
             // 查找下一个 <activity 标签的开始位置
             val startTag = manifestContent.indexOf("<activity", pos)
             if (startTag == -1) break
-            
+
             // 查找 activity 标签的开始标签结束位置（> 或 />）
             val tagEnd = findTagEnd(manifestContent, startTag)
             if (tagEnd == -1) break
-            
+
             // 检查是否是自闭合标签
             val tagContent = manifestContent.substring(startTag, tagEnd + 1)
             if (tagContent.trimEnd().endsWith("/>")) {
@@ -629,23 +640,23 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
                 pos = tagEnd + 1
                 continue
             }
-            
+
             // 查找对应的 </activity> 结束标签
             val endTag = findMatchingEndTag(manifestContent, tagEnd + 1, "activity")
             if (endTag == -1) {
                 pos = tagEnd + 1
                 continue
             }
-            
+
             // 提取完整的 activity XML
             val activityXml = manifestContent.substring(startTag, endTag + "</activity>".length)
             activities.add(activityXml)
             pos = endTag + "</activity>".length
         }
-        
+
         return activities
     }
-    
+
     /**
      * 查找标签的结束位置（> 或 />）
      */
@@ -653,7 +664,7 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
         var pos = start
         var inQuotes = false
         var quoteChar: Char? = null
-        
+
         while (pos < content.length) {
             val ch = content[pos]
             when {
@@ -661,10 +672,12 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
                     inQuotes = true
                     quoteChar = ch
                 }
+
                 inQuotes && ch == quoteChar -> {
                     inQuotes = false
                     quoteChar = null
                 }
+
                 !inQuotes && ch == '>' -> {
                     return pos
                 }
@@ -673,7 +686,7 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
         }
         return -1
     }
-    
+
     /**
      * 查找匹配的结束标签（处理嵌套标签）
      */
@@ -682,11 +695,11 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
         val endTag = "</$tagName>"
         var pos = start
         var depth = 1
-        
+
         while (pos < content.length && depth > 0) {
             val nextStart = content.indexOf(startTag, pos)
             val nextEnd = content.indexOf(endTag, pos)
-            
+
             when {
                 nextEnd == -1 -> return -1 // 没找到结束标签
                 nextStart != -1 && nextStart < nextEnd -> {
@@ -694,6 +707,7 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
                     depth++
                     pos = nextStart + startTag.length
                 }
+
                 else -> {
                     // 找到结束标签
                     depth--
@@ -706,7 +720,7 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
         }
         return -1
     }
-    
+
     /**
      * 从 XML 片段中提取指定属性的值
      */
@@ -716,7 +730,7 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
         val match = pattern.find(xml)
         return match?.groupValues?.get(1)
     }
-    
+
     /**
      * 检查 activity 是否包含标准的启动 intent-filter（MAIN action + LAUNCHER category）
      * 需要在同一个 intent-filter 中同时包含这两个
@@ -724,33 +738,33 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
     private fun hasMainLauncherIntentFilter(activityXml: String): Boolean {
         // 提取所有 intent-filter 标签
         val intentFilters = extractIntentFilters(activityXml)
-        
+
         for (intentFilter in intentFilters) {
             // 检查是否同时包含 MAIN action 和 LAUNCHER category
             val hasMainAction = """android\.intent\.action\.MAIN""".toRegex().containsMatchIn(intentFilter)
             val hasLauncherCategory = """android\.intent\.category\.LAUNCHER""".toRegex().containsMatchIn(intentFilter)
-            
+
             if (hasMainAction && hasLauncherCategory) {
                 return true
             }
         }
         return false
     }
-    
+
     /**
      * 从 activity XML 中提取所有 intent-filter 标签
      */
     private fun extractIntentFilters(activityXml: String): List<String> {
         val intentFilters = mutableListOf<String>()
         var pos = 0
-        
+
         while (pos < activityXml.length) {
             val startTag = activityXml.indexOf("<intent-filter", pos)
             if (startTag == -1) break
-            
+
             val tagEnd = findTagEnd(activityXml, startTag)
             if (tagEnd == -1) break
-            
+
             // 检查是否是自闭合标签（intent-filter 通常不是自闭合的，但为了安全起见还是检查）
             val tagContent = activityXml.substring(startTag, tagEnd + 1)
             if (tagContent.trimEnd().endsWith("/>")) {
@@ -758,19 +772,19 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
                 pos = tagEnd + 1
                 continue
             }
-            
+
             // 查找对应的 </intent-filter> 结束标签
             val endTag = findMatchingEndTag(activityXml, tagEnd + 1, "intent-filter")
             if (endTag == -1) {
                 pos = tagEnd + 1
                 continue
             }
-            
+
             val intentFilterXml = activityXml.substring(startTag, endTag + "</intent-filter>".length)
             intentFilters.add(intentFilterXml)
             pos = endTag + "</intent-filter>".length
         }
-        
+
         return intentFilters
     }
 
@@ -807,10 +821,10 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
     private fun findSmaliFile(workspaceRoot: File, className: String): File? {
         // 将类名转换为路径（com.example.MainActivity -> com/example/MainActivity.smali）
         val path = className.replace(".", "/") + ".smali"
-        
+
         // 在 smali 目录下查找（apktool 反编译后的常见结构）
         // 可能有多个 smali 目录（smali, smali_classes2, smali_classes3, ...）
-        val smaliDirs = workspaceRoot.listFiles()?.filter { 
+        val smaliDirs = workspaceRoot.listFiles()?.filter {
             it.isDirectory && it.name.matches("""^smali(_classes\d+)?$""".toRegex())
         } ?: emptyList()
 

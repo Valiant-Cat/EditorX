@@ -87,9 +87,9 @@ class MainWindow(val guiControl: GuiEnvironment) : JFrame() {
             System.setProperty("com.apple.mrj.application.apple.menu.about.name", "EditorX")
 
             // 保留原生窗口装饰，但启用全窗口内容模式
-//            rootPane.putClientProperty("apple.awt.fullWindowContent", true)
-//            rootPane.putClientProperty("apple.awt.transparentTitleBar", true)
-//            rootPane.putClientProperty("apple.awt.windowTitleVisible", false)
+            rootPane.putClientProperty("apple.awt.fullWindowContent", true)
+            rootPane.putClientProperty("apple.awt.transparentTitleBar", true)
+            rootPane.putClientProperty("apple.awt.windowTitleVisible", false)
         }
     }
 
