@@ -25,6 +25,8 @@
             <option value="$PROJECT_DIR$/gui" />
             <option value="$PROJECT_DIR$/plugins" />
             <option value="$PROJECT_DIR$/plugins/git" />
+            <option value="$PROJECT_DIR$/plugins/i18n-en" />
+            <option value="$PROJECT_DIR$/plugins/jadx" />
             <option value="$PROJECT_DIR$/plugins/json" />
             <option value="$PROJECT_DIR$/plugins/smali" />
             <option value="$PROJECT_DIR$/plugins/xml" />

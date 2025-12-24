@@ -11,4 +11,3 @@ data class DiscoveredPlugin(
     val classLoader: ClassLoader = plugin::class.java.classLoader,
     val closeable: AutoCloseable? = null,
 )
-

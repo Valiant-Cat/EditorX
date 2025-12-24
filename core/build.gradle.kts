@@ -8,7 +8,7 @@ dependencies {
     implementation("com.formdev:flatlaf-extras:3.4")
     
     // SLF4J 日志框架
-    implementation(libs.slf4j.api)
+    api(libs.slf4j.api)
     runtimeOnly(libs.slf4j.simple)
 
     testImplementation(kotlin("test"))

@@ -6,8 +6,8 @@ import editorx.gui.core.Constants
 import editorx.gui.main.activitybar.ActivityBar
 import editorx.gui.main.editor.Editor
 import editorx.gui.main.explorer.Explorer
-import editorx.gui.main.search.SearchView
 import editorx.gui.main.menubar.MenuBar
+import editorx.gui.main.search.SearchView
 import editorx.gui.main.sidebar.SideBar
 import editorx.gui.main.statusbar.StatusBar
 import editorx.gui.main.toolbar.ToolBar
@@ -137,9 +137,8 @@ class MainWindow(val guiControl: GuiEnvironment) : JFrame() {
     }
 
     private fun setupDefaultActivityBarItems() {
-        // 添加默认的Explorer
         activityBar.addItem(
-            "explorer",
+            Constants.ACTIVITY_BAR_DEFAULT_ID,
             "Explorer",
             "icons/folder.svg",
             object : CachedGuiViewProvider() {
@@ -147,7 +146,6 @@ class MainWindow(val guiControl: GuiEnvironment) : JFrame() {
             }
         )
 
-        // 全局搜索（参考 jadx）
         activityBar.addItem(
             "search",
             "搜索",

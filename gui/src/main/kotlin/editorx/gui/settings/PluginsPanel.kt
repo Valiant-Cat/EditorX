@@ -192,10 +192,12 @@ class PluginsPanel(
     }
 
     private fun reloadList() {
-        enforceDisabledState()
         val selectedId = selectedRecord()?.id
         listModel.clear()
-        pluginManager.listPlugins().forEach { listModel.addElement(it) }
+        val records = pluginManager.listPlugins()
+        disabledSet.clear()
+        disabledSet.addAll(records.filter { it.disabled }.map { it.id })
+        records.forEach { listModel.addElement(it) }
         ensureSelection(selectedId)
         statusLabel.text = if (isEnglish()) {
             "${listModel.size()} plugins"
@@ -253,8 +255,8 @@ class PluginsPanel(
 
     private fun updateActionButtons() {
         val record = selectedRecord()
-        enableBtn.isEnabled = record != null && (record.state != PluginState.STARTED || disabledSet.contains(record.id))
-        disableBtn.isEnabled = record != null && record.state == PluginState.STARTED && !disabledSet.contains(record.id)
+        enableBtn.isEnabled = record != null && (record.state != PluginState.STARTED || record.disabled)
+        disableBtn.isEnabled = record != null && !record.disabled
         uninstallBtn.isEnabled = record != null
     }
 
@@ -273,15 +275,20 @@ class PluginsPanel(
 
     private fun enableSelected() {
         val record = selectedRecord() ?: return
+        pluginManager.markDisabled(record.id, false)
+        disabledSet.remove(record.id)
         pluginManager.startPlugin(record.id)
         statusLabel.text = if (isEnglish()) "Enabled: ${record.id}" else "已启用：${record.id}"
+        saveDisabledSet()
         reloadList()
     }
 
     private fun disableSelected() {
         val record = selectedRecord() ?: return
-        pluginManager.stopPlugin(record.id)
+        pluginManager.markDisabled(record.id, true)
+        disabledSet.add(record.id)
         statusLabel.text = if (isEnglish()) "Disabled: ${record.id}" else "已禁用：${record.id}"
+        saveDisabledSet()
         reloadList()
     }
 
@@ -379,15 +386,9 @@ class PluginsPanel(
         PluginOrigin.JAR -> "JAR"
     }
 
-    private fun enforceDisabledState() {
-        pluginManager.listPlugins()
-            .filter { disabledSet.contains(it.id) && it.state == PluginState.STARTED }
-            .forEach { pluginManager.stopPlugin(it.id) }
-    }
-
     private fun displayState(record: PluginRecord): String {
         return when {
-            disabledSet.contains(record.id) -> if (isEnglish()) "Disabled" else "已禁用"
+            record.disabled -> if (isEnglish()) "Disabled" else "已禁用"
             record.state == PluginState.STARTED -> if (isEnglish()) "Enabled" else "已启用"
             record.state == PluginState.FAILED -> if (isEnglish()) "Failed" else "失败"
             else -> record.state.name

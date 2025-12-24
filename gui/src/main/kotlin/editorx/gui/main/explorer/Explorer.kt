@@ -3,6 +3,7 @@ package editorx.gui.main.explorer
 import editorx.core.filetype.FileTypeRegistry
 import editorx.core.util.IconRef
 import editorx.gui.main.MainWindow
+import editorx.core.services.DecompilerService
 import editorx.core.toolchain.ApkTool
 import editorx.core.toolchain.JadxTool
 import editorx.core.util.IconLoader
@@ -1162,9 +1163,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         try {
             if (isTaskCancelled || Thread.currentThread().isInterrupted) return
 
-            if (JadxTool.locate() == null) {
-                throw Exception("未找到 JADX（jadx）。请安装 jadx 或将可执行文件放到 toolchain/jadx/ 下。")
-            }
+            val decompiler = ensureDecompilerService()
 
             if (outputDir.exists()) {
                 val overwrite =
@@ -1180,13 +1179,26 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
             showProgress(message = "正在使用 JADX 生成 Java 源码…", indeterminate = true, cancellable = true)
             if (outputDir.exists()) deleteRecursively(outputDir)
 
-            val result =
-                JadxTool.decompile(apkFile, outputDir) {
+            val result = if (decompiler != null) {
+                decompiler.decompile(
+                    apkFile,
+                    outputDir,
+                    mapOf("cancelSignal" to { isTaskCancelled || Thread.currentThread().isInterrupted })
+                )
+            } else {
+                val fallback = JadxTool.decompile(apkFile, outputDir) {
                     isTaskCancelled || Thread.currentThread().isInterrupted
                 }
+                when (fallback.status) {
+                    JadxTool.Status.SUCCESS -> DecompilerService.DecompileResult(true, outputDir = outputDir)
+                    JadxTool.Status.CANCELLED -> DecompilerService.DecompileResult(false, "cancelled")
+                    JadxTool.Status.NOT_FOUND -> DecompilerService.DecompileResult(false, "jadx not found")
+                    JadxTool.Status.FAILED -> DecompilerService.DecompileResult(false, fallback.output)
+                }
+            }
 
-            when (result.status) {
-                JadxTool.Status.SUCCESS ->
+            when {
+                result.success ->
                     if (!isTaskCancelled && !Thread.currentThread().isInterrupted) {
                         SwingUtilities.invokeLater {
                             if (openWorkspace) {
@@ -1198,9 +1210,9 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                         }
                     }
 
-                JadxTool.Status.CANCELLED -> return
-                JadxTool.Status.NOT_FOUND -> throw Exception("未找到 JADX（jadx）")
-                JadxTool.Status.FAILED -> throw Exception("jadx 执行失败: ${result.output}")
+                result.message == "cancelled" -> return
+                result.message == "jadx not found" -> throw Exception("未找到 JADX（jadx）")
+                else -> throw Exception(result.message ?: "jadx 执行失败")
             }
         } catch (e: Exception) {
             if (!isTaskCancelled) throw Exception("JADX 反编译失败: ${e.message}")
@@ -1256,6 +1268,12 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                 throw Exception("反编译APK失败: ${e.message}")
             }
         }
+    }
+
+    private fun ensureDecompilerService(): DecompilerService? {
+        val manager = mainWindow.pluginManager ?: return null
+        manager.triggerCommand("decompiler")
+        return manager.serviceRegistry().get(DecompilerService::class.java)
     }
 
     // Node representing a File with lazy children loading

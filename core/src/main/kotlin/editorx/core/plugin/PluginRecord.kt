@@ -13,5 +13,5 @@ data class PluginRecord(
     val state: PluginState,
     val source: Path?,
     val lastError: String?,
+    val disabled: Boolean,
 )
-
