@@ -16,7 +16,7 @@ class GitPlugin : Plugin {
         val guiContext = pluginContext.gui() ?: return
         
         guiContext.addActivityBarItem(
-            "icons/git.svg",
+            "icons/git-branch.svg",
             object : CachedGuiViewProvider() {
                 override fun createView(): javax.swing.JComponent {
                     return GitView(guiContext)
