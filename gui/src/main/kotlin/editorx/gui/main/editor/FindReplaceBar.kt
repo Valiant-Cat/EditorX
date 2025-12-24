@@ -645,10 +645,14 @@ class FindReplaceBar(
             toolTipText = tooltip
             isFocusable = false
             font = font.deriveFont(Font.PLAIN, 12f)
-            margin = Insets(4, 14, 4, 14)
-            border = BorderFactory.createLineBorder(Color(0xCC, 0xCC, 0xCC))
+            margin = Insets(0, 0, 0, 0)
+            border = BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(Color(0xCC, 0xCC, 0xCC)),
+                BorderFactory.createEmptyBorder(4, 16, 4, 16)
+            )
             background = Color.WHITE
             isContentAreaFilled = false
+            isOpaque = false
             addActionListener { onClick() }
         }
     }
