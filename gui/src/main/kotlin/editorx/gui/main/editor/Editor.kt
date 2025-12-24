@@ -1,6 +1,8 @@
 package editorx.gui.main.editor
 
 import editorx.core.filetype.FileTypeRegistry
+import editorx.core.toolchain.JadxTool
+import editorx.core.toolchain.SmaliTool
 import editorx.gui.core.theme.ThemeManager
 import editorx.gui.main.MainWindow
 import editorx.gui.main.explorer.ExplorerIcons
@@ -16,7 +18,11 @@ import java.awt.event.MouseEvent
 import java.awt.event.MouseMotionAdapter
 import java.io.File
 import java.nio.file.Files
+import java.util.zip.ZipEntry
+import java.util.zip.ZipFile
 import javax.swing.*
+import javax.swing.tree.DefaultMutableTreeNode
+import javax.swing.tree.DefaultTreeModel
 
 class Editor(private val mainWindow: MainWindow) : JPanel() {
     companion object {
@@ -35,9 +41,18 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
     private var isManifestMode = false
     private var manifestFile: File? = null
     private var manifestOriginalContent: String? = null
+    
+    // Smali 底部视图
+    private var smaliViewTabs: JTabbedPane? = null
+    private var isSmaliMode = false
+    private var smaliFile: File? = null
+    private var smaliOriginalContent: String? = null
+    private var smaliJavaContent: String? = null
+    
     private val bottomContainer = JPanel(BorderLayout()).apply {
         isOpaque = false
         border = BorderFactory.createEmptyBorder(0, 0, 0, 0)
+        isVisible = true
     }
     private val findReplaceBar = FindReplaceBar { getCurrentTextArea() }
 
@@ -124,6 +139,9 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             
             // 检测是否为 AndroidManifest.xml，显示/隐藏底部视图标签
             updateManifestViewTabs(file)
+            
+            // 检测是否为 smali 文件，显示/隐藏底部视图标签
+            updateSmaliViewTabs(file)
 
             // 文件内查找条：切换标签后同步高亮
             if (findReplaceBar.isVisible) {
@@ -366,6 +384,14 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             mainWindow.statusBar.updateNavigation(file)
             return
         }
+        
+        // 检测是否为 Android 压缩包文件（xapk、aab、aar）
+        val fileType = FileTypeRegistry.getFileTypeByFileName(file.name)
+        if (fileType?.getName() == "android-archive") {
+            openArchiveFile(file)
+            return
+        }
+        
         val textArea = TextArea().apply {
             font = Font("Consolas", Font.PLAIN, 14)
             addCaretListener {
@@ -486,6 +512,9 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         
         // 检测是否为 AndroidManifest.xml，显示/隐藏底部视图标签
         updateManifestViewTabs(file)
+        
+        // 检测是否为 smali 文件，显示/隐藏底部视图标签
+        updateSmaliViewTabs(file)
     }
 
     fun openFileAndSelect(file: File, line: Int, column: Int, length: Int) {
@@ -1223,7 +1252,32 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             }
             
             // 将底部标签面板添加到统一容器中，避免与查找条冲突
-            bottomContainer.add(manifestViewTabs!!, BorderLayout.SOUTH)
+            // 如果已有 smaliViewTabs，需要处理布局
+            if (smaliViewTabs != null) {
+                // 检查是否已经有容器
+                val existingContainer = bottomContainer.getComponent(0) as? JPanel
+                if (existingContainer != null && existingContainer.layout is BorderLayout) {
+                    // 已有容器，直接添加到容器中
+                    existingContainer.add(manifestViewTabs!!, BorderLayout.NORTH)
+                } else {
+                    // 创建新容器
+                    val container = JPanel(BorderLayout()).apply {
+                        isOpaque = false
+                    }
+                    container.add(manifestViewTabs!!, BorderLayout.NORTH)
+                    container.add(smaliViewTabs!!, BorderLayout.SOUTH)
+                    bottomContainer.removeAll()
+                    bottomContainer.add(container, BorderLayout.SOUTH)
+                }
+            } else {
+                // 检查是否已有容器
+                val existingContainer = bottomContainer.getComponent(0) as? JPanel
+                if (existingContainer != null && existingContainer.layout is BorderLayout) {
+                    existingContainer.add(manifestViewTabs!!, BorderLayout.NORTH)
+                } else {
+                    bottomContainer.add(manifestViewTabs!!, BorderLayout.SOUTH)
+                }
+            }
             
             isManifestMode = true
             revalidate()
@@ -1285,7 +1339,22 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
     private fun removeManifestViewTabs() {
         if (manifestViewTabs != null) {
             // 移除底部标签面板
-            bottomContainer.remove(manifestViewTabs!!)
+            val container = bottomContainer.getComponent(0) as? JPanel
+            if (container != null && container.layout is BorderLayout) {
+                // 从容器中移除
+                container.remove(manifestViewTabs!!)
+                if (container.componentCount == 0) {
+                    // 容器为空，移除容器
+                    bottomContainer.remove(container)
+                } else {
+                    // 容器还有其他组件（如 smali tabs），保留容器
+                    bottomContainer.revalidate()
+                    bottomContainer.repaint()
+                }
+            } else {
+                // 直接添加到 bottomContainer
+                bottomContainer.remove(manifestViewTabs!!)
+            }
             manifestViewTabs = null
             isManifestMode = false
             manifestFile = null
@@ -1440,4 +1509,669 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         val receiversXml: List<String>,
         val providersXml: List<String>
     )
+    
+    // 检测并更新 Smali 底部视图标签
+    private fun updateSmaliViewTabs(file: File?) {
+        val isSmali = file?.let { 
+            val name = it.name.lowercase()
+            name.endsWith(".smali", ignoreCase = true)
+        } ?: false
+        
+        if (isSmali && file != null && file.exists()) {
+            // 显示底部视图标签
+            if (!isSmaliMode) {
+                logger.debug("检测到 smali 文件: ${file.name}, 创建底部 tab")
+                createSmaliViewTabs(file)
+            } else {
+                // 如果已经是 smali 模式，但文件不同，需要更新
+                if (smaliFile != file) {
+                    logger.debug("切换到新的 smali 文件: ${file.name}")
+                    removeSmaliViewTabs()
+                    createSmaliViewTabs(file)
+                }
+            }
+        } else {
+            // 隐藏底部视图标签
+            if (isSmaliMode) {
+                logger.debug("隐藏 smali 底部 tab")
+                removeSmaliViewTabs()
+            }
+        }
+    }
+    
+    // 创建 Smali 底部视图标签
+    private fun createSmaliViewTabs(file: File) {
+        try {
+            // 保存文件引用和原始内容
+            smaliFile = file
+            val content = Files.readString(file.toPath())
+            smaliOriginalContent = content
+            
+            // 创建底部标签面板（参考 jadx 样式）
+            smaliViewTabs = JTabbedPane().apply {
+                tabPlacement = JTabbedPane.TOP
+                tabLayoutPolicy = JTabbedPane.SCROLL_TAB_LAYOUT
+                border = BorderFactory.createMatteBorder(1, 0, 0, 0, Color(220, 220, 220))
+                background = Color(250, 250, 250)
+                preferredSize = Dimension(0, 40)
+                minimumSize = Dimension(0, 40)
+                maximumSize = Dimension(Int.MAX_VALUE, 40)
+                isVisible = true
+                isOpaque = true
+                
+                // 设置简洁的标签页样式（参考 jadx）
+                setUI(object : javax.swing.plaf.basic.BasicTabbedPaneUI() {
+                    override fun installDefaults() {
+                        super.installDefaults()
+                        tabAreaInsets = java.awt.Insets(2, 4, 2, 4)
+                        tabInsets = java.awt.Insets(6, 12, 6, 12)
+                        selectedTabPadInsets = java.awt.Insets(0, 0, 0, 0)
+                        contentBorderInsets = java.awt.Insets(0, 0, 0, 0)
+                    }
+                    
+                    override fun paintTabBackground(g: Graphics, tabPlacement: Int, tabIndex: Int, x: Int, y: Int, w: Int, h: Int, isSelected: Boolean) {
+                        val g2d = g.create() as Graphics2D
+                        try {
+                            if (isSelected) {
+                                // 选中状态：白色背景
+                                g2d.color = Color.WHITE
+                                g2d.fillRect(x, y, w, h)
+                                
+                                // 蓝色底部边框
+                                g2d.color = Color(0, 120, 212)
+                                g2d.fillRect(x, y + h - 2, w, 2)
+                            } else {
+                                // 未选中状态：透明背景
+                                g2d.color = Color(0, 0, 0, 0)
+                                g2d.fillRect(x, y, w, h)
+                            }
+                        } finally {
+                            g2d.dispose()
+                        }
+                    }
+                    
+                    override fun paintTabBorder(g: Graphics?, tabPlacement: Int, tabIndex: Int, x: Int, y: Int, w: Int, h: Int, isSelected: Boolean) {
+                        // 不绘制边框
+                    }
+                    
+                    override fun paintContentBorder(g: Graphics?, tabPlacement: Int, selectedIndex: Int) {
+                        // 不绘制内容边框
+                    }
+                    
+                    override fun paintFocusIndicator(g: Graphics?, tabPlacement: Int, rects: Array<out Rectangle>?, tabIndex: Int, iconRect: Rectangle?, textRect: Rectangle?, isSelected: Boolean) {
+                        // 不绘制焦点指示器
+                    }
+                })
+                
+                font = Font("Dialog", Font.PLAIN, 12)
+                
+                // 监听标签切换事件
+                addChangeListener {
+                    val selectedIndex = selectedIndex
+                    if (selectedIndex >= 0) {
+                        switchSmaliView(selectedIndex)
+                    }
+                }
+            }
+            
+            // 添加 "Smali" 标签（默认选中）
+            smaliViewTabs!!.addTab("Smali", JPanel())
+            
+            // 添加 "Code" 标签
+            smaliViewTabs!!.addTab("Code", JPanel())
+            
+            // 默认选中 Smali 标签
+            smaliViewTabs!!.selectedIndex = 0
+            
+            // 将底部标签面板添加到统一容器中，避免与查找条冲突
+            // 如果已有 manifestViewTabs，需要处理布局
+            if (manifestViewTabs != null) {
+                // 检查是否已经有容器
+                val existingContainer = bottomContainer.getComponent(0) as? JPanel
+                if (existingContainer != null && existingContainer.layout is BorderLayout) {
+                    // 已有容器，直接添加到容器中
+                    existingContainer.add(smaliViewTabs!!, BorderLayout.SOUTH)
+                } else {
+                    // 创建新容器
+                    val container = JPanel(BorderLayout()).apply {
+                        isOpaque = false
+                    }
+                    container.add(manifestViewTabs!!, BorderLayout.NORTH)
+                    container.add(smaliViewTabs!!, BorderLayout.SOUTH)
+                    bottomContainer.removeAll()
+                    bottomContainer.add(container, BorderLayout.SOUTH)
+                }
+            } else {
+                // 没有 manifest tabs，直接添加到 bottomContainer
+                // 检查是否已有容器
+                val existingContainer = if (bottomContainer.componentCount > 0) {
+                    bottomContainer.getComponent(0) as? JPanel
+                } else {
+                    null
+                }
+                
+                if (existingContainer != null && existingContainer.layout is BorderLayout) {
+                    // 已有容器，添加到容器中
+                    existingContainer.add(smaliViewTabs!!, BorderLayout.SOUTH)
+                } else {
+                    // 没有容器，直接添加到 bottomContainer
+                    bottomContainer.removeAll()
+                    bottomContainer.add(smaliViewTabs!!, BorderLayout.SOUTH)
+                }
+            }
+            
+            isSmaliMode = true
+            bottomContainer.revalidate()
+            bottomContainer.repaint()
+            revalidate()
+            repaint()
+            
+            logger.debug("Smali 底部 tab 已创建并添加到界面")
+            
+        } catch (e: Exception) {
+            logger.warn("构建 Smali 视图失败", e)
+        }
+    }
+    
+    // 切换 Smali 视图
+    private fun switchSmaliView(tabIndex: Int) {
+        // 获取当前 smali 文件的编辑器索引
+        val fileIndex = smaliFile?.let { fileToTab[it] } ?: return
+        val textArea = tabTextAreas[fileIndex] ?: return
+        
+        // 暂时禁用脏检测
+        textArea.putClientProperty("suppressDirty", true)
+        
+        try {
+            when (smaliViewTabs!!.getTitleAt(tabIndex)) {
+                "Smali" -> {
+                    // 显示原始 Smali 代码
+                    textArea.text = smaliOriginalContent ?: ""
+                    textArea.isEditable = true
+                    textArea.detectSyntax(smaliFile!!)
+                }
+                "Code" -> {
+                    // 显示 Java 代码（反编译或查找对应文件）
+                    val javaContent = getJavaCodeForSmali(smaliFile!!)
+                    textArea.text = javaContent
+                    textArea.isEditable = false
+                    textArea.syntaxEditingStyle = org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_JAVA
+                }
+            }
+            
+            // 滚动到顶部
+            SwingUtilities.invokeLater {
+                textArea.caretPosition = 0
+                textArea.scrollRectToVisible(Rectangle(0, 0, 1, 1))
+            }
+            
+        } finally {
+            // 恢复脏检测
+            textArea.putClientProperty("suppressDirty", false)
+        }
+    }
+    
+    // 获取 Smali 文件对应的 Java 代码
+    private fun getJavaCodeForSmali(smaliFile: File): String {
+        logger.info("开始获取 Java 代码，smali 文件: ${smaliFile.absolutePath}")
+        
+        // 如果已经缓存了 Java 内容，直接返回
+        if (smaliJavaContent != null) {
+            logger.info("使用缓存的 Java 内容")
+            return smaliJavaContent!!
+        }
+        
+        try {
+            // 策略1: 查找对应的 Java 文件（如果是从 JADX 反编译的 APK）
+            // smali 文件路径通常类似: .../smali/com/example/MyClass.smali
+            // Java 文件路径通常类似: .../java_src/com/example/MyClass.java 或 .../sources/com/example/MyClass.java
+            val smaliPath = smaliFile.absolutePath
+            val javaPaths = listOf(
+                smaliPath.replace("/smali/", "/java_src/").replace(".smali", ".java"),
+                smaliPath.replace("/smali/", "/sources/").replace(".smali", ".java"),
+                smaliPath.replace("/smali_classes", "/java_src").replace(".smali", ".java"),
+            )
+            
+            for (javaPath in javaPaths) {
+                val javaFile = File(javaPath)
+                if (javaFile.exists() && javaFile.canRead()) {
+                    val content = Files.readString(javaFile.toPath())
+                    smaliJavaContent = content
+                    return content
+                }
+            }
+            
+            // 策略2: 查找同一目录下的同名 .java 文件（向上查找）
+            var currentDir = smaliFile.parentFile
+            while (currentDir != null) {
+                val javaFile = File(currentDir, smaliFile.nameWithoutExtension + ".java")
+                if (javaFile.exists() && javaFile.canRead()) {
+                    val content = Files.readString(javaFile.toPath())
+                    smaliJavaContent = content
+                    return content
+                }
+                // 检查是否有 sources 或 java_src 目录
+                val sourcesDir = File(currentDir, "sources")
+                if (sourcesDir.exists() && sourcesDir.isDirectory) {
+                    val relativePath = smaliFile.relativeTo(currentDir).path.replace("/smali/", "/").replace(".smali", ".java")
+                    val javaFile2 = File(sourcesDir, relativePath)
+                    if (javaFile2.exists() && javaFile2.canRead()) {
+                        val content = Files.readString(javaFile2.toPath())
+                        smaliJavaContent = content
+                        return content
+                    }
+                }
+                val javaSrcDir = File(currentDir, "java_src")
+                if (javaSrcDir.exists() && javaSrcDir.isDirectory) {
+                    val relativePath = smaliFile.relativeTo(currentDir).path.replace("/smali/", "/").replace(".smali", ".java")
+                    val javaFile2 = File(javaSrcDir, relativePath)
+                    if (javaFile2.exists() && javaFile2.canRead()) {
+                        val content = Files.readString(javaFile2.toPath())
+                        smaliJavaContent = content
+                        return content
+                    }
+                }
+                currentDir = currentDir.parentFile
+            }
+            
+            // 策略3: 尝试使用 JADX 实时反编译（类似 MT 管理器）
+            logger.info("策略3: 尝试使用 JADX 实时反编译")
+            val decompiledJava = tryDecompileWithJadx(smaliFile)
+            if (decompiledJava != null) {
+                logger.info("实时反编译成功")
+                smaliJavaContent = decompiledJava
+                return decompiledJava
+            }
+            logger.warn("实时反编译失败")
+            
+            // 策略4: 如果找不到，显示提示信息
+            smaliJavaContent = """
+                // 未找到对应的 Java 源码文件
+                // 
+                // 提示：
+                // 1. 如果这是从 APK 反编译的 smali 文件，请确保已使用 JADX 反编译生成 Java 源码
+                // 2. Java 源码通常位于以下目录之一：
+                //    - java_src/
+                //    - sources/
+                //    - 与 smali 文件同目录
+                // 3. 或者确保已安装 jadx 工具，可以实时反编译
+                //
+                // 当前 smali 文件路径: ${smaliFile.absolutePath}
+            """.trimIndent()
+            return smaliJavaContent!!
+            
+        } catch (e: Exception) {
+            logger.warn("获取 Java 代码失败", e)
+            smaliJavaContent = "// 获取 Java 代码时出错: ${e.message}"
+            return smaliJavaContent!!
+        }
+    }
+    
+    // 尝试使用 JADX 实时反编译 smali 文件（类似 MT 管理器）
+    // 策略：先将单个 smali 文件编译成 DEX，然后用 jadx 反编译
+    private fun tryDecompileWithJadx(smaliFile: File): String? {
+        try {
+            logger.info("开始实时反编译 smali 文件: ${smaliFile.absolutePath}")
+            
+            // 检查 jadx 和 smali 工具是否可用
+            val jadxPath = JadxTool.locate()
+            if (jadxPath == null) {
+                logger.warn("JADX 工具未找到，跳过实时反编译")
+                return null
+            }
+            logger.info("找到 JADX 工具: $jadxPath")
+            
+            val smaliPath = SmaliTool.locate()
+            if (smaliPath == null) {
+                logger.warn("smali 工具未找到，尝试使用完整 DEX 文件反编译")
+                // 回退到使用完整 DEX 文件的方式
+                return tryDecompileWithFullDex(smaliFile)
+            }
+            
+            logger.info("找到 smali 工具: $smaliPath，使用单个文件编译方式")
+            
+            // 计算 smali 文件对应的类名
+            val className = extractClassNameFromSmaliPath(smaliFile.absolutePath)
+            if (className == null) {
+                logger.debug("无法从 smali 路径提取类名: ${smaliFile.absolutePath}")
+                return null
+            }
+            
+            // 创建临时目录
+            val tempDir = Files.createTempDirectory("smali_to_java_").toFile()
+            tempDir.deleteOnExit()
+            
+            // 步骤1: 使用 smali 工具将单个 smali 文件编译成 DEX
+            val tempDexFile = File(tempDir, "classes.dex")
+            logger.info("编译 smali 文件为 DEX: ${smaliFile.absolutePath} -> ${tempDexFile.absolutePath}")
+            logger.info("使用 smali 工具路径: $smaliPath")
+            System.out.println("=== 开始编译 smali 文件 ===")
+            System.out.println("smali 工具: $smaliPath")
+            System.out.println("输入文件: ${smaliFile.absolutePath}")
+            System.out.println("输出文件: ${tempDexFile.absolutePath}")
+            
+            val assembleResult = SmaliTool.assemble(smaliFile, tempDexFile)
+            
+            if (assembleResult.status != SmaliTool.Status.SUCCESS) {
+                logger.error("smali 编译失败 (status=${assembleResult.status}, exitCode=${assembleResult.exitCode})")
+                logger.error("smali 编译错误输出: ${assembleResult.output}")
+                System.err.println("=== SMALI 编译失败 ===")
+                System.err.println("状态: ${assembleResult.status}")
+                System.err.println("退出码: ${assembleResult.exitCode}")
+                System.err.println("输出: ${assembleResult.output}")
+                tempDir.deleteRecursively()
+                return null
+            }
+            
+            if (!tempDexFile.exists()) {
+                logger.error("smali 编译完成但 DEX 文件不存在: ${tempDexFile.absolutePath}")
+                System.err.println("=== SMALI 编译完成但文件不存在 ===")
+                System.err.println("路径: ${tempDexFile.absolutePath}")
+                tempDir.deleteRecursively()
+                return null
+            }
+            
+            logger.info("smali 编译成功，DEX 文件大小: ${tempDexFile.length()} 字节")
+            System.out.println("✓ smali 编译成功，DEX 文件: ${tempDexFile.absolutePath} (${tempDexFile.length()} 字节)")
+            
+            // 步骤2: 使用 JADX 反编译 DEX 文件
+            val jadxOutputDir = File(tempDir, "jadx_output")
+            logger.debug("使用 JADX 反编译 DEX: ${tempDexFile.absolutePath} -> ${jadxOutputDir.absolutePath}")
+            val decompileResult = JadxTool.decompile(tempDexFile, jadxOutputDir)
+            
+            if (decompileResult.status != JadxTool.Status.SUCCESS) {
+                logger.warn("JADX 反编译失败: ${decompileResult.output}")
+                tempDir.deleteRecursively()
+                return null
+            }
+            
+            // 步骤3: 查找对应的 Java 文件
+            val javaRelativePath = className.replace(".", "/") + ".java"
+            val possibleJavaPaths = listOf(
+                File(jadxOutputDir, "sources/$javaRelativePath"),
+                File(jadxOutputDir, javaRelativePath),
+                File(jadxOutputDir, "src/main/java/$javaRelativePath"),
+            )
+            
+            for (javaFile in possibleJavaPaths) {
+                if (javaFile.exists() && javaFile.isFile) {
+                    val content = Files.readString(javaFile.toPath())
+                    tempDir.deleteRecursively()
+                    logger.debug("成功使用 smali+jadx 反编译单个文件")
+                    return content
+                }
+            }
+            
+            logger.debug("反编译后的 Java 文件不存在，类名: $className")
+            tempDir.deleteRecursively()
+            return null
+            
+        } catch (e: Exception) {
+            logger.warn("使用 smali+jadx 实时反编译失败", e)
+            return null
+        }
+    }
+    
+    // 回退方案：使用完整 DEX 文件反编译（如果 smali 工具不可用）
+    private fun tryDecompileWithFullDex(smaliFile: File): String? {
+        try {
+            // 尝试找到对应的 DEX 文件
+            var currentDir = smaliFile.parentFile
+            var dexFile: File? = null
+            
+            while (currentDir != null) {
+                val parent = currentDir.parentFile
+                if (parent != null && (currentDir.name == "smali" || currentDir.name.startsWith("smali_"))) {
+                    val possibleDexFiles = listOf(
+                        File(parent, "classes.dex"),
+                        File(parent, "classes2.dex"),
+                        File(parent, "classes3.dex"),
+                        File(parent, "classes4.dex"),
+                        File(parent, "classes5.dex"),
+                    )
+                    dexFile = possibleDexFiles.firstOrNull { it.exists() && it.canRead() }
+                    if (dexFile != null) break
+                }
+                currentDir = parent
+            }
+            
+            if (dexFile == null || !dexFile.exists()) {
+                return null
+            }
+            
+            val className = extractClassNameFromSmaliPath(smaliFile.absolutePath) ?: return null
+            
+            val tempDir = Files.createTempDirectory("jadx_decompile_").toFile()
+            tempDir.deleteOnExit()
+            
+            val result = JadxTool.decompile(dexFile, tempDir)
+            if (result.status != JadxTool.Status.SUCCESS) {
+                tempDir.deleteRecursively()
+                return null
+            }
+            
+            val javaRelativePath = className.replace(".", "/") + ".java"
+            val javaFile = File(tempDir, "sources/$javaRelativePath")
+            
+            if (!javaFile.exists()) {
+                val javaFile2 = File(tempDir, javaRelativePath)
+                if (javaFile2.exists()) {
+                    val content = Files.readString(javaFile2.toPath())
+                    tempDir.deleteRecursively()
+                    return content
+                }
+                tempDir.deleteRecursively()
+                return null
+            }
+            
+            val content = Files.readString(javaFile.toPath())
+            tempDir.deleteRecursively()
+            return content
+            
+        } catch (e: Exception) {
+            logger.warn("使用完整 DEX 反编译失败", e)
+            return null
+        }
+    }
+    
+    // 从 smali 文件路径提取类名
+    private fun extractClassNameFromSmaliPath(smaliPath: String): String? {
+        try {
+            // 路径格式: .../smali/com/example/MyClass.smali
+            // 或: .../smali_classes2/com/example/MyClass.smali
+            val smaliPattern = """.*[/\\](?:smali(?:_classes\d+)?)[/\\](.+?)\.smali$""".toRegex()
+            val match = smaliPattern.find(smaliPath) ?: return null
+            val classPath = match.groupValues[1]
+            return classPath.replace("/", ".").replace("\\", ".")
+        } catch (e: Exception) {
+            logger.warn("提取类名失败", e)
+            return null
+        }
+    }
+    
+    // 移除 Smali 底部视图标签
+    private fun removeSmaliViewTabs() {
+        if (smaliViewTabs != null) {
+            // 移除底部标签面板
+            val container = bottomContainer.getComponent(0) as? JPanel
+            if (container != null && container.layout is BorderLayout) {
+                // 从容器中移除
+                container.remove(smaliViewTabs!!)
+                if (container.componentCount == 0) {
+                    // 容器为空，移除容器
+                    bottomContainer.remove(container)
+                } else {
+                    // 容器还有其他组件（如 manifest tabs），保留容器
+                    bottomContainer.revalidate()
+                    bottomContainer.repaint()
+                }
+            } else {
+                // 直接添加到 bottomContainer
+                bottomContainer.remove(smaliViewTabs!!)
+            }
+            smaliViewTabs = null
+            isSmaliMode = false
+            smaliFile = null
+            smaliOriginalContent = null
+            smaliJavaContent = null
+            revalidate()
+            repaint()
+        }
+    }
+    
+    // 打开压缩包文件（XAPK、AAB、AAR）
+    private fun openArchiveFile(file: File) {
+        try {
+            // 创建压缩包浏览器视图
+            val archiveView = createArchiveView(file)
+            
+            // 创建一个包装面板来容纳压缩包视图
+            val contentPanel = JPanel(BorderLayout()).apply {
+                isOpaque = false
+                border = BorderFactory.createEmptyBorder()
+                add(archiveView, BorderLayout.CENTER)
+            }
+            
+            val title = file.name
+            tabbedPane.addTab(title, resolveTabIcon(file), contentPanel, null)
+            
+            val index = tabbedPane.tabCount - 1
+            fileToTab[file] = index
+            tabToFile[index] = file
+            // 注意：压缩包文件不需要 textArea，所以不添加到 tabTextAreas
+            val closeButton = createVSCodeTabHeader(file)
+            tabbedPane.setTabComponentAt(index, closeButton)
+            attachPopupToHeader(closeButton)
+            tabbedPane.selectedIndex = index
+            
+            mainWindow.statusBar.setFileInfo(file.name, Files.size(file.toPath()).toString() + " B")
+            mainWindow.statusBar.updateNavigation(file)
+            
+        } catch (e: Exception) {
+            logger.error("打开压缩包文件失败", e)
+            mainWindow.statusBar.showError("无法打开压缩包: ${e.message}")
+        }
+    }
+    
+    // 创建压缩包浏览器视图
+    private fun createArchiveView(archiveFile: File): JPanel {
+        val treeModel = DefaultTreeModel(DefaultMutableTreeNode("加载中..."))
+        val fileTree = JTree(treeModel).apply {
+            isRootVisible = false
+            showsRootHandles = true
+            addMouseListener(object : MouseAdapter() {
+                override fun mouseClicked(e: MouseEvent) {
+                    if (e.clickCount == 2) {
+                        val path = getPathForLocation(e.x, e.y) ?: return
+                        val node = path.lastPathComponent as? DefaultMutableTreeNode ?: return
+                        val entry = node.userObject as? ZipEntry ?: return
+                        if (!entry.isDirectory) {
+                            openZipEntry(archiveFile, entry)
+                        }
+                    }
+                }
+            })
+        }
+        
+        val infoLabel = JLabel().apply {
+            border = BorderFactory.createEmptyBorder(8, 8, 8, 8)
+            font = font.deriveFont(Font.PLAIN, 11f)
+            foreground = Color.GRAY
+        }
+        
+        val panel = JPanel(BorderLayout()).apply {
+            val scrollPane = JScrollPane(fileTree).apply {
+                border = BorderFactory.createEmptyBorder()
+            }
+            add(scrollPane, BorderLayout.CENTER)
+            add(infoLabel, BorderLayout.SOUTH)
+        }
+        
+        // 异步加载压缩包内容
+        Thread {
+            try {
+                val zipFile = ZipFile(archiveFile)
+                val rootNode = DefaultMutableTreeNode(archiveFile.name)
+                val entries = zipFile.entries().toList()
+                val entryMap = mutableMapOf<String, DefaultMutableTreeNode>()
+                
+                entries.forEach { entry ->
+                    val parts = entry.name.split("/").filter { it.isNotEmpty() }
+                    var currentPath = ""
+                    var parentNode = rootNode
+                    
+                    parts.forEachIndexed { index, part ->
+                        currentPath += if (currentPath.isEmpty()) part else "/$part"
+                        val isDirectory = index < parts.size - 1 || entry.name.endsWith("/")
+                        
+                        val node = entryMap.getOrPut(currentPath) {
+                            val newNode = DefaultMutableTreeNode(entry)
+                            parentNode.add(newNode)
+                            newNode
+                        }
+                        parentNode = node
+                    }
+                }
+                
+                SwingUtilities.invokeLater {
+                    treeModel.setRoot(rootNode)
+                    fileTree.expandRow(0)
+                    infoLabel.text = "共 ${entries.size} 个文件/目录"
+                }
+                
+                zipFile.close()
+            } catch (e: Exception) {
+                SwingUtilities.invokeLater {
+                    val errorNode = DefaultMutableTreeNode("加载失败: ${e.message}")
+                    treeModel.setRoot(errorNode)
+                    infoLabel.text = "无法读取压缩包"
+                }
+            }
+        }.apply {
+            isDaemon = true
+            start()
+        }
+        
+        return panel
+    }
+    
+    // 打开压缩包中的文件条目
+    private fun openZipEntry(archiveFile: File, entry: ZipEntry) {
+        Thread {
+            try {
+                val zipFile = ZipFile(archiveFile)
+                val zipEntry = zipFile.getEntry(entry.name) ?: return@Thread
+                
+                val inputStream = zipFile.getInputStream(zipEntry)
+                val content = try {
+                    inputStream.bufferedReader().use { it.readText() }
+                } catch (e: Exception) {
+                    // 如果是二进制文件，显示提示信息
+                    "// 二进制文件，无法以文本形式显示\n// 文件大小: ${zipEntry.size} 字节"
+                }
+                zipFile.close()
+                
+                // 创建临时文件并打开
+                val tempFile = File.createTempFile("archive_", "_${entry.name.split("/").last()}")
+                tempFile.writeText(content)
+                tempFile.deleteOnExit()
+                
+                SwingUtilities.invokeLater {
+                    openFile(tempFile)
+                }
+            } catch (e: Exception) {
+                SwingUtilities.invokeLater {
+                    JOptionPane.showMessageDialog(
+                        this@Editor,
+                        "无法打开文件: ${e.message}",
+                        "错误",
+                        JOptionPane.ERROR_MESSAGE
+                    )
+                }
+            }
+        }.apply {
+            isDaemon = true
+            start()
+        }
+    }
 }

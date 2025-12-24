@@ -28,6 +28,9 @@ fun main() {
         System.setProperty("org.slf4j.simpleLogger.dateTimeFormat", "yyyy-MM-dd HH:mm:ss.SSS")
         System.setProperty("org.slf4j.simpleLogger.showThreadName", "true")
         System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "info")
+        // 同时输出到控制台
+        System.setProperty("org.slf4j.simpleLogger.showLogName", "false")
+        System.setProperty("org.slf4j.simpleLogger.showShortLogName", "true")
     }
 
     Thread.setDefaultUncaughtExceptionHandler { _, exception ->

@@ -16,9 +16,12 @@ import java.awt.event.KeyEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.io.File
+import java.io.FileOutputStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 import java.util.concurrent.TimeUnit
+import java.util.zip.ZipEntry
+import java.util.zip.ZipFile
 import javax.swing.*
 import javax.swing.border.EmptyBorder
 import javax.swing.event.TreeExpansionEvent
@@ -1246,7 +1249,10 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                 }
 
             when (result.status) {
-                ApkTool.Status.SUCCESS ->
+                ApkTool.Status.SUCCESS -> {
+                    // 从 APK 中提取 DEX 文件到输出目录（用于实时 smali to java）
+                    extractDexFilesFromApk(apkFile, outputDir)
+                    
                     if (!isTaskCancelled && !Thread.currentThread().isInterrupted) {
                         SwingUtilities.invokeLater {
                             mainWindow.guiControl.workspace.openWorkspace(outputDir)
@@ -1258,6 +1264,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                             promptCreateGitRepository(outputDir)
                         }
                     }
+                }
 
                 ApkTool.Status.CANCELLED -> return
                 ApkTool.Status.NOT_FOUND -> throw Exception("未找到apktool，请确保apktool已安装并在PATH中")
@@ -1270,6 +1277,50 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         }
     }
 
+    // 从 APK 文件中提取 DEX 文件到输出目录（用于实时 smali to java 反编译）
+    private fun extractDexFilesFromApk(apkFile: File, outputDir: File) {
+        try {
+            val logger = org.slf4j.LoggerFactory.getLogger(Explorer::class.java)
+            logger.debug("开始从 APK 提取 DEX 文件: ${apkFile.absolutePath} -> ${outputDir.absolutePath}")
+            
+            val zipFile = ZipFile(apkFile)
+            val dexPattern = """^classes\d*\.dex$""".toRegex()
+            var extractedCount = 0
+            val extractedFiles = mutableListOf<String>()
+            
+            zipFile.entries().asSequence().forEach { entry ->
+                if (dexPattern.matches(entry.name)) {
+                    val outputDexFile = File(outputDir, entry.name)
+                    try {
+                        zipFile.getInputStream(entry).use { input ->
+                            FileOutputStream(outputDexFile).use { output ->
+                                input.copyTo(output)
+                            }
+                        }
+                        extractedCount++
+                        extractedFiles.add(entry.name)
+                        logger.debug("提取 DEX 文件: ${entry.name} -> ${outputDexFile.absolutePath}")
+                    } catch (e: Exception) {
+                        logger.warn("提取 DEX 文件失败: ${entry.name}", e)
+                    }
+                }
+            }
+            
+            zipFile.close()
+            
+            if (extractedCount > 0) {
+                logger.info("从 APK 成功提取了 $extractedCount 个 DEX 文件到: ${outputDir.absolutePath}")
+                logger.debug("提取的文件: ${extractedFiles.joinToString(", ")}")
+            } else {
+                logger.warn("未找到任何 DEX 文件在 APK 中: ${apkFile.absolutePath}")
+            }
+        } catch (e: Exception) {
+            val logger = org.slf4j.LoggerFactory.getLogger(Explorer::class.java)
+            logger.error("提取 DEX 文件失败: ${e.message}", e)
+            // 不抛出异常，因为反编译本身已经成功
+        }
+    }
+    
     private fun ensureDecompilerService(): DecompilerService? {
         val manager = mainWindow.pluginManager ?: return null
         manager.triggerCommand("decompiler")
