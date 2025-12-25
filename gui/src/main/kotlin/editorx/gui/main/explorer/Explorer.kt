@@ -119,20 +119,20 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         /*
         Right - 固定按钮组
          */
-        locateButton = JButton(IconLoader.getIcon(IconRef("icons/locate.svg"), TOP_BAR_ICON_SIZE)).apply {
+        locateButton = JButton(IconLoader.getIcon(IconRef("icons/common/locate.svg"), TOP_BAR_ICON_SIZE)).apply {
             toolTipText = "定位打开的文件..."
             isFocusable = false
             margin = Insets(4, 4, 4, 4)
             addActionListener { locateCurrentFile() }
         }
         toolBar.add(locateButton!!)
-        toolBar.add(JButton(IconLoader.getIcon(IconRef("icons/refresh.svg"), TOP_BAR_ICON_SIZE)).apply {
+        toolBar.add(JButton(IconLoader.getIcon(IconRef("icons/common/refresh.svg"), TOP_BAR_ICON_SIZE)).apply {
             toolTipText = "刷新文件树..."
             isFocusable = false
             margin = Insets(4, 4, 4, 4)
             addActionListener { refreshRootPreserveSelection() }
         })
-        toolBar.add(JButton(IconLoader.getIcon(IconRef("icons/collapseAll.svg"), TOP_BAR_ICON_SIZE)).apply {
+        toolBar.add(JButton(IconLoader.getIcon(IconRef("icons/common/collapseAll.svg"), TOP_BAR_ICON_SIZE)).apply {
             toolTipText = "全部收起..."
             isFocusable = false
             margin = Insets(4, 4, 4, 4)

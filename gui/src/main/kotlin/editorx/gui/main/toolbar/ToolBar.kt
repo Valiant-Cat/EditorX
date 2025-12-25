@@ -194,7 +194,7 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
     private fun loadVcsIcon(): Icon? {
         return try {
             // 尝试从主资源加载
-            IconLoader.getIcon(IconRef("icons/git-branch.svg"), 14)
+            IconLoader.getIcon(IconRef("icons/gui/git-branch.svg"), 14)
         } catch (e: Exception) {
             null
         }
@@ -399,7 +399,7 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
         add(
             JButton(
                 IconLoader.getIcon(
-                    IconRef("icons/android-manifest.svg"),
+                    IconRef("icons/gui/android-manifest.svg"),
                     ICON_SIZE
                 )
             ).compact("跳转到 AndroidManifest.xml") {
@@ -408,13 +408,13 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
 
         add(Box.createHorizontalStrut(6))
 
-        add(JButton(IconLoader.getIcon(IconRef("icons/main-activity.svg"), ICON_SIZE)).compact("跳转到 MainActivity") {
+        add(JButton(IconLoader.getIcon(IconRef("icons/gui/main-activity.svg"), ICON_SIZE)).compact("跳转到 MainActivity") {
             navigateToMainActivity()
         })
 
         add(Box.createHorizontalStrut(6))
 
-        add(JButton(IconLoader.getIcon(IconRef("icons/application.svg"), ICON_SIZE)).compact("跳转到 Application") {
+        add(JButton(IconLoader.getIcon(IconRef("icons/gui/application.svg"), ICON_SIZE)).compact("跳转到 Application") {
             navigateToApplication()
         })
 
@@ -422,7 +422,7 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
     }
 
     private fun setupRightActions() {
-        add(JButton(IconLoader.getIcon(IconRef("icons/build.svg"), ICON_SIZE)).compact("构建") {
+        add(JButton(IconLoader.getIcon(IconRef("icons/common/build.svg"), ICON_SIZE)).compact("构建") {
             compileWorkspaceApk()
         })
 
@@ -439,13 +439,13 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
 
         // 全局搜索按钮（双击 Shift）
         val doubleShiftText = if (I18n.locale().language == Locale.ENGLISH.language) "Double Shift" else "双击Shift"
-        add(JButton(IconLoader.getIcon(IconRef("icons/search.svg"), ICON_SIZE)).compactWithShortcut("全局搜索", doubleShiftText) {
+        add(JButton(IconLoader.getIcon(IconRef("icons/common/search.svg"), ICON_SIZE)).compactWithShortcut("全局搜索", doubleShiftText) {
             showGlobalSearch()
         })
 
         add(Box.createHorizontalStrut(6))
 
-        add(JButton(IconLoader.getIcon(IconRef("icons/settings.svg"), ICON_SIZE)).compact("设置") {
+        add(JButton(IconLoader.getIcon(IconRef("icons/common/settings.svg"), ICON_SIZE)).compact("设置") {
             showSettings()
         })
 
@@ -468,13 +468,13 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
     }
 
     fun updateSideBarIcon(sideBarVisible: Boolean) {
-        val iconName = if (sideBarVisible) "icons/layout-sidebar-left.svg" else "icons/layout-sidebar-left-off.svg"
+        val iconName = if (sideBarVisible) "icons/gui/layout-sidebar-left.svg" else "icons/gui/layout-sidebar-left-off.svg"
         toggleSideBarButton?.icon = IconLoader.getIcon(IconRef(iconName), ICON_SIZE)
     }
 
     private fun getSideBarIcon(): Icon? {
         val isVisible = mainWindow.sideBar.isSideBarVisible()
-        val iconName = if (isVisible) "icons/layout-sidebar-left.svg" else "icons/layout-sidebar-left-off.svg"
+        val iconName = if (isVisible) "icons/gui/layout-sidebar-left.svg" else "icons/gui/layout-sidebar-left-off.svg"
         return IconLoader.getIcon(IconRef(iconName), ICON_SIZE)
     }
 

@@ -5,28 +5,77 @@ import javax.swing.Icon
 import javax.swing.ImageIcon
 
 object IconLoader {
+    /**
+     * 尝试从多个 ClassLoader 查找资源
+     * 查找顺序：
+     * 1. 传入的 ClassLoader（如果提供）
+     * 2. icons 模块的 ClassLoader（如果可用）
+     * 3. IconLoader 的 ClassLoader
+     * 4. 系统 ClassLoader
+     */
+    private fun findResource(resourcePath: String, classLoader: ClassLoader?): URL? {
+        val normalized =
+            if (resourcePath.startsWith("/")) resourcePath.substring(1) else resourcePath
+        
+        // 1. 优先使用传入的 ClassLoader
+        classLoader?.getResource(normalized)?.let { return it }
+        
+        // 2. 尝试从 icons 模块的 ClassLoader 查找
+        // 通过尝试加载 icons 模块的资源来获取其 ClassLoader
+        runCatching {
+            // 尝试通过资源路径推断 icons 模块的 ClassLoader
+            // 如果资源路径包含 icons/common/ 或 icons/gui/，说明可能是从 icons 模块加载
+            val iconsClassLoader = findIconsModuleClassLoader()
+            iconsClassLoader?.getResource(normalized)?.let { return it }
+        }
+        
+        // 3. 使用 IconLoader 的 ClassLoader
+        IconLoader::class.java.classLoader?.getResource(normalized)?.let { return it }
+        
+        // 4. 使用系统 ClassLoader
+        ClassLoader.getSystemClassLoader().getResource(normalized)?.let { return it }
+        
+        return null
+    }
+    
+    /**
+     * 尝试找到 icons 模块的 ClassLoader
+     * 通过查找 icons 模块中的资源来确定其 ClassLoader
+     */
+    private fun findIconsModuleClassLoader(): ClassLoader? {
+        // 尝试查找 icons 模块中的已知资源
+        val testResource = "icons/common/folder.svg"
+        val classLoaders = listOfNotNull(
+            IconLoader::class.java.classLoader,
+            ClassLoader.getSystemClassLoader(),
+            Thread.currentThread().contextClassLoader
+        )
+        
+        for (cl in classLoaders) {
+            if (cl.getResource(testResource) != null) {
+                return cl
+            }
+        }
+        return null
+    }
+
     fun getIcon(iconRef: IconRef, size: Int = 16): Icon? {
         return if (iconRef.isSvg) loadSvg(iconRef, size) else loadRaster(iconRef, size)
     }
 
     private fun loadRaster(iconRef: IconRef, size: Int): Icon? {
-        val cl = iconRef.classLoader ?: IconLoader::class.java.classLoader
-        val normalized =
-            if (iconRef.resourcePath.startsWith("/")) iconRef.resourcePath.substring(1) else iconRef.resourcePath
-        val url = cl.getResource(normalized) ?: return null
+        val url = findResource(iconRef.resourcePath, iconRef.classLoader) ?: return null
         return IconUtils.resizeIcon(ImageIcon(url), size, size)
     }
 
     private fun loadSvg(iconRef: IconRef, size: Int): Icon? {
-        val cl = iconRef.classLoader ?: IconLoader::class.java.classLoader
-        val normalized =
-            if (iconRef.resourcePath.startsWith("/")) iconRef.resourcePath.substring(1) else iconRef.resourcePath
-        val url: URL = cl.getResource(normalized) ?: return SvgIcon.fromResource(
-            iconRef.resourcePath,
-            iconRef.classLoader,
-            size,
-            size
-        )
+        val url: URL = findResource(iconRef.resourcePath, iconRef.classLoader) 
+            ?: return SvgIcon.fromResource(
+                iconRef.resourcePath,
+                iconRef.classLoader,
+                size,
+                size
+            )
 
         // Prefer FlatLaf's robust SVG renderer if available
         runCatching {

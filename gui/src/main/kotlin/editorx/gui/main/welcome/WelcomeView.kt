@@ -122,7 +122,7 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
         
         // 新建文件 按钮
         val newFileBtn = createActionButton(
-            icon = IconLoader.getIcon(IconRef("icons/addFile.svg"), 24),
+            icon = IconLoader.getIcon(IconRef("icons/common/addFile.svg"), 24),
             text = "新建文件",
             onClick = { newFile() }
         )
@@ -132,7 +132,7 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
         
         // 打开文件 按钮
         val openFileBtn = createActionButton(
-            icon = IconLoader.getIcon(IconRef("icons/anyType.svg"), 24),
+            icon = IconLoader.getIcon(IconRef("icons/common/anyType.svg"), 24),
             text = "打开文件",
             onClick = { openFile() }
         )
@@ -142,7 +142,7 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
         
         // 打开项目 按钮
         val openProjectBtn = createActionButton(
-            icon = IconLoader.getIcon(IconRef("icons/folder.svg"), 24),
+            icon = IconLoader.getIcon(IconRef("icons/common/folder.svg"), 24),
             text = "打开项目",
             onClick = { openProject() }
         )
@@ -355,7 +355,7 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
         }
         
         val deleteButton = JButton().apply {
-            icon = IconLoader.getIcon(IconRef("icons/close.svg"), 24)
+            icon = IconLoader.getIcon(IconRef("icons/common/close.svg"), 24)
             isOpaque = true
             isContentAreaFilled = true
             isBorderPainted = false

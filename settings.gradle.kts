@@ -18,6 +18,7 @@ plugins {
 rootProject.name = "EditorX"
 
 include(":core")
+include(":icons")
 include(":gui")
 include(":plugins:smali")
 include(":plugins:json")
@@ -25,4 +26,3 @@ include(":plugins:yaml")
 include(":plugins:xml")
 include(":plugins:git")
 include(":plugins:i18n-en")
-include(":plugins:android-archive")

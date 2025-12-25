@@ -5,6 +5,7 @@ plugins {
 
 dependencies {
     implementation(project(":core"))
+    implementation(project(":icons"))
     implementation(project(":plugins:smali"))
     implementation(project(":plugins:json"))
     implementation(project(":plugins:yaml"))

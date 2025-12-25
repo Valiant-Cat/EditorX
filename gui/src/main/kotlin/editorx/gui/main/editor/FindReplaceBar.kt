@@ -64,11 +64,11 @@ class FindReplaceBar(
         font = font.deriveFont(Font.PLAIN, 12f)
     }
 
-    private val expandIconCollapsed = IconLoader.getIcon(IconRef("icons/chevron-right.svg"), 16)
-    private val expandIconExpanded = IconLoader.getIcon(IconRef("icons/chevron-down.svg"), 16)
-    private val prevIcon = IconLoader.getIcon(IconRef("icons/arrow-up.svg"), 16)
-    private val nextIcon = IconLoader.getIcon(IconRef("icons/arrow-down.svg"), 16)
-    private val closeIcon = IconLoader.getIcon(IconRef("icons/close.svg"), 24)
+    private val expandIconCollapsed = IconLoader.getIcon(IconRef("icons/common/chevron-right.svg"), 16)
+    private val expandIconExpanded = IconLoader.getIcon(IconRef("icons/common/chevron-down.svg"), 16)
+    private val prevIcon = IconLoader.getIcon(IconRef("icons/common/arrow-up.svg"), 16)
+    private val nextIcon = IconLoader.getIcon(IconRef("icons/common/arrow-down.svg"), 16)
+    private val closeIcon = IconLoader.getIcon(IconRef("icons/common/close.svg"), 24)
     private val expandButton = createIconButton(expandIconCollapsed, "展开替换", fallbackText = "▸") {
         toggleReplaceRow()
     }
