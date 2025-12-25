@@ -416,28 +416,50 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
     }
     
     private fun openFile() {
-        val chooser = JFileChooser().apply {
-            fileSelectionMode = JFileChooser.FILES_ONLY
-            dialogTitle = "选择文件"
+        val fileDialog = java.awt.FileDialog(mainWindow, "选择文件", java.awt.FileDialog.LOAD).apply {
+            isMultipleMode = false
         }
-        if (chooser.showOpenDialog(mainWindow) == JFileChooser.APPROVE_OPTION) {
-            val selected = chooser.selectedFile
-            if (selected.isFile && selected.canRead()) {
-                mainWindow.editor.openFile(selected)
-                mainWindow.guiControl.workspace.addRecentFile(selected)
+        fileDialog.isVisible = true
+        
+        val fileName = fileDialog.file
+        val dir = fileDialog.directory
+        
+        if (fileName != null && dir != null) {
+            val selectedFile = File(dir, fileName)
+            if (selectedFile.isFile && selectedFile.canRead()) {
+                mainWindow.editor.openFile(selectedFile)
+                mainWindow.guiControl.workspace.addRecentFile(selectedFile)
                 mainWindow.editor.showEditorContent()
             }
         }
     }
     
     private fun openProject() {
-        val chooser = JFileChooser().apply {
-            fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
-            dialogTitle = "选择项目文件夹"
+        val fileDialog = java.awt.FileDialog(mainWindow, "选择项目文件夹", java.awt.FileDialog.LOAD).apply {
+            isMultipleMode = false
+            // 在 macOS 上，设置系统属性以使用文件夹选择模式
+            if (System.getProperty("os.name").lowercase().contains("mac")) {
+                System.setProperty("apple.awt.fileDialogForDirectories", "true")
+            }
         }
-        if (chooser.showOpenDialog(mainWindow) == JFileChooser.APPROVE_OPTION) {
-            val selected = chooser.selectedFile
-            openWorkspace(selected)
+        fileDialog.isVisible = true
+        
+        val selectedDir = fileDialog.directory?.let { dir ->
+            val fileName = fileDialog.file
+            if (fileName != null) {
+                File(dir, fileName)
+            } else {
+                File(dir)
+            }
+        }
+        
+        // 恢复系统属性
+        if (System.getProperty("os.name").lowercase().contains("mac")) {
+            System.setProperty("apple.awt.fileDialogForDirectories", "false")
+        }
+        
+        if (selectedDir != null && selectedDir.isDirectory) {
+            openWorkspace(selectedDir)
         }
     }
     
