@@ -105,7 +105,8 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         Left - 可收缩部分
         */
         val titleLabel = JLabel("资源管理器").apply {
-            font = font.deriveFont(Font.PLAIN, 12f)
+            font = font.deriveFont(Font.BOLD, 12f)
+            foreground = Color(0x333333)
             border = EmptyBorder(0, 8, 0, 8)
             // 允许标签收缩，但设置最小宽度为0
             minimumSize = Dimension(0, preferredSize.height)
@@ -1444,6 +1445,10 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
             if (file != null) {
                 icon = getIconForFile(file)
                 text = node.displayName
+            }
+            // 设置文本颜色为 #333333（如果未选中）
+            if (!sel) {
+                foreground = Color(0x333333)
             }
             return c
         }
