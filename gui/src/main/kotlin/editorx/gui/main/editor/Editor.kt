@@ -97,7 +97,10 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
     init {
         // 设置JPanel的布局
         layout = java.awt.BorderLayout()
-        background = Color.WHITE
+        updateTheme()
+        
+        // 监听主题变更
+        ThemeManager.addThemeChangeListener { updateTheme() }
 
         // 配置内部的JTabbedPane
         tabbedPane.apply {
@@ -220,6 +223,12 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                 return false
             }
         }
+    }
+    
+    private fun updateTheme() {
+        background = ThemeManager.currentTheme.editorBackground
+        revalidate()
+        repaint()
     }
 
     // VSCode 风格的 Tab 头：固定槽位 + hover/选中显示 close 按钮
@@ -474,16 +483,6 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             actionMap.put("editor.replace", object : AbstractAction() {
                 override fun actionPerformed(e: java.awt.event.ActionEvent?) {
                     this@Editor.showReplaceBar()
-                }
-            })
-
-            getInputMap(JComponent.WHEN_FOCUSED).put(
-                KeyStroke.getKeyStroke(KeyEvent.VK_F, shortcutMask or InputEvent.SHIFT_DOWN_MASK),
-                "editor.globalSearch"
-            )
-            actionMap.put("editor.globalSearch", object : AbstractAction() {
-                override fun actionPerformed(e: java.awt.event.ActionEvent?) {
-                    mainWindow.showGlobalSearch()
                 }
             })
         }

@@ -1,13 +1,9 @@
 package editorx.gui.main
 
-import editorx.core.gui.CachedGuiViewProvider
 import editorx.gui.GuiEnvironment
-import editorx.gui.core.Constants
-import editorx.gui.main.activitybar.ActivityBar
 import editorx.gui.main.editor.Editor
 import editorx.gui.main.explorer.Explorer
 import editorx.gui.main.menubar.MenuBar
-import editorx.gui.main.search.SearchView
 import editorx.gui.main.sidebar.SideBar
 import editorx.gui.main.statusbar.StatusBar
 import editorx.gui.main.toolbar.ToolBar
@@ -16,6 +12,8 @@ import editorx.core.plugin.PluginState
 import editorx.gui.util.NoLineSplitPaneUI
 import java.awt.BorderLayout
 import java.awt.Dimension
+import java.awt.event.MouseAdapter
+import java.awt.event.MouseMotionAdapter
 import java.io.File
 import javax.swing.JFileChooser
 import javax.swing.JFrame
@@ -26,7 +24,6 @@ class MainWindow(val guiControl: GuiEnvironment) : JFrame() {
     // UI 组件
     val titleBar by lazy { MenuBar(this) }
     val toolBar by lazy { ToolBar(this) }
-    val activityBar by lazy { ActivityBar(this) }
     val sideBar by lazy { SideBar(this) }
     val editor by lazy { Editor(this) }
     val statusBar by lazy { StatusBar(this) }
@@ -38,7 +35,6 @@ class MainWindow(val guiControl: GuiEnvironment) : JFrame() {
             if (state != PluginState.STARTED) {
                 // 插件被停用/失败：移除可能残留的入口与视图
                 sideBar.removeView(pluginId)
-                activityBar.removeViewProvider(pluginId)
             }
             editor.refreshSyntaxForOpenTabs()
         }
@@ -46,7 +42,6 @@ class MainWindow(val guiControl: GuiEnvironment) : JFrame() {
         override fun onPluginUnloaded(pluginId: String) {
             // 插件卸载：无条件移除入口与视图
             sideBar.removeView(pluginId)
-            activityBar.removeViewProvider(pluginId)
             editor.refreshSyntaxForOpenTabs()
         }
     }
@@ -62,7 +57,7 @@ class MainWindow(val guiControl: GuiEnvironment) : JFrame() {
         JSplitPane(JSplitPane.HORIZONTAL_SPLIT, sideBar, editor).apply {
             dividerLocation = 0  // 初始时隐藏SideBar
             isOneTouchExpandable = false
-            dividerSize = 8
+            dividerSize = 0  // 初始时 SideBar 关闭，隐藏拖拽条
         }
     }
 
@@ -70,7 +65,7 @@ class MainWindow(val guiControl: GuiEnvironment) : JFrame() {
         setupWindow()
         setupLayout()
         tuneSplitPanes()
-        setupDefaultActivityBarItems()
+        setupExplorer()
     }
 
     private fun setupWindow() {
@@ -104,7 +99,6 @@ class MainWindow(val guiControl: GuiEnvironment) : JFrame() {
         jMenuBar = titleBar
 
         add(toolBar, BorderLayout.NORTH)
-        add(activityBar, BorderLayout.WEST)
         add(horizontalSplit, BorderLayout.CENTER)
         add(statusBar, BorderLayout.SOUTH)
     }
@@ -115,56 +109,118 @@ class MainWindow(val guiControl: GuiEnvironment) : JFrame() {
         // 启用连续布局，减少布局跳动
         horizontalSplit.isContinuousLayout = true
 
-        // 当用户手动拖动分割条把 SideBar 拉出时，若尚未有激活视图，则激活默认项
+        // 当用户手动拖动分割条时，同步 SideBar 状态
         horizontalSplit.addPropertyChangeListener(javax.swing.JSplitPane.DIVIDER_LOCATION_PROPERTY) { _ ->
             val visible = horizontalSplit.dividerLocation > 0
             // 同步SideBar内部状态与分割条位置
             sideBar.syncVisibilityWithDivider()
-
-            if (visible && sideBar.getCurrentViewId() == null) {
-                sideBar.preserveNextDividerOnShow()
-                activityBar.activateItem(Constants.ACTIVITY_BAR_DEFAULT_ID, userInitiated = false)
-            } else if (visible && sideBar.getCurrentViewId() != null) {
-                // 用户手动拖拽显示：仅同步按钮高亮，不再触发切换逻辑，避免误判为已显示而反向关闭
-                activityBar.highlightOnly(sideBar.getCurrentViewId()!!)
-            } else if (!visible) {
-                activityBar.clearActive()
-            }
+            
+            // 根据 SideBar 可见性调整拖拽条大小
+            horizontalSplit.dividerSize = if (visible) 4 else 0
 
             // 同步更新ToolBar中的侧边栏toggle按钮
             toolBar.updateSideBarIcon(visible)
         }
+        
+        // 添加自定义拖拽功能：在 SideBar 右边缘和 Editor 左边缘检测拖拽
+        setupCustomDrag()
+    }
+    
+    private var isDragging = false
+    private var dragStartX = 0
+    private var dragStartLocation = 0
+    
+    private fun setupCustomDrag() {
+        // 在 SideBar 右边缘添加鼠标监听器
+        sideBar.addMouseListener(object : MouseAdapter() {
+            override fun mousePressed(e: java.awt.event.MouseEvent) {
+                val rightEdge = sideBar.width
+                val mouseX = e.x
+                // 检测是否在右边缘 5 像素范围内
+                if (mouseX >= rightEdge - 5 && mouseX <= rightEdge && horizontalSplit.dividerLocation > 0) {
+                    isDragging = true
+                    dragStartX = e.xOnScreen
+                    dragStartLocation = horizontalSplit.dividerLocation
+                    sideBar.cursor = java.awt.Cursor(java.awt.Cursor.E_RESIZE_CURSOR)
+                }
+            }
+            
+            override fun mouseReleased(e: java.awt.event.MouseEvent) {
+                if (isDragging) {
+                    isDragging = false
+                    sideBar.cursor = java.awt.Cursor(java.awt.Cursor.DEFAULT_CURSOR)
+                    editor.cursor = java.awt.Cursor(java.awt.Cursor.DEFAULT_CURSOR)
+                }
+            }
+        })
+        
+        sideBar.addMouseMotionListener(object : MouseMotionAdapter() {
+            override fun mouseDragged(e: java.awt.event.MouseEvent) {
+                if (isDragging) {
+                    val deltaX = e.xOnScreen - dragStartX
+                    val newLocation = (dragStartLocation + deltaX).coerceAtLeast(0)
+                        .coerceAtMost(horizontalSplit.width)
+                    horizontalSplit.dividerLocation = newLocation
+                }
+            }
+            
+            override fun mouseMoved(e: java.awt.event.MouseEvent) {
+                val rightEdge = sideBar.width
+                val mouseX = e.x
+                if (mouseX >= rightEdge - 5 && mouseX <= rightEdge && horizontalSplit.dividerLocation > 0) {
+                    sideBar.cursor = java.awt.Cursor(java.awt.Cursor.E_RESIZE_CURSOR)
+                } else {
+                    sideBar.cursor = java.awt.Cursor(java.awt.Cursor.DEFAULT_CURSOR)
+                }
+            }
+        })
+        
+        // 在 Editor 左边缘添加鼠标监听器
+        editor.addMouseListener(object : MouseAdapter() {
+            override fun mousePressed(e: java.awt.event.MouseEvent) {
+                val mouseX = e.x
+                // 检测是否在左边缘 5 像素范围内
+                if (mouseX >= 0 && mouseX <= 5 && horizontalSplit.dividerLocation > 0) {
+                    isDragging = true
+                    dragStartX = e.xOnScreen
+                    dragStartLocation = horizontalSplit.dividerLocation
+                    editor.cursor = java.awt.Cursor(java.awt.Cursor.E_RESIZE_CURSOR)
+                }
+            }
+            
+            override fun mouseReleased(e: java.awt.event.MouseEvent) {
+                if (isDragging) {
+                    isDragging = false
+                    sideBar.cursor = java.awt.Cursor(java.awt.Cursor.DEFAULT_CURSOR)
+                    editor.cursor = java.awt.Cursor(java.awt.Cursor.DEFAULT_CURSOR)
+                }
+            }
+        })
+        
+        editor.addMouseMotionListener(object : MouseMotionAdapter() {
+            override fun mouseDragged(e: java.awt.event.MouseEvent) {
+                if (isDragging) {
+                    val deltaX = e.xOnScreen - dragStartX
+                    val newLocation = (dragStartLocation + deltaX).coerceAtLeast(0)
+                        .coerceAtMost(horizontalSplit.width)
+                    horizontalSplit.dividerLocation = newLocation
+                }
+            }
+            
+            override fun mouseMoved(e: java.awt.event.MouseEvent) {
+                val mouseX = e.x
+                if (mouseX >= 0 && mouseX <= 5 && horizontalSplit.dividerLocation > 0) {
+                    editor.cursor = java.awt.Cursor(java.awt.Cursor.E_RESIZE_CURSOR)
+                } else {
+                    editor.cursor = java.awt.Cursor(java.awt.Cursor.DEFAULT_CURSOR)
+                }
+            }
+        })
     }
 
-    private fun setupDefaultActivityBarItems() {
-        activityBar.addItem(
-            Constants.ACTIVITY_BAR_DEFAULT_ID,
-            "Explorer",
-            "icons/folder.svg",
-            object : CachedGuiViewProvider() {
-                override fun createView() = Explorer(this@MainWindow)
-            }
-        )
-
-        activityBar.addItem(
-            "search",
-            "搜索",
-            "icons/search.svg",
-            object : CachedGuiViewProvider() {
-                override fun createView() = SearchView(this@MainWindow)
-            }
-        )
-    }
-
-    fun showGlobalSearch() {
-        // 若已处于搜索视图，仅聚焦输入框，不触发 ActivityBar 的“再次点击关闭”逻辑
-        if (sideBar.getCurrentViewId() == "search" && sideBar.isActuallyVisible()) {
-            (sideBar.getView("search") as? SearchView)?.focusQuery()
-            return
-        }
-        sideBar.preserveNextDividerOnShow()
-        activityBar.activateItem("search", userInitiated = false)
-        (sideBar.getView("search") as? SearchView)?.focusQuery()
+    private fun setupExplorer() {
+        // 注册 Explorer，但不自动打开 SideBar（保持默认关闭状态）
+        sideBar.showView("explorer", Explorer(this), autoShow = false)
     }
 
     fun openFileChooserAndOpen() {

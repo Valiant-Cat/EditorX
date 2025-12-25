@@ -50,6 +50,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
     private var isTaskCancelled = false
 
     init {
+        isOpaque = false  // 使 Explorer 透明，显示 SideBar 的背景色
         buildUI()
         installListeners()
         installFileDropTarget()
@@ -86,6 +87,8 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
 
         val scrollPane = JScrollPane(tree)
         scrollPane.border = null
+        scrollPane.isOpaque = false  // 使滚动面板透明，显示 SideBar 背景色
+        scrollPane.viewport.isOpaque = false  // 使视口透明
         add(scrollPane, BorderLayout.CENTER)
     }
 
@@ -93,6 +96,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         val toolBar =
             JToolBar().apply {
                 isFloatable = false
+                isOpaque = false  // 使工具栏透明，显示 SideBar 的背景色
                 border = EmptyBorder(0, 0, 0, 0)
                 layout = BoxLayout(this, BoxLayout.X_AXIS)
             }
@@ -144,6 +148,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         tree.showsRootHandles = true
         // 单击只选中；双击才展开/收起。点击左侧的展开图标仍然是单击生效（JTree 默认行为）
         tree.toggleClickCount = 2
+        tree.isOpaque = false  // 使 JTree 透明，显示 SideBar 的背景色
         // 统一展开/收缩控制的缩进，使手柄在同一列对齐
         try {
             UIManager.put("Tree.leftChildIndent", 10)

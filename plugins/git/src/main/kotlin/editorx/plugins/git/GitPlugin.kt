@@ -1,6 +1,5 @@
 package editorx.plugins.git
 
-import editorx.core.gui.CachedGuiViewProvider
 import editorx.core.plugin.Plugin
 import editorx.core.plugin.PluginContext
 import editorx.core.plugin.PluginInfo
@@ -13,16 +12,8 @@ class GitPlugin : Plugin {
     )
 
     override fun activate(pluginContext: PluginContext) {
-        val guiContext = pluginContext.gui() ?: return
-        
-        guiContext.addActivityBarItem(
-            "icons/git-branch.svg",
-            object : CachedGuiViewProvider() {
-                override fun createView(): javax.swing.JComponent {
-                    return GitView(guiContext)
-                }
-            }
-        )
+        // 注意：addActivityBarItem 已不再支持
+        // 插件不再支持在 SideBar 中注册视图
     }
 }
 

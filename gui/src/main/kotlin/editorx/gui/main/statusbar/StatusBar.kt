@@ -1,5 +1,6 @@
 package editorx.gui.main.statusbar
 
+import editorx.gui.core.theme.ThemeManager
 import editorx.gui.main.MainWindow
 import java.awt.Color
 import java.awt.Dimension
@@ -14,12 +15,10 @@ class StatusBar(private val mainWindow: MainWindow) : JPanel() {
     private val navigationBar = NavigationBar(mainWindow)
     private val statusLabel = JLabel("就绪").apply {
         font = font.deriveFont(Font.PLAIN, 12f)
-        foreground = Color.BLACK
     }
 
     private val fileInfoLabel = JLabel("").apply {
         font = font.deriveFont(Font.PLAIN, 11f)
-        foreground = Color.GRAY
     }
 
     private var currentMessageTimer: Timer? = null
@@ -31,7 +30,6 @@ class StatusBar(private val mainWindow: MainWindow) : JPanel() {
     // 进度条
     private val progressLabel = JLabel("").apply {
         font = font.deriveFont(Font.PLAIN, 11f)
-        foreground = Color.GRAY
         isVisible = false
     }
     private val progressBar = JProgressBar().apply {
@@ -61,7 +59,6 @@ class StatusBar(private val mainWindow: MainWindow) : JPanel() {
     private val lineColumnLabel = JLabel("").apply {
         toolTipText = "转到行/列"
         font = font.deriveFont(Font.PLAIN, 12f)
-        foreground = Color(99, 99, 99)
         isVisible = false  // 初始状态隐藏
         verticalAlignment = SwingConstants.CENTER
 
@@ -69,7 +66,7 @@ class StatusBar(private val mainWindow: MainWindow) : JPanel() {
         addMouseListener(object : MouseAdapter() {
             override fun mouseEntered(e: MouseEvent) {
                 this@apply.isOpaque = true
-                this@apply.background = Color(200, 200, 200, 0xef) // 半透明浅灰色
+                this@apply.background = ThemeManager.currentTheme.statusBarHoverBackground
                 this@apply.repaint()
             }
 
@@ -83,13 +80,7 @@ class StatusBar(private val mainWindow: MainWindow) : JPanel() {
     init {
         // 初始状态栏布局
         layout = BoxLayout(this, BoxLayout.X_AXIS)
-        val separator = Color(0xDE, 0xDE, 0xDE)
-        border =
-            BorderFactory.createCompoundBorder(
-                BorderFactory.createMatteBorder(1, 0, 0, 0, separator),
-                BorderFactory.createEmptyBorder(2, 5, 2, 5)
-            )
-        background = Color.decode("#f2f2f2")
+        updateTheme()
         preferredSize = Dimension(0, 28)
 
         // 安装子组件
@@ -98,6 +89,24 @@ class StatusBar(private val mainWindow: MainWindow) : JPanel() {
         add(Box.createHorizontalGlue())
         setupRightComponents()
         add(Box.createHorizontalStrut(4))
+        
+        // 监听主题变更
+        ThemeManager.addThemeChangeListener { updateTheme() }
+    }
+    
+    private fun updateTheme() {
+        val theme = ThemeManager.currentTheme
+        background = theme.statusBarBackground
+        border = BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(1, 0, 0, 0, theme.statusBarSeparator),
+            BorderFactory.createEmptyBorder(2, 5, 2, 5)
+        )
+        statusLabel.foreground = theme.statusBarForeground
+        fileInfoLabel.foreground = theme.statusBarSecondaryForeground
+        progressLabel.foreground = theme.statusBarSecondaryForeground
+        lineColumnLabel.foreground = theme.statusBarSecondaryForeground
+        revalidate()
+        repaint()
     }
 
     private fun setupLeftComponents() {
@@ -123,7 +132,10 @@ class StatusBar(private val mainWindow: MainWindow) : JPanel() {
         if (!persistent) {
             currentMessageTimer?.stop()
             currentMessageTimer =
-                Timer(3000) { statusLabel.text = "就绪" }.apply {
+                Timer(3000) { 
+                    statusLabel.text = "就绪"
+                    statusLabel.foreground = ThemeManager.currentTheme.statusBarForeground
+                }.apply {
                     isRepeats = false
                     start()
                 }
@@ -245,7 +257,9 @@ class StatusBar(private val mainWindow: MainWindow) : JPanel() {
             text = "错误: $message"
             foreground = Color.RED
         }
-        Timer(5000) { statusLabel.foreground = Color.BLACK }.apply {
+        Timer(5000) { 
+            statusLabel.foreground = ThemeManager.currentTheme.statusBarForeground
+        }.apply {
             isRepeats = false
             start()
         }
@@ -256,7 +270,9 @@ class StatusBar(private val mainWindow: MainWindow) : JPanel() {
             text = "警告: $message"
             foreground = Color.ORANGE
         }
-        Timer(3000) { statusLabel.foreground = Color.BLACK }.apply {
+        Timer(3000) { 
+            statusLabel.foreground = ThemeManager.currentTheme.statusBarForeground
+        }.apply {
             isRepeats = false
             start()
         }
@@ -267,7 +283,9 @@ class StatusBar(private val mainWindow: MainWindow) : JPanel() {
             text = "成功: $message"
             foreground = Color.GREEN
         }
-        Timer(2000) { statusLabel.foreground = Color.BLACK }.apply {
+        Timer(2000) { 
+            statusLabel.foreground = ThemeManager.currentTheme.statusBarForeground
+        }.apply {
             isRepeats = false
             start()
         }

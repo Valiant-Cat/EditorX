@@ -1,5 +1,6 @@
 package editorx.gui.main.sidebar
 
+import editorx.gui.core.theme.ThemeManager
 import editorx.gui.main.MainWindow
 import java.awt.CardLayout
 import java.awt.Color
@@ -23,14 +24,24 @@ class SideBar(private val mainWindow: MainWindow) : JPanel() {
 
     private fun setupSideBar() {
         layout = cardLayout
-        background = Color.WHITE
+        updateTheme()
+        isOpaque = true  // 确保背景色可见
         border = BorderFactory.createEmptyBorder(0, 0, 0, 0)
         isVisible = false
         // 初始化时隐藏SideBar
         updateVisibility()
+        
+        // 监听主题变更
+        ThemeManager.addThemeChangeListener { updateTheme() }
+    }
+    
+    private fun updateTheme() {
+        background = ThemeManager.currentTheme.sidebarBackground
+        revalidate()
+        repaint()
     }
 
-    fun showView(id: String, component: JComponent? = null) {
+    fun showView(id: String, component: JComponent? = null, autoShow: Boolean = true) {
         // 如果视图不存在且提供了组件，则先注册
         if (!views.containsKey(id) && component != null) {
             views[id] = component
@@ -42,7 +53,7 @@ class SideBar(private val mainWindow: MainWindow) : JPanel() {
             cardLayout.show(this, id)
             currentViewId = id
             // 显示SideBar（当实际不可见时强制展开到首选宽度）
-            if (!isActuallyVisible()) {
+            if (autoShow && !isActuallyVisible()) {
                 isVisible = true
                 updateVisibility()
             }
@@ -83,7 +94,7 @@ class SideBar(private val mainWindow: MainWindow) : JPanel() {
                 // 保留用户当前拖拽的位置，不主动设置分割条与尺寸，避免闪烁
                 preserveNextDivider = false
             } else {
-                minimumSize = Dimension(0, 0)
+                minimumSize = Dimension(120, 0)
                 preferredSize = Dimension(250, 0)
                 updateDividerLocation(250) // 显示SideBar时，设置dividerLocation为300（和preferredSize保持一致）
             }
@@ -98,13 +109,17 @@ class SideBar(private val mainWindow: MainWindow) : JPanel() {
     }
 
     private fun updateDividerLocation(location: Int) {
-        // 查找包含SideBar的JSplitPane并更新其dividerLocation
+        // 查找包含SideBar的JSplitPane并更新其dividerLocation和dividerSize
         var current = parent
         while (current != null) {
             if (current is javax.swing.JSplitPane) {
                 val split = current
                 // 延迟到布局完成后再设置，避免初始化阶段被覆盖
-                javax.swing.SwingUtilities.invokeLater { split.dividerLocation = location }
+                SwingUtilities.invokeLater {
+                    split.dividerLocation = location
+                    // 根据 SideBar 可见性调整拖拽条大小
+                    split.dividerSize = if (location > 0) 4 else 0
+                }
                 break
             }
             current = current.parent

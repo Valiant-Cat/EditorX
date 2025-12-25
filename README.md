@@ -98,15 +98,8 @@ Main-Class: editorx.plugins.explorer.ExplorerPlugin
 3) 将 JAR 放入应用运行目录的 `plugins/` 文件夹。
 4) 插件的名称、版本等元信息来自 `Plugin.getInfo()`，Manifest 中可保留其他元数据供将来扩展。
 
-### UI 扩展（ActivityBar → SideBar）
-在 `activate()` 中通过 `PluginContext.addActivityBarItem` 注册入口，提供一个 `ViewProvider` 或 `CachedViewProvider`：
-```kotlin
-context.addActivityBarItem(
-    iconPath = "icons/my.svg",
-    viewProvider = object : CachedViewProvider() {
-        override fun createView(): JComponent = JPanel()
-    }
-)
+### UI 扩展
+注意：插件不再支持在 SideBar 中注册视图。SideBar 固定显示 Explorer。
 ```
 
 ## 技术栈

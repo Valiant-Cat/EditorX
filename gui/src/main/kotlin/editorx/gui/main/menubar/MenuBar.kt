@@ -103,14 +103,6 @@ class MenuBar(private val mainWindow: MainWindow) : JMenuBar() {
                 accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_R, shortcut)
                 addActionListener { showReplaceDialog() }
             })
-
-            addSeparator()
-
-            add(JMenuItem(t("action.globalSearch", "全局搜索...")).apply {
-                mnemonic = KeyEvent.VK_S
-                accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_F, shortcut or InputEvent.SHIFT_DOWN_MASK)
-                addActionListener { mainWindow.showGlobalSearch() }
-            })
         }
     }
 
