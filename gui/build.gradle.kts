@@ -11,6 +11,7 @@ dependencies {
     implementation(project(":plugins:yaml"))
     implementation(project(":plugins:xml"))
     implementation(project(":plugins:git"))
+    implementation(project(":plugins:i18n-zh"))
     implementation(project(":plugins:i18n-en"))
 
     implementation("com.fifesoft:rsyntaxtextarea:3.4.0")

@@ -1,6 +1,6 @@
 package editorx.core.i18n
 
-import java.util.Locale
+import java.util.*
 
 /**
  * 简单的国际化服务：
@@ -48,12 +48,30 @@ object I18n {
     }
 
     /**
-     * 获取翻译；若不存在则返回 defaultText。
-     * 实时从当前语言的提供器获取翻译，不缓存。
+     * 获取翻译。
+     *
+     *  @param key 翻译 key
+     * @return 翻译文本，如果都找不到则返回 key
      */
-    fun translate(key: String, defaultText: String): String {
-        val provider = providers[currentLocale] ?: return defaultText
-        return runCatching { provider.translate(key) }.getOrDefault(null) ?: defaultText
+    fun translate(key: String): String {
+
+        val currentProvider = providers[currentLocale]
+        if (currentProvider != null) {
+            val result = runCatching { currentProvider.translate(key) }.getOrDefault(null)
+            if (result != null) return result
+        }
+
+        // 找不到，返回 key
+        return key
+    }
+
+    /**
+     * 获取所有已注册的语言。
+     *
+     * @return 已注册的语言列表
+     */
+    fun getAvailableLocales(): List<Locale> {
+        return providers.keys.sortedWith(compareBy { it.toLanguageTag() })
     }
 
     fun addListener(listener: () -> Unit) {

@@ -17,16 +17,23 @@ private val dictionary = mapOf(
     "action.save" to "Save",
     "action.saveAs" to "Save As…",
     "action.exit" to "Quit",
-
     "action.find" to "Find…",
     "action.replace" to "Replace…",
     "action.globalSearch" to "Search in Files…",
-
     "action.pluginManager" to "Plugin Manager",
     "action.about" to "About",
     "action.help" to "Help",
 
+    "settings.appearance" to "Appearance",
+    "settings.language" to "Language",
+    "settings.theme" to "Theme",
+    "theme.light" to "Light",
+    "theme.dark" to "Dark",
+    "settings.appearance.tip" to "Tip: language and theme changes apply immediately.",
+
     "lang.zh" to "Chinese",
+    "lang.zh-CN" to "Chinese (Simplified)",
+    "lang.zh-TW" to "Chinese (Traditional)",
     "lang.en" to "English",
 )
 

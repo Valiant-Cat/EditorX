@@ -16,8 +16,8 @@ import javax.swing.JPanel
 import javax.swing.JRadioButton
 
 class AppearancePanel(private val settings: Store) : JPanel(BorderLayout()) {
-    private val zhButton = JRadioButton()
-    private val enButton = JRadioButton()
+    private val languageButtons = mutableMapOf<Locale, JRadioButton>()
+    private val languageGroup = ButtonGroup()
     private val lightThemeButton = JRadioButton()
     private val darkThemeButton = JRadioButton()
     private val headerLabel = JLabel()
@@ -30,25 +30,14 @@ class AppearancePanel(private val settings: Store) : JPanel(BorderLayout()) {
 
         headerLabel.font = headerLabel.font.deriveFont(Font.BOLD, 16f)
         headerLabel.border = BorderFactory.createEmptyBorder(0, 0, 12, 0)
-
-        val languageGroup = ButtonGroup().apply {
-            add(zhButton)
-            add(enButton)
-        }
         
-        val themeGroup = ButtonGroup().apply {
+        // 主题按钮分组
+        ButtonGroup().apply {
             add(lightThemeButton)
             add(darkThemeButton)
         }
 
         languagePanel.layout = BoxLayout(languagePanel, BoxLayout.Y_AXIS)
-        zhButton.alignmentX = LEFT_ALIGNMENT
-        enButton.alignmentX = LEFT_ALIGNMENT
-        zhButton.addActionListener { changeLocale(Locale.SIMPLIFIED_CHINESE) }
-        enButton.addActionListener { changeLocale(Locale.ENGLISH) }
-        languagePanel.add(zhButton)
-        languagePanel.add(Box.createVerticalStrut(8))
-        languagePanel.add(enButton)
         
         themePanel.layout = BoxLayout(themePanel, BoxLayout.Y_AXIS)
         lightThemeButton.alignmentX = LEFT_ALIGNMENT
@@ -76,23 +65,15 @@ class AppearancePanel(private val settings: Store) : JPanel(BorderLayout()) {
     }
 
     fun refresh() {
-        val locale = I18n.locale()
-        val isEnglish = locale.language == Locale.ENGLISH.language
+        val currentLocale = I18n.locale()
         
-        // 语言设置
-        if (isEnglish) {
-            enButton.isSelected = true
-            zhButton.text = "Chinese (Simplified)"
-            enButton.text = "English"
-            headerLabel.text = "Appearance"
-            languagePanel.border = BorderFactory.createTitledBorder("Language")
-        } else {
-            zhButton.isSelected = true
-            zhButton.text = "中文（简体）"
-            enButton.text = "English"
-            headerLabel.text = "外观"
-            languagePanel.border = BorderFactory.createTitledBorder("语言")
-        }
+        // 更新语言选项按钮
+        updateLanguageButtons(currentLocale)
+        
+        // 更新界面文本
+        headerLabel.text = I18n.translate("settings.appearance")
+        languagePanel.border = BorderFactory.createTitledBorder(I18n.translate("settings.language"))
+        themePanel.border = BorderFactory.createTitledBorder(I18n.translate("settings.theme"))
         
         // 主题设置
         val currentTheme = ThemeManager.currentTheme
@@ -101,16 +82,54 @@ class AppearancePanel(private val settings: Store) : JPanel(BorderLayout()) {
             is Theme.Dark -> darkThemeButton.isSelected = true
         }
         
-        if (isEnglish) {
-            lightThemeButton.text = "Light"
-            darkThemeButton.text = "Dark"
-            themePanel.border = BorderFactory.createTitledBorder("Theme")
-            footerLabel.text = "Tip: language and theme changes apply immediately."
+        lightThemeButton.text = I18n.translate("theme.light")
+        darkThemeButton.text = I18n.translate("theme.dark")
+        footerLabel.text = I18n.translate("settings.appearance.tip")
+    }
+
+    private fun updateLanguageButtons(currentLocale: Locale) {
+        val availableLocales = I18n.getAvailableLocales()
+        
+        // 移除旧的按钮
+        languagePanel.removeAll()
+        // 从 ButtonGroup 中移除所有按钮
+        languageButtons.values.forEach { languageGroup.remove(it) }
+        languageButtons.clear()
+        
+        // 创建新的按钮
+        availableLocales.forEachIndexed { index, locale ->
+            val button = JRadioButton().apply {
+                alignmentX = LEFT_ALIGNMENT
+                text = getLanguageDisplayName(locale)
+                addActionListener { changeLocale(locale) }
+            }
+            languageButtons[locale] = button
+            languageGroup.add(button)
+            languagePanel.add(button)
+            if (index < availableLocales.size - 1) {
+                languagePanel.add(Box.createVerticalStrut(8))
+            }
+        }
+        
+        // 最后设置选中状态（必须在添加到 ButtonGroup 之后）
+        languageButtons[currentLocale]?.isSelected = true
+        
+        languagePanel.revalidate()
+        languagePanel.repaint()
+    }
+
+    private fun getLanguageDisplayName(locale: Locale): String {
+        // 尝试从翻译中获取语言名称
+        val langKey = "lang.${locale.toLanguageTag()}"
+        
+        val translated = I18n.translate(langKey)
+        // 如果翻译返回的是 key 本身，使用 Locale 的显示名称（用当前界面语言显示）
+        // 这样即使新增语言包，现有语言包也不需要更新
+        return if (translated == langKey) {
+            val currentLocale = I18n.locale()
+            locale.getDisplayName(currentLocale)
         } else {
-            lightThemeButton.text = "浅色"
-            darkThemeButton.text = "深色"
-            themePanel.border = BorderFactory.createTitledBorder("主题")
-            footerLabel.text = "提示：语言和主题切换立即生效。"
+            translated
         }
     }
 
@@ -129,8 +148,13 @@ class AppearancePanel(private val settings: Store) : JPanel(BorderLayout()) {
     }
 
     fun resetToDefault() {
-        zhButton.isSelected = true
-        changeLocale(Locale.SIMPLIFIED_CHINESE)
+        val defaultLocale = Locale.SIMPLIFIED_CHINESE
+        if (I18n.getAvailableLocales().contains(defaultLocale)) {
+            changeLocale(defaultLocale)
+        } else {
+            // 如果没有简体中文，使用第一个可用语言
+            I18n.getAvailableLocales().firstOrNull()?.let { changeLocale(it) }
+        }
         lightThemeButton.isSelected = true
         changeTheme(Theme.Light)
         refresh()
