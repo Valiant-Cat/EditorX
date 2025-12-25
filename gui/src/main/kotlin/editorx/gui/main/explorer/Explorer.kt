@@ -1148,9 +1148,9 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                         // 直接打开已存在的项目
                         SwingUtilities.invokeLater {
                             mainWindow.guiContext.workspace.openWorkspace(outputDir)
-                            mainWindow.statusBar.updateNavigation(null)
+                            mainWindow.editor.updateNavigation(null)
                             refreshRoot()
-                            mainWindow.toolBar.updateProjectDisplay()
+                            mainWindow.statusBar.updateVcsDisplay()
                             mainWindow.statusBar.setMessage("已打开项目: ${outputDir.name}")
                         }
                         return
@@ -1184,9 +1184,9 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                     if (!isTaskCancelled && !Thread.currentThread().isInterrupted) {
                         SwingUtilities.invokeLater {
                             mainWindow.guiContext.workspace.openWorkspace(outputDir)
-                            mainWindow.statusBar.updateNavigation(null)
+                            mainWindow.editor.updateNavigation(null)
                             refreshRoot()
-                            mainWindow.toolBar.updateProjectDisplay()
+                            mainWindow.statusBar.updateVcsDisplay()
                             mainWindow.statusBar.setMessage("APK反编译完成: ${outputDir.name}")
 
                             // 提示是否创建 Git 仓库
@@ -1491,9 +1491,9 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                             val dir = files.firstOrNull { it.isDirectory }
                             if (dir != null) {
                                 mainWindow.guiContext.workspace.openWorkspace(dir)
-                                mainWindow.statusBar.updateNavigation(null)
+                                mainWindow.editor.updateNavigation(null)
                                 refreshRoot()
-                                mainWindow.toolBar.updateProjectDisplay()
+                                mainWindow.statusBar.updateVcsDisplay()
                                 mainWindow.statusBar.setMessage("已打开文件夹: ${dir.name}")
                                 dtde.dropComplete(true)
                             } else {

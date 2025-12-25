@@ -4,9 +4,9 @@ import editorx.core.i18n.I18n
 import editorx.core.external.ApkTool
 import editorx.core.util.IconLoader
 import editorx.core.util.IconRef
+import editorx.gui.core.ThemeManager
 import editorx.gui.main.MainWindow
 import editorx.gui.main.explorer.Explorer
-import editorx.gui.main.navigationbar.NavigationBar
 import editorx.gui.search.SearchDialog
 import editorx.gui.settings.SettingsDialog
 import org.slf4j.LoggerFactory
@@ -27,11 +27,8 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
         private const val ICON_SIZE = 18
     }
 
-    private val navigationBar = NavigationBar(mainWindow)
     private var toggleSideBarButton: JButton? = null
     private var compileTask: Thread? = null
-    private var vcsWidgetLabel: JLabel? = null
-    private var vcsWidgetIconLabel: JLabel? = null
 
     init {
         isFloatable = false
@@ -41,14 +38,25 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
             BorderFactory.createEmptyBorder(2, 5, 2, 5),
         )
         layout = BoxLayout(this, BoxLayout.X_AXIS)
+        isOpaque = true
+        updateTheme()
         buildActions()
+        
+        // 监听主题变更
+        ThemeManager.addThemeChangeListener { updateTheme() }
 
         // 添加双击空白处全屏功能
         addMouseListener(object : java.awt.event.MouseAdapter() {
             override fun mouseClicked(e: java.awt.event.MouseEvent) {
                 if (e.clickCount == 2 && e.button == java.awt.event.MouseEvent.BUTTON1) {
                     // 检查是否点击在空白区域（不是按钮上）
-                    if (e.source == this@ToolBar) {
+                    val component = SwingUtilities.getDeepestComponentAt(
+                        this@ToolBar,
+                        e.x,
+                        e.y
+                    )
+                    // 只有在点击工具栏本身（空白处）时才触发全屏
+                    if (component == this@ToolBar || component is Box.Filler) {
                         toggleFullScreen()
                     }
                 }
@@ -60,306 +68,29 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
         return System.getProperty("os.name").lowercase().contains("mac")
     }
 
-    /**
-     * 设置 VCS Widget（参考 IDEA/Android Studio 的效果）
-     */
-    private fun setupVcsWidget() {
-        // 创建一个面板，包含图标、文字标签和下拉箭头
-        val widgetPanel = JPanel(BorderLayout()).apply {
-            // 设置边框和样式，使其看起来像一个下拉框（幽灵按钮样式：透明背景，只有边框）
-            border = BorderFactory.createCompoundBorder(
-                BorderFactory.createLineBorder(Color(0xCC, 0xCC, 0xCC), 1),
-                BorderFactory.createEmptyBorder(4, 8, 4, 8)
-            )
-            maximumSize = Dimension(300, 28)
-            minimumSize = Dimension(100, 28)
-            isOpaque = false  // 透明背景（幽灵按钮样式）
-
-            // 创建鼠标监听器（用于显示弹出菜单和悬停效果）
-            val panel = this
-            val mouseListener = object : java.awt.event.MouseAdapter() {
-                override fun mousePressed(e: java.awt.event.MouseEvent) {
-                    if (SwingUtilities.isLeftMouseButton(e)) {
-                        showVcsPopupMenu(panel)
-                    }
-                }
-
-                override fun mouseEntered(e: java.awt.event.MouseEvent) {
-                    // 悬停时保持透明，或使用半透明效果
-                    panel.isOpaque = false
-                    panel.repaint()
-                }
-
-                override fun mouseExited(e: java.awt.event.MouseEvent) {
-                    // 保持透明背景
-                    panel.isOpaque = false
-                    panel.repaint()
-                }
-            }
-
-            // 左侧容器：图标 + 文字
-            val leftPanel = JPanel().apply {
-                layout = BoxLayout(this, BoxLayout.X_AXIS)
-                isOpaque = false
-                alignmentX = Component.LEFT_ALIGNMENT
-                // 添加鼠标监听器，使点击文字和图标也能弹出菜单
-                addMouseListener(mouseListener)
-
-                // 图标标签（版本控制图标）
-                val iconLabel = JLabel().apply {
-                    preferredSize = Dimension(16, 16)
-                    maximumSize = Dimension(16, 16)
-                    minimumSize = Dimension(16, 16)
-                    horizontalAlignment = SwingConstants.CENTER
-                    verticalAlignment = SwingConstants.CENTER
-                    // 添加鼠标监听器
-                    addMouseListener(mouseListener)
-                }
-                vcsWidgetIconLabel = iconLabel
-                add(iconLabel)
-                add(Box.createHorizontalStrut(6))
-
-                // 文字标签
-                val textLabel = JLabel().apply {
-                    font = font.deriveFont(java.awt.Font.PLAIN, 13f)
-                    horizontalAlignment = SwingConstants.LEFT
-                    // 添加鼠标监听器
-                    addMouseListener(mouseListener)
-                }
-                vcsWidgetLabel = textLabel
-                add(textLabel)
-            }
-            add(leftPanel, BorderLayout.CENTER)
-
-            // 下拉箭头图标（右侧）
-            val arrowLabel = JLabel("▼").apply {
-                font = font.deriveFont(java.awt.Font.PLAIN, 10f)
-                foreground = Color(0x66, 0x66, 0x66)
-                horizontalAlignment = SwingConstants.CENTER
-                preferredSize = Dimension(16, 16)
-                // 添加鼠标监听器，使点击箭头也能弹出菜单
-                addMouseListener(mouseListener)
-            }
-            add(arrowLabel, BorderLayout.EAST)
-
-            // 添加鼠标监听器到整个面板
-            addMouseListener(mouseListener)
-
-            // 初始更新显示
-            updateVcsDisplay()
-        }
-        add(widgetPanel)
+    private fun updateTheme() {
+        background = ThemeManager.currentTheme.toolbarBackground
+        revalidate()
+        repaint()
     }
 
+
     /**
-     * 更新 VCS Widget 的显示内容（显示 git 分支或"版本控制"）
+     * 兼容性方法：保持向后兼容，现在委托给 StatusBar
      */
+    @Deprecated("使用 mainWindow.statusBar.updateVcsDisplay() 代替", ReplaceWith("mainWindow.statusBar.updateVcsDisplay()"))
     fun updateVcsDisplay() {
-        val label = vcsWidgetLabel ?: return
-        val iconLabel = vcsWidgetIconLabel ?: return
-        val workspaceRoot = mainWindow.guiContext.workspace.getWorkspaceRoot()
-
-        label.text = "版本控制"
-        iconLabel.icon = null
-
-        if (workspaceRoot == null || !workspaceRoot.exists()) {
-            return
-        }
-
-        // 在后台线程中获取 git 分支
-        Thread {
-            try {
-                val branchName = getCurrentGitBranch(workspaceRoot)
-                SwingUtilities.invokeLater {
-                    // 设置图标（git 图标）
-                    iconLabel.icon = loadVcsIcon()
-
-                    if (branchName != null) {
-                        // 是 git 仓库，显示分支名称
-                        label.text = branchName
-                    }
-                }
-            } catch (e: Exception) {
-                logger.debug("获取 git 分支失败", e)
-            }
-        }.apply {
-            isDaemon = true
-            start()
-        }
-    }
-
-    /**
-     * 加载版本控制图标
-     */
-    private fun loadVcsIcon(): Icon? {
-        return try {
-            // 尝试从主资源加载
-            IconLoader.getIcon(IconRef("icons/gui/git-branch.svg"), 14)
-        } catch (e: Exception) {
-            null
-        }
+        mainWindow.statusBar.updateVcsDisplay()
     }
 
     /**
      * 兼容性方法：保持向后兼容
      */
-    @Deprecated("使用 updateVcsDisplay() 代替", ReplaceWith("updateVcsDisplay()"))
+    @Deprecated("使用 mainWindow.statusBar.updateVcsDisplay() 代替", ReplaceWith("mainWindow.statusBar.updateVcsDisplay()"))
     fun updateProjectDisplay() {
-        updateVcsDisplay()
+        mainWindow.statusBar.updateVcsDisplay()
     }
 
-    /**
-     * 获取当前 git 分支名称
-     * @return 分支名称，如果不是 git 仓库或获取失败则返回 null
-     */
-    private fun getCurrentGitBranch(workspaceRoot: File): String? {
-        try {
-            // 检查是否是 git 仓库（.git 可能是目录或文件）
-            val gitFile = File(workspaceRoot, ".git")
-            if (!gitFile.exists()) {
-                logger.debug("工作区不是 git 仓库: {}", workspaceRoot.absolutePath)
-                return null
-            }
-
-            // 方法1：使用 git rev-parse --abbrev-ref HEAD 获取当前分支名称
-            try {
-                val process1 = ProcessBuilder("git", "rev-parse", "--abbrev-ref", "HEAD")
-                    .directory(workspaceRoot)
-                    .redirectErrorStream(true)
-                    .start()
-
-                val output1 = process1.inputStream.bufferedReader().use { it.readText() }.trim()
-                val exitCode1 = process1.waitFor()
-
-                if (exitCode1 == 0 && output1.isNotBlank() && output1 != "HEAD") {
-                    logger.debug("获取 git 分支成功 (rev-parse): {}", output1)
-                    return output1
-                }
-
-                // 如果是 detached HEAD，output1 会是 "HEAD"
-                if (output1 == "HEAD") {
-                    logger.debug("处于 detached HEAD 状态")
-                }
-            } catch (e: Exception) {
-                logger.debug("git rev-parse 命令失败", e)
-            }
-
-            // 方法2：使用 git branch --show-current（备用方案）
-            try {
-                val process2 = ProcessBuilder("git", "branch", "--show-current")
-                    .directory(workspaceRoot)
-                    .redirectErrorStream(true)
-                    .start()
-
-                val output2 = process2.inputStream.bufferedReader().use { it.readText() }.trim()
-                val exitCode2 = process2.waitFor()
-
-                if (exitCode2 == 0 && output2.isNotBlank()) {
-                    logger.debug("获取 git 分支成功 (branch --show-current): {}", output2)
-                    return output2
-                }
-            } catch (e: Exception) {
-                logger.debug("git branch --show-current 命令失败", e)
-            }
-
-            logger.debug("无法获取 git 分支名称，但工作区是 git 仓库")
-        } catch (e: Exception) {
-            logger.warn("执行 git 命令时发生异常", e)
-        }
-        return null
-    }
-
-    /**
-     * 显示 VCS 弹出菜单（点击 VCS Widget 时）
-     */
-    private fun showVcsPopupMenu(invoker: java.awt.Component) {
-        val workspaceRoot = mainWindow.guiContext.workspace.getWorkspaceRoot()
-        val popupMenu = JPopupMenu()
-
-        if (workspaceRoot != null && workspaceRoot.exists()) {
-            // 获取当前分支（同步获取，用于菜单显示）
-            val branchName = getCurrentGitBranchSync(workspaceRoot)
-
-            if (branchName != null) {
-                // 显示当前分支
-                popupMenu.add(JMenuItem("分支: $branchName").apply {
-                    isEnabled = false
-                    font = font.deriveFont(font.size - 1f)
-                    foreground = Color.GRAY
-                })
-            } else {
-                // 显示当前项目路径（非 git 仓库时）
-                popupMenu.add(JMenuItem("路径: ${workspaceRoot.absolutePath}").apply {
-                    isEnabled = false
-                    font = font.deriveFont(font.size - 1f)
-                    foreground = Color.GRAY
-                })
-            }
-            popupMenu.addSeparator()
-        }
-
-        // 添加"打开文件夹..."选项
-        popupMenu.add(JMenuItem("打开文件夹...").apply {
-            addActionListener {
-                openFolder()
-                updateVcsDisplay()
-            }
-        })
-
-        // 显示弹出菜单，位置在项目选择框下方
-        popupMenu.show(invoker, 0, invoker.height)
-    }
-
-    /**
-     * 同步获取当前 git 分支名称（用于菜单显示，避免阻塞 UI）
-     * @return 分支名称，如果不是 git 仓库或获取失败则返回 null
-     */
-    private fun getCurrentGitBranchSync(workspaceRoot: File): String? {
-        return try {
-            val gitFile = File(workspaceRoot, ".git")
-            if (!gitFile.exists()) {
-                return null
-            }
-
-            // 方法1：使用 git rev-parse --abbrev-ref HEAD
-            try {
-                val process1 = ProcessBuilder("git", "rev-parse", "--abbrev-ref", "HEAD")
-                    .directory(workspaceRoot)
-                    .redirectErrorStream(true)
-                    .start()
-
-                val output1 = process1.inputStream.bufferedReader().use { it.readText() }.trim()
-                val exitCode1 = process1.waitFor()
-
-                if (exitCode1 == 0 && output1.isNotBlank() && output1 != "HEAD") {
-                    return output1
-                }
-            } catch (e: Exception) {
-                // 忽略，尝试下一个方法
-            }
-
-            // 方法2：使用 git branch --show-current
-            try {
-                val process2 = ProcessBuilder("git", "branch", "--show-current")
-                    .directory(workspaceRoot)
-                    .redirectErrorStream(true)
-                    .start()
-
-                val output2 = process2.inputStream.bufferedReader().use { it.readText() }.trim()
-                val exitCode2 = process2.waitFor()
-
-                if (exitCode2 == 0 && output2.isNotBlank()) {
-                    return output2
-                }
-            } catch (e: Exception) {
-                // 忽略
-            }
-
-            null
-        } catch (e: Exception) {
-            null
-        }
-    }
 
     private fun JButton.compact(textLabel: String, l: ActionListener): JButton = apply {
         toolTipText = textLabel
@@ -389,11 +120,6 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
             // macOS 模式：左侧留空（给系统控制按钮），中间显示标题，右侧显示按钮
             add(Box.createHorizontalStrut(70)) // 为 macOS 交通灯按钮留空间
         }
-
-        // VCS Widget（最左侧）
-        setupVcsWidget()
-
-        add(Box.createHorizontalStrut(12))
 
         // Android 项目快速跳转按钮
         add(
@@ -462,7 +188,7 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
             mainWindow.guiContext.workspace.openWorkspace(selected)
             mainWindow.guiContext.workspace.addRecentWorkspace(selected)
             (mainWindow.sideBar.getView("explorer") as? Explorer)?.refreshRoot()
-            updateProjectDisplay()
+            mainWindow.statusBar.updateVcsDisplay()
             mainWindow.editor.showEditorContent()
         }
     }
@@ -1172,3 +898,6 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
         return File(defaultSmaliDir, path)
     }
 }
+
+
+

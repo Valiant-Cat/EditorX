@@ -8,6 +8,7 @@ import editorx.gui.core.ThemeManager
 import editorx.gui.main.MainWindow
 import editorx.gui.main.explorer.ExplorerIcons
 import editorx.core.util.IconUtils
+import editorx.gui.main.navigationbar.NavigationBar
 import org.fife.ui.rtextarea.RTextScrollPane
 import org.slf4j.LoggerFactory
 import java.awt.*
@@ -82,6 +83,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
     private val findReplaceBars = mutableMapOf<File, FindReplaceBar>()
     private val smaliLoadingPanels = mutableMapOf<File, JPanel>()
     private val welcomeView = editorx.gui.main.welcome.WelcomeView(mainWindow)
+    private val navigationBar = NavigationBar(mainWindow)
     private val editorContentPanel = JPanel(BorderLayout()).apply {
         add(tabbedPane, BorderLayout.CENTER)
         add(bottomContainer, BorderLayout.SOUTH)
@@ -201,7 +203,10 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         tabbedPane.addChangeListener {
             val file = getCurrentFile()
             mainWindow.statusBar.setFileInfo(file?.name ?: "", file?.let { it.length().toString() + " B" })
-            mainWindow.statusBar.updateNavigation(file)
+            updateNavigation(file)
+
+            // 更新导航栏位置：将其添加到当前选中的标签页的 topSlot
+            updateNavigationBarPosition()
 
             // 更新行号和列号显示
             if (file != null) {
@@ -494,7 +499,8 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
     fun openFile(file: File) {
         if (fileToTab.containsKey(file)) {
             tabbedPane.selectedIndex = fileToTab[file]!!
-            mainWindow.statusBar.updateNavigation(file)
+            updateNavigation(file)
+            updateNavigationBarPosition()
             return
         }
         
@@ -627,7 +633,10 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         dirtyTabs.remove(index)
         textArea.putClientProperty("suppressDirty", false)
         updateTabHeaderStyles()
-        mainWindow.statusBar.updateNavigation(file)
+        updateNavigation(file)
+        
+        // 更新导航栏位置
+        updateNavigationBarPosition()
         
         // 检测是否为 AndroidManifest.xml，显示/隐藏底部视图标签
         updateManifestViewTabs(file)
@@ -740,6 +749,9 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         updateTabHeaderStyles()
         mainWindow.statusBar.setFileInfo(title, "0 B")
         mainWindow.statusBar.setLineColumn(1, 1)
+        
+        // 更新导航栏位置
+        updateNavigationBarPosition()
         
         // 聚焦到编辑器
         SwingUtilities.invokeLater {
@@ -1085,7 +1097,8 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             fileToTab.clear()
             newTabToFile.forEach { (i, f) -> fileToTab[f] = i }
 
-            mainWindow.statusBar.updateNavigation(getCurrentFile())
+            updateNavigation(getCurrentFile())
+            updateNavigationBarPosition()
             
             // 如果所有标签都关闭了，显示欢迎界面
             if (tabbedPane.tabCount == 0) {
@@ -1119,7 +1132,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             dirtyTabs.remove(index)
             originalTextByIndex[index] = ta.text
             updateTabTitle(index)
-            mainWindow.statusBar.updateNavigation(file)
+            updateNavigation(file)
             mainWindow.statusBar.showSuccess("已保存: ${file.name}")
             return true
         }
@@ -1151,7 +1164,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             updateTabTitle(index)
             updateTabHeaderStyles()
             mainWindow.guiContext.workspace.addRecentFile(newFile)
-            mainWindow.statusBar.updateNavigation(newFile)
+            updateNavigation(newFile)
             mainWindow.statusBar.showSuccess("已保存: ${newFile.name}")
             return true
         } else {
@@ -1193,7 +1206,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             updateTabTitle(idx)
             updateTabHeaderStyles()
             mainWindow.guiContext.workspace.addRecentFile(file)
-            mainWindow.statusBar.updateNavigation(file)
+            updateNavigation(file)
             mainWindow.statusBar.showSuccess("已保存: ${file.name}")
         }
     }
@@ -2747,7 +2760,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             tabbedPane.selectedIndex = index
             
             mainWindow.statusBar.setFileInfo(file.name, Files.size(file.toPath()).toString() + " B")
-            mainWindow.statusBar.updateNavigation(file)
+            updateNavigation(file)
             
         } catch (e: Exception) {
             logger.error("打开压缩包文件失败", e)
@@ -2874,6 +2887,32 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         }.apply {
             isDaemon = true
             start()
+        }
+    }
+
+    fun updateNavigation(currentFile: File?) {
+        navigationBar.update(currentFile)
+    }
+
+    private fun updateNavigationBarPosition() {
+        // 从所有标签页的 topSlot 中移除导航栏
+        for (i in 0 until tabbedPane.tabCount) {
+            val component = tabbedPane.getComponentAt(i)
+            if (component is TabContent) {
+                component.topSlot.remove(navigationBar)
+            }
+        }
+        
+        // 将导航栏添加到当前选中的标签页的 topSlot 中
+        val selectedIndex = tabbedPane.selectedIndex
+        if (selectedIndex >= 0) {
+            val component = tabbedPane.getComponentAt(selectedIndex)
+            if (component is TabContent) {
+                component.topSlot.removeAll()
+                component.topSlot.add(navigationBar, BorderLayout.CENTER)
+                component.topSlot.revalidate()
+                component.topSlot.repaint()
+            }
         }
     }
 }

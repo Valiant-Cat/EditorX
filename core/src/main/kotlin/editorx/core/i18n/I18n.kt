@@ -15,11 +15,11 @@ object I18n {
         val provider: TranslationProvider,
     )
 
+    private val providers: MutableList<Registration> = mutableListOf()
+    private val listeners: MutableList<() -> Unit> = mutableListOf()
+
     @Volatile
     private var currentLocale: Locale = Locale.SIMPLIFIED_CHINESE
-
-    private val registrations: MutableList<Registration> = mutableListOf()
-    private val listeners: MutableList<() -> Unit> = mutableListOf()
 
     @Volatile
     private var dictionary: Map<String, String> = emptyMap()
@@ -30,7 +30,7 @@ object I18n {
         if (locale == currentLocale) return
         currentLocale = locale
         rebuild()
-        notifyListeners()
+        fireLanguageChanged()
     }
 
     fun addListener(listener: () -> Unit) {
@@ -42,36 +42,36 @@ object I18n {
     }
 
     fun register(provider: TranslationProvider, ownerId: String? = null) {
-        registrations.add(Registration(ownerId = ownerId, provider = provider))
+        providers.add(Registration(ownerId = ownerId, provider = provider))
         rebuild()
-        notifyListeners()
+        fireLanguageChanged()
     }
 
     fun unregisterByOwner(ownerId: String) {
-        val changed = registrations.removeIf { it.ownerId == ownerId }
+        val changed = providers.removeIf { it.ownerId == ownerId }
         if (!changed) return
         rebuild()
-        notifyListeners()
+        fireLanguageChanged()
     }
 
     /**
      * 获取翻译；若不存在则返回 defaultText。
      */
-    fun t(key: String, defaultText: String): String {
+    fun translate(key: String, defaultText: String): String {
         return dictionary[key] ?: defaultText
     }
 
     private fun rebuild() {
         val locale = currentLocale
         val merged = LinkedHashMap<String, String>()
-        registrations.forEach { reg ->
+        providers.forEach { reg ->
             val map = runCatching { reg.provider.translations(locale) }.getOrDefault(emptyMap())
             merged.putAll(map)
         }
         dictionary = merged
     }
 
-    private fun notifyListeners() {
+    private fun fireLanguageChanged() {
         listeners.forEach { listener -> runCatching { listener() } }
     }
 }

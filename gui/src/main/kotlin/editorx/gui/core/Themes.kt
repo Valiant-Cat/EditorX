@@ -20,6 +20,7 @@ sealed class Theme(
     // UI 组件颜色
     val sidebarBackground: Color,
     val editorBackground: Color,
+    val toolbarBackground: Color,
     val statusBarBackground: Color,
     val statusBarForeground: Color,
     val statusBarSecondaryForeground: Color,
@@ -43,6 +44,7 @@ sealed class Theme(
         // UI 组件颜色
         sidebarBackground = Color(0xF2, 0xF2, 0xF2),   // #f2f2f2
         editorBackground = Color.WHITE,                 // #ffffff
+        toolbarBackground = Color.WHITE,                 // #ffffff
         statusBarBackground = Color(0xF2, 0xF2, 0xF2),   // #f2f2f2
         statusBarForeground = Color.BLACK,
         statusBarSecondaryForeground = Color.GRAY,
@@ -64,9 +66,10 @@ sealed class Theme(
         outline = Color(0x93, 0x8F, 0x99),              // #938F99
         error = Color(0xF2, 0xB8, 0xB5),                // #F2B8B5
         // UI 组件颜色
-        sidebarBackground = Color(0x16, 0x1B, 0x22),   // #161b22
-        editorBackground = Color(0x0D, 0x11, 0x17),    // #0d1117
-        statusBarBackground = Color(0x0D, 0x11, 0x17),  // #0d1117
+        sidebarBackground = Color(0x14, 0x14, 0x14),   // #141414
+        editorBackground = Color(0x18, 0x18, 0x18),    // #181818
+        toolbarBackground = Color(0x14, 0x14, 0x14),   // #141414
+        statusBarBackground = Color(0x14, 0x14, 0x14),  // #141414
         statusBarForeground = Color(0xC9, 0xD1, 0xD9),  // #c9d1d9
         statusBarSecondaryForeground = Color(0x8B, 0x94, 0x9F), // #8b949f
         statusBarSeparator = Color(0x21, 0x27, 0x2E),   // #21272e

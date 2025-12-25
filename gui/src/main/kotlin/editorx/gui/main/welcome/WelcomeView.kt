@@ -10,6 +10,13 @@ import java.awt.Dimension
 import java.awt.Font
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
+import java.awt.datatransfer.DataFlavor
+import java.awt.dnd.DnDConstants
+import java.awt.dnd.DropTarget
+import java.awt.dnd.DropTargetDragEvent
+import java.awt.dnd.DropTargetDropEvent
+import java.awt.dnd.DropTargetEvent
+import java.awt.dnd.DropTargetListener
 import java.io.File
 import javax.swing.*
 import javax.swing.border.EmptyBorder
@@ -24,6 +31,9 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
 
         // 监听主题变更
         ThemeManager.addThemeChangeListener { updateTheme() }
+
+        // 安装拖放支持
+        installFileDropTarget()
 
         refreshContent()
     }
@@ -516,10 +526,121 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
         mainWindow.guiContext.workspace.openWorkspace(workspace)
         mainWindow.guiContext.workspace.addRecentWorkspace(workspace)
         (mainWindow.sideBar.getView("explorer") as? editorx.gui.main.explorer.Explorer)?.refreshRoot()
-        mainWindow.toolBar.updateVcsDisplay()
+        mainWindow.statusBar.updateVcsDisplay()
         // 自动打开资源管理器
         mainWindow.sideBar.showView("explorer")
         mainWindow.editor.showEditorContent()
+    }
+
+    // DnD: 支持拖放目录到欢迎界面打开工作区
+    private fun installFileDropTarget() {
+        try {
+            val listener = object : DropTargetListener {
+                override fun dragEnter(dtde: DropTargetDragEvent) {
+                    if (isDragAcceptable(dtde)) {
+                        dtde.acceptDrag(DnDConstants.ACTION_COPY)
+                    } else {
+                        dtde.rejectDrag()
+                    }
+                }
+
+                override fun dragOver(dtde: DropTargetDragEvent) {
+                    if (isDragAcceptable(dtde)) {
+                        dtde.acceptDrag(DnDConstants.ACTION_COPY)
+                    } else {
+                        dtde.rejectDrag()
+                    }
+                }
+
+                override fun dropActionChanged(dtde: DropTargetDragEvent) {
+                    if (isDragAcceptable(dtde)) {
+                        dtde.acceptDrag(DnDConstants.ACTION_COPY)
+                    } else {
+                        dtde.rejectDrag()
+                    }
+                }
+
+                override fun dragExit(dtde: DropTargetEvent) {}
+
+                override fun drop(dtde: DropTargetDropEvent) {
+                    if (!isDropAcceptable(dtde)) {
+                        dtde.rejectDrop()
+                        return
+                    }
+                    dtde.acceptDrop(DnDConstants.ACTION_COPY)
+                    try {
+                        val transferable = dtde.transferable
+                        val flavor = DataFlavor.javaFileListFlavor
+
+                        @Suppress("UNCHECKED_CAST")
+                        val files = transferable.getTransferData(flavor) as List<File>
+
+                        // 检查是否有文件夹可以打开为工作区
+                        val dir = files.firstOrNull { it.isDirectory }
+                        if (dir != null) {
+                            openWorkspace(dir)
+                            mainWindow.statusBar.setMessage("已打开文件夹: ${dir.name}")
+                            dtde.dropComplete(true)
+                        } else {
+                            JOptionPane.showMessageDialog(
+                                mainWindow,
+                                "请拖拽一个文件夹到此处",
+                                "提示",
+                                JOptionPane.INFORMATION_MESSAGE
+                            )
+                            dtde.dropComplete(false)
+                        }
+                    } catch (e: Exception) {
+                        dtde.dropComplete(false)
+                        JOptionPane.showMessageDialog(
+                            mainWindow,
+                            "拖放操作失败: ${e.message}",
+                            "错误",
+                            JOptionPane.ERROR_MESSAGE
+                        )
+                    }
+                }
+            }
+            DropTarget(this, DnDConstants.ACTION_COPY, listener, true)
+        } catch (e: Exception) {
+            println("WelcomeView: 无法安装拖放目标: ${e.message}")
+        }
+    }
+
+    private fun isDragAcceptable(e: DropTargetDragEvent): Boolean {
+        val flavors = e.transferable.transferDataFlavors
+        val hasList = flavors.any { it.isFlavorJavaFileListType }
+        if (!hasList) return false
+
+        // 检查是否包含文件夹
+        try {
+            val files = e.transferable.getTransferData(DataFlavor.javaFileListFlavor) as? List<File>
+            if (files != null) {
+                return files.any { it.isDirectory }
+            }
+        } catch (e: Exception) {
+            // 忽略异常，继续检查
+        }
+
+        return true
+    }
+
+    private fun isDropAcceptable(e: DropTargetDropEvent): Boolean {
+        val flavors = e.transferable.transferDataFlavors
+        val hasList = flavors.any { it.isFlavorJavaFileListType }
+        if (!hasList) return false
+
+        // 检查是否包含文件夹
+        try {
+            val files = e.transferable.getTransferData(DataFlavor.javaFileListFlavor) as? List<File>
+            if (files != null) {
+                return files.any { it.isDirectory }
+            }
+        } catch (e: Exception) {
+            // 忽略异常，继续检查
+        }
+
+        return true
     }
 }
 

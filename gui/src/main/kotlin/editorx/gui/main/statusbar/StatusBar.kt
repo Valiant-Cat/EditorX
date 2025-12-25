@@ -5,14 +5,11 @@ import editorx.gui.main.MainWindow
 import java.awt.Color
 import java.awt.Dimension
 import java.awt.Font
-import java.io.File
-import javax.swing.*
-import editorx.gui.main.navigationbar.NavigationBar
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
+import javax.swing.*
 
 class StatusBar(private val mainWindow: MainWindow) : JPanel() {
-    private val navigationBar = NavigationBar(mainWindow)
     private val statusLabel = JLabel("就绪").apply {
         font = font.deriveFont(Font.PLAIN, 12f)
     }
@@ -22,6 +19,9 @@ class StatusBar(private val mainWindow: MainWindow) : JPanel() {
     }
 
     private var currentMessageTimer: Timer? = null
+
+    // VCS Widget
+    private val vcsWidget = VcsWidget(mainWindow.guiContext.workspace)
 
     /////////////////////
     // 右侧子组件
@@ -84,16 +84,16 @@ class StatusBar(private val mainWindow: MainWindow) : JPanel() {
         preferredSize = Dimension(0, 28)
 
         // 安装子组件
-        add(Box.createHorizontalStrut(4))
+        add(Box.createHorizontalStrut(12))
         setupLeftComponents()
         add(Box.createHorizontalGlue())
         setupRightComponents()
-        add(Box.createHorizontalStrut(4))
-        
+        add(Box.createHorizontalStrut(12))
+
         // 监听主题变更
         ThemeManager.addThemeChangeListener { updateTheme() }
     }
-    
+
     private fun updateTheme() {
         val theme = ThemeManager.currentTheme
         background = theme.statusBarBackground
@@ -114,7 +114,9 @@ class StatusBar(private val mainWindow: MainWindow) : JPanel() {
 //        add(Box.createHorizontalStrut(8))
 //        add(fileInfoLabel)
 //        add(Box.createHorizontalStrut(12))
-        add(navigationBar)
+
+        // VCS Widget
+        add(vcsWidget)
     }
 
     private fun setupRightComponents() {
@@ -132,7 +134,7 @@ class StatusBar(private val mainWindow: MainWindow) : JPanel() {
         if (!persistent) {
             currentMessageTimer?.stop()
             currentMessageTimer =
-                Timer(3000) { 
+                Timer(3000) {
                     statusLabel.text = "就绪"
                     statusLabel.foreground = ThemeManager.currentTheme.statusBarForeground
                 }.apply {
@@ -142,10 +144,6 @@ class StatusBar(private val mainWindow: MainWindow) : JPanel() {
         }
     }
 
-
-    fun updateNavigation(currentFile: File?) {
-        navigationBar.update(currentFile)
-    }
 
     fun setFileInfo(fileName: String, fileSize: String? = null, encoding: String? = null) {
         val info = buildString {
@@ -257,7 +255,7 @@ class StatusBar(private val mainWindow: MainWindow) : JPanel() {
             text = "错误: $message"
             foreground = Color.RED
         }
-        Timer(5000) { 
+        Timer(5000) {
             statusLabel.foreground = ThemeManager.currentTheme.statusBarForeground
         }.apply {
             isRepeats = false
@@ -270,7 +268,7 @@ class StatusBar(private val mainWindow: MainWindow) : JPanel() {
             text = "警告: $message"
             foreground = Color.ORANGE
         }
-        Timer(3000) { 
+        Timer(3000) {
             statusLabel.foreground = ThemeManager.currentTheme.statusBarForeground
         }.apply {
             isRepeats = false
@@ -283,7 +281,7 @@ class StatusBar(private val mainWindow: MainWindow) : JPanel() {
             text = "成功: $message"
             foreground = Color.GREEN
         }
-        Timer(2000) { 
+        Timer(2000) {
             statusLabel.foreground = ThemeManager.currentTheme.statusBarForeground
         }.apply {
             isRepeats = false
@@ -313,5 +311,12 @@ class StatusBar(private val mainWindow: MainWindow) : JPanel() {
                 }
             }
         }
+    }
+
+    /**
+     * 更新 VCS Widget 的显示内容（显示 git 分支或"版本控制"）
+     */
+    fun updateVcsDisplay() {
+        vcsWidget.updateDisplay()
     }
 }

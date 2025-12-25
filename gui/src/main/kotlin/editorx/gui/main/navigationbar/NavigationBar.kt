@@ -5,6 +5,7 @@ import editorx.gui.main.explorer.Explorer
 import editorx.core.filetype.FileTypeRegistry
 import editorx.gui.main.explorer.ExplorerIcons
 import editorx.core.util.IconUtils
+import editorx.gui.core.ThemeManager
 import java.awt.Color
 import java.awt.Cursor
 import java.awt.Font
@@ -26,8 +27,23 @@ class NavigationBar(private val mainWindow: MainWindow) : JPanel() {
 
     init {
         layout = BoxLayout(this, BoxLayout.X_AXIS)
-        isOpaque = false
-        border = EmptyBorder(0, 4, 0, 12)
+        isOpaque = true
+        preferredSize = java.awt.Dimension(0, 28)
+        minimumSize = java.awt.Dimension(0, 28)
+        updateTheme()
+        border = BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(0, 0, 1, 0, Color(0xDE, 0xDE, 0xDE)),
+            EmptyBorder(4, 8, 4, 12)
+        )
+
+        // 监听主题变更
+        ThemeManager.addThemeChangeListener { updateTheme() }
+    }
+
+    private fun updateTheme() {
+        background = ThemeManager.currentTheme.editorBackground
+        revalidate()
+        repaint()
     }
 
     fun update(currentFile: File?) {
@@ -51,26 +67,22 @@ class NavigationBar(private val mainWindow: MainWindow) : JPanel() {
 
     private fun buildCrumbs(workspaceRoot: File?, currentFile: File?): List<Crumb> {
         val result = mutableListOf<Crumb>()
-        if (workspaceRoot != null) {
-            val projectName = workspaceRoot.name.ifEmpty { workspaceRoot.absolutePath }
-            result += Crumb(projectName, workspaceRoot, true)
-            if (currentFile != null) {
-                val rootPath = workspaceRoot.toPath()
-                val filePath = currentFile.toPath()
-                if (filePath.startsWith(rootPath)) {
-                    try {
-                        var cumulative = workspaceRoot
-                        rootPath.relativize(filePath).forEach { part ->
-                            cumulative = File(cumulative, part.toString())
-                            result += Crumb(part.toString(), cumulative, false)
-                        }
-                        return result
-                    } catch (_: Exception) {
-                        // fallback below
+        if (workspaceRoot != null && currentFile != null) {
+            val rootPath = workspaceRoot.toPath()
+            val filePath = currentFile.toPath()
+            if (filePath.startsWith(rootPath)) {
+                try {
+                    var cumulative = workspaceRoot
+                    rootPath.relativize(filePath).forEach { part ->
+                        cumulative = File(cumulative, part.toString())
+                        result += Crumb(part.toString(), cumulative, false)
                     }
+                    return result
+                } catch (_: Exception) {
+                    // fallback below
                 }
-                appendAbsoluteSegments(result, currentFile)
             }
+            appendAbsoluteSegments(result, currentFile)
             return result
         }
         if (currentFile != null) {
@@ -159,46 +171,28 @@ class NavigationBar(private val mainWindow: MainWindow) : JPanel() {
     private fun showMenu(crumb: Crumb, e: MouseEvent) {
         val file = crumb.file ?: return
         val menu = JPopupMenu()
-        if (file.isDirectory) {
-            menu.add(JMenuItem("在资源管理器中打开").apply {
-                addActionListener { reveal(file) }
-            })
-            menu.add(JMenuItem("设为工作区根目录").apply {
-                addActionListener {
-                    mainWindow.guiContext.workspace.openWorkspace(file)
-                    update(null)
-                    (mainWindow.sideBar.getView("explorer") as? Explorer)?.refreshRoot()
-                    mainWindow.toolBar.updateProjectDisplay()
-                }
-            })
-            menu.add(JMenuItem("在侧栏中选中").apply {
-                addActionListener {
-                    (mainWindow.sideBar.getView("explorer") as? Explorer)?.focusFileInTree(file)
-                    mainWindow.sideBar.showView("explorer")
-                }
-            })
-        } else {
-            menu.add(JMenuItem("打开文件").apply {
-                addActionListener { mainWindow.editor.openFile(file) }
-            })
-            menu.add(JMenuItem("在资源管理器中显示").apply {
-                addActionListener { reveal(file) }
-            })
-            menu.add(JMenuItem("在侧栏中选中").apply {
-                addActionListener {
-                    (mainWindow.sideBar.getView("explorer") as? Explorer)?.focusFileInTree(file)
-                    mainWindow.sideBar.showView("explorer")
-                }
-            })
-        }
         menu.add(JMenuItem("复制路径").apply { addActionListener { copyPath(file) } })
+        menu.add(JMenuItem("在侧栏中选中").apply {
+            addActionListener {
+                (mainWindow.sideBar.getView("explorer") as? Explorer)?.focusFileInTree(file)
+                mainWindow.sideBar.showView("explorer")
+            }
+        })
+        menu.add(JMenuItem("在资源管理器中显示").apply {
+            addActionListener { reveal(file) }
+        })
         menu.show(e.component, e.x, e.y)
     }
 
     private fun reveal(file: File) {
         try {
             if (!file.exists()) {
-                JOptionPane.showMessageDialog(this, "路径不存在: ${file.absolutePath}", "提示", JOptionPane.INFORMATION_MESSAGE)
+                JOptionPane.showMessageDialog(
+                    this,
+                    "路径不存在: ${file.absolutePath}",
+                    "提示",
+                    JOptionPane.INFORMATION_MESSAGE
+                )
                 return
             }
             val desktop = java.awt.Desktop.getDesktop()
