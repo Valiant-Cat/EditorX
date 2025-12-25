@@ -143,8 +143,31 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         // 根据工作区状态显示欢迎界面或编辑器内容
         updateEditorContent()
 
-        // 注册快捷键：Command+W (macOS) 或 Ctrl+W (其他系统) 关闭标签页
+        // 注册快捷键：Command+N (macOS) 或 Ctrl+N (其他系统) 新建文件
+        // 在Editor本身注册，这样在WelcomeView显示时也能响应
         val shortcutMask = java.awt.Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx
+        getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(
+            KeyStroke.getKeyStroke(KeyEvent.VK_N, shortcutMask),
+            "editor.newFile"
+        )
+        actionMap.put("editor.newFile", object : javax.swing.AbstractAction() {
+            override fun actionPerformed(e: java.awt.event.ActionEvent?) {
+                newUntitledFile()
+            }
+        })
+        
+        // 同时在tabbedPane上注册，确保在编辑器内也能响应
+        tabbedPane.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(
+            KeyStroke.getKeyStroke(KeyEvent.VK_N, shortcutMask),
+            "editor.newFile"
+        )
+        tabbedPane.actionMap.put("editor.newFile", object : javax.swing.AbstractAction() {
+            override fun actionPerformed(e: java.awt.event.ActionEvent?) {
+                newUntitledFile()
+            }
+        })
+
+        // 注册快捷键：Command+W (macOS) 或 Ctrl+W (其他系统) 关闭标签页
         tabbedPane.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(
             KeyStroke.getKeyStroke(KeyEvent.VK_W, shortcutMask),
             "editor.closeTab"
@@ -617,12 +640,9 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
     }
 
     fun newUntitledFile() {
-        // 创建一个临时的未命名文件标识
-        val untitledFile = File.createTempFile("Untitled-${untitledCounter++}", ".tmp").apply {
-            deleteOnExit()
-        }
-        // 立即删除临时文件，我们只需要它的路径作为标识
-        untitledFile.delete()
+        // 创建一个未命名文件标识（不创建实际文件）
+        val untitledFileName = "untitled-${untitledCounter++}"
+        val untitledFile = File(untitledFileName)
         
         val textArea = TextArea().apply {
             font = Font("Consolas", Font.PLAIN, 14)
@@ -694,7 +714,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         installFileDropTarget(scroll)
         installFileDropTarget(textArea)
         
-        val title = "未命名-${untitledCounter - 1}"
+        val title = untitledFileName
         tabbedPane.addTab(title, resolveTabIcon(untitledFile), TabContent(scroll), null)
         val index = tabbedPane.tabCount - 1
         fileToTab[untitledFile] = index
@@ -1091,54 +1111,89 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
     private fun saveTab(index: Int): Boolean {
         if (index < 0 || index >= tabbedPane.tabCount) return false
         val file = tabToFile[index]
-        val ta = tabTextAreas[index]
-        if (ta != null && file != null && file.canWrite()) {
+        val ta = tabTextAreas[index] ?: return true
+        
+        // 如果文件存在且可写，直接保存
+        if (file != null && file.exists() && file.canWrite()) {
             runCatching { Files.writeString(file.toPath(), ta.text) }
             dirtyTabs.remove(index)
             originalTextByIndex[index] = ta.text
             updateTabTitle(index)
+            mainWindow.statusBar.updateNavigation(file)
             mainWindow.statusBar.showSuccess("已保存: ${file.name}")
             return true
-        } else if (ta != null) {
-            // 文件不可写，尝试另存为
-            val chooser = javax.swing.JFileChooser()
-            if (chooser.showSaveDialog(this) == javax.swing.JFileChooser.APPROVE_OPTION) {
-                val newFile = chooser.selectedFile
-                runCatching { Files.writeString(newFile.toPath(), ta.text) }
-                // 更新文件映射
-                tabToFile[index]?.let { fileToTab.remove(it) }
-                tabToFile[index] = newFile
-                fileToTab[newFile] = index
-                updateTabTitle(index)
-                dirtyTabs.remove(index)
-                originalTextByIndex[index] = ta.text
-                mainWindow.guiControl.workspace.addRecentFile(newFile)
-                mainWindow.statusBar.showSuccess("已保存: ${newFile.name}")
-                return true
-            } else {
-                // 用户取消了另存为对话框
-                return false
+        }
+        
+        // 文件不存在（未命名文件）或不可写，使用系统文件选择器另存为
+        val fileDialog = java.awt.FileDialog(mainWindow, "保存文件", java.awt.FileDialog.SAVE).apply {
+            isMultipleMode = false
+            // 如果当前文件有名称且不是未命名文件，设置为默认文件名
+            if (file != null && !file.name.startsWith("untitled-") && file.exists()) {
+                this.file = file.name
+                directory = file.parent
             }
         }
-        return true
+        fileDialog.isVisible = true
+        
+        val fileName = fileDialog.file
+        val dir = fileDialog.directory
+        
+        if (fileName != null && dir != null) {
+            val newFile = File(dir, fileName)
+            runCatching { Files.writeString(newFile.toPath(), ta.text) }
+            // 更新文件映射
+            tabToFile[index]?.let { fileToTab.remove(it) }
+            tabToFile[index] = newFile
+            fileToTab[newFile] = index
+            // 先更新原始内容和脏标记，再更新标题
+            originalTextByIndex[index] = ta.text
+            dirtyTabs.remove(index)
+            updateTabTitle(index)
+            updateTabHeaderStyles()
+            mainWindow.guiControl.workspace.addRecentFile(newFile)
+            mainWindow.statusBar.updateNavigation(newFile)
+            mainWindow.statusBar.showSuccess("已保存: ${newFile.name}")
+            return true
+        } else {
+            // 用户取消了保存对话框
+            return false
+        }
     }
 
     fun saveCurrentAs() {
         val idx = tabbedPane.selectedIndex
         if (idx < 0) return
         val ta = tabTextAreas[idx] ?: return
-        val chooser = javax.swing.JFileChooser()
-        if (chooser.showSaveDialog(this) == javax.swing.JFileChooser.APPROVE_OPTION) {
-            val file = chooser.selectedFile
+        val currentFile = tabToFile[idx]
+        
+        // 使用系统文件选择器
+        val fileDialog = java.awt.FileDialog(mainWindow, "另存为", java.awt.FileDialog.SAVE).apply {
+            isMultipleMode = false
+            // 如果当前文件存在，设置为默认文件名
+            if (currentFile != null && currentFile.exists()) {
+                file = currentFile.name
+                directory = currentFile.parent
+            }
+        }
+        fileDialog.isVisible = true
+        
+        val fileName = fileDialog.file
+        val dir = fileDialog.directory
+        
+        if (fileName != null && dir != null) {
+            val file = File(dir, fileName)
             runCatching { Files.writeString(file.toPath(), ta.text) }
             // Update mappings
             tabToFile[idx]?.let { fileToTab.remove(it) }
             tabToFile[idx] = file
             fileToTab[file] = idx
-            updateTabTitle(idx)
-            dirtyTabs.remove(idx)
+            // 先更新原始内容和脏标记，再更新标题
             originalTextByIndex[idx] = ta.text
+            dirtyTabs.remove(idx)
+            updateTabTitle(idx)
+            updateTabHeaderStyles()
             mainWindow.guiControl.workspace.addRecentFile(file)
+            mainWindow.statusBar.updateNavigation(file)
             mainWindow.statusBar.showSuccess("已保存: ${file.name}")
         }
     }

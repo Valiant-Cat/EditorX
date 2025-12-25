@@ -75,6 +75,7 @@ class MainWindow(val guiControl: GuiEnvironment) : JFrame() {
         tuneSplitPanes()
         setupExplorer()
         setupDoubleShiftShortcut()
+        setupCommandNShortcut()
     }
 
     private fun setupWindow() {
@@ -85,6 +86,9 @@ class MainWindow(val guiControl: GuiEnvironment) : JFrame() {
         setLocationRelativeTo(null)
         minimumSize = Dimension(800, 600)
 
+        // 设置窗口图标
+        setApplicationIcon()
+
         if (isMacOS()) {
             // 启用 macOS 外观
             System.setProperty("apple.laf.useScreenMenuBar", "true")
@@ -94,6 +98,14 @@ class MainWindow(val guiControl: GuiEnvironment) : JFrame() {
             rootPane.putClientProperty("apple.awt.fullWindowContent", true)
             rootPane.putClientProperty("apple.awt.transparentTitleBar", true)
             rootPane.putClientProperty("apple.awt.windowTitleVisible", false)
+        }
+    }
+
+    private fun setApplicationIcon() {
+        val iconUrl = javaClass.classLoader.getResource("icon.png")
+        if (iconUrl != null) {
+            val image = java.awt.Toolkit.getDefaultToolkit().getImage(iconUrl)
+            iconImage = image
         }
     }
 
@@ -276,5 +288,26 @@ class MainWindow(val guiControl: GuiEnvironment) : JFrame() {
     fun showGlobalSearch() {
         val dialog = GlobalSearchDialog(this, this)
         dialog.showDialog()
+    }
+    
+    /**
+     * 设置 Command+N 快捷键（新建文件）
+     */
+    private fun setupCommandNShortcut() {
+        val focusManager = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager()
+        val shortcutMask = java.awt.Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx
+        focusManager.addKeyEventDispatcher { e ->
+            if (e.id == KeyEvent.KEY_PRESSED && 
+                e.keyCode == KeyEvent.VK_N && 
+                (e.modifiersEx and shortcutMask) == shortcutMask &&
+                !e.isConsumed) {
+                SwingUtilities.invokeLater {
+                    editor.newUntitledFile()
+                }
+                true // 消费事件
+            } else {
+                false // 不消费事件
+            }
+        }
     }
 }
