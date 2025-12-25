@@ -53,29 +53,61 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
     private fun createCenterPanel(): JPanel {
         val panel = JPanel(GridBagLayout()).apply {
             background = ThemeManager.currentTheme.editorBackground
-            border = EmptyBorder(80, 0, 80, 0)
+            border = EmptyBorder(0, 0, 0, 0)
         }
-        val gbc = GridBagConstraints().apply {
+        
+        // 顶部弹性空间
+        val topSpacer = JPanel().apply {
+            preferredSize = Dimension(0, 0)
+            minimumSize = Dimension(0, 0)
+        }
+        val topGbc = GridBagConstraints().apply {
             gridx = 0
             gridy = 0
+            weightx = 1.0
+            weighty = 1.0
+            fill = GridBagConstraints.BOTH
+        }
+        panel.add(topSpacer, topGbc)
+        
+        // 操作按钮区域
+        val actionsPanel = createActionsPanel()
+        val actionsGbc = GridBagConstraints().apply {
+            gridx = 0
+            gridy = 1
             weightx = 1.0
             weighty = 0.0
             anchor = GridBagConstraints.CENTER
             insets = java.awt.Insets(0, 0, 40, 0)
         }
-        
-        // 操作按钮区域
-        val actionsPanel = createActionsPanel()
-        panel.add(actionsPanel, gbc)
+        panel.add(actionsPanel, actionsGbc)
         
         // Recent projects 区域
-        gbc.gridy = 1
-        gbc.weighty = 1.0
-        gbc.fill = GridBagConstraints.VERTICAL
-        gbc.anchor = GridBagConstraints.CENTER
-        gbc.insets = java.awt.Insets(0, 0, 0, 0)
         val recentProjectsPanel = createRecentProjectsPanel()
-        panel.add(recentProjectsPanel, gbc)
+        val projectsGbc = GridBagConstraints().apply {
+            gridx = 0
+            gridy = 2
+            weightx = 1.0
+            weighty = 0.0
+            fill = GridBagConstraints.NONE
+            anchor = GridBagConstraints.CENTER
+            insets = java.awt.Insets(0, 0, 0, 0)
+        }
+        panel.add(recentProjectsPanel, projectsGbc)
+        
+        // 底部弹性空间
+        val bottomSpacer = JPanel().apply {
+            preferredSize = Dimension(0, 0)
+            minimumSize = Dimension(0, 0)
+        }
+        val bottomGbc = GridBagConstraints().apply {
+            gridx = 0
+            gridy = 3
+            weightx = 1.0
+            weighty = 1.0
+            fill = GridBagConstraints.BOTH
+        }
+        panel.add(bottomSpacer, bottomGbc)
         
         return panel
     }
