@@ -1,23 +1,11 @@
-package editorx.core.settings
+package editorx.core.store
 
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import java.util.Properties
+import java.util.*
 
-/**
- * Simple persistent key-value settings store backed by a .properties file.
- * Keys are flat dot-separated strings (e.g. editor.theme, files.recent.0).
- */
-interface SettingsStore {
-    fun get(key: String, default: String? = null): String?
-    fun put(key: String, value: String)
-    fun remove(key: String)
-    fun keys(prefix: String? = null): List<String>
-    fun sync()
-}
-
-class PropertiesSettingsStore(private val file: File) : SettingsStore {
+class FileStore(private val file: File) : Store {
     private val props = Properties()
     private var loaded = false
 

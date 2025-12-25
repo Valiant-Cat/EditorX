@@ -1,6 +1,6 @@
 package editorx.core.workspace
 
-import editorx.core.settings.SettingsStore
+import editorx.core.store.Store
 import java.io.File
 
 /**
@@ -15,7 +15,7 @@ interface WorkspaceManager {
     fun addRecentWorkspace(workspace: File)
 }
 
-class DefaultWorkspaceManager(private val settings: SettingsStore) : editorx.core.workspace.WorkspaceManager {
+class DefaultWorkspaceManager(private val settings: Store) : editorx.core.workspace.WorkspaceManager {
     private var root: File? = null
 
     override fun getWorkspaceRoot(): File? = root

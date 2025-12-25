@@ -1,7 +1,7 @@
 package editorx.gui.settings
 
 import editorx.core.i18n.I18n
-import editorx.core.settings.SettingsStore
+import editorx.core.store.Store
 import editorx.gui.core.ui.Theme
 import editorx.gui.core.ui.ThemeManager
 import java.awt.BorderLayout
@@ -15,7 +15,7 @@ import javax.swing.JLabel
 import javax.swing.JPanel
 import javax.swing.JRadioButton
 
-class AppearancePanel(private val settings: SettingsStore) : JPanel(BorderLayout()) {
+class AppearancePanel(private val settings: Store) : JPanel(BorderLayout()) {
     private val zhButton = JRadioButton()
     private val enButton = JRadioButton()
     private val lightThemeButton = JRadioButton()

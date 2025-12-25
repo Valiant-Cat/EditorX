@@ -4,7 +4,7 @@ import com.formdev.flatlaf.FlatLightLaf
 import editorx.core.gui.GuiContext
 import editorx.core.plugin.PluginManager
 import editorx.core.plugin.loader.PluginLoaderImpl
-import editorx.core.settings.SettingsStore
+import editorx.core.store.Store
 import editorx.core.util.StartupTimer
 import editorx.gui.core.ui.ThemeManager
 import editorx.gui.main.MainWindow
@@ -156,7 +156,7 @@ private fun initializeMainWindow(startupTimer: StartupTimer) {
     }.apply { name = "plugin-loader"; isDaemon = true }.start()
 }
 
-private fun loadDisabledSet(settings: SettingsStore): Set<String> {
+private fun loadDisabledSet(settings: Store): Set<String> {
     return settings.get("plugins.disabled", "")
         ?.split(',')
         ?.map { it.trim() }

@@ -6,7 +6,7 @@ import editorx.core.plugin.PluginOrigin
 import editorx.core.plugin.PluginRecord
 import editorx.core.plugin.PluginState
 import editorx.core.plugin.loader.PluginLoaderImpl
-import editorx.core.settings.SettingsStore
+import editorx.core.store.Store
 import java.awt.BorderLayout
 import java.awt.Color
 import java.awt.Dimension
@@ -35,7 +35,7 @@ import javax.swing.SwingUtilities
  */
 class PluginsPanel(
     private val pluginManager: PluginManager,
-    private val settings: SettingsStore,
+    private val settings: Store,
 ) : JPanel(BorderLayout()) {
 
     private val disabledSet: MutableSet<String> = settings.get(DISABLED_KEY, "")
