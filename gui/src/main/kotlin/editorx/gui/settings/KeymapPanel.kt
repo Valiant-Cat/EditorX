@@ -31,12 +31,8 @@ class KeymapPanel : JPanel(BorderLayout()) {
     private val shortcuts = listOf(
         ShortcutItem("查找", "Find", keyStroke(KeyEvent.VK_F), "聚焦顶部搜索栏", "Focus search bar"),
         ShortcutItem("替换", "Replace", keyStroke(KeyEvent.VK_R), "展开替换行", "Expand replace row"),
-        ShortcutItem("全局搜索", "Global Search", keyStroke(KeyEvent.VK_F, InputEvent.SHIFT_DOWN_MASK), "打开侧边栏搜索", "Open sidebar search"),
-        ShortcutItem("打开文件", "Open File", keyStroke(KeyEvent.VK_O), "选择并打开文件", "Select and open a file"),
         ShortcutItem("保存文件", "Save File", keyStroke(KeyEvent.VK_S), "保存当前编辑内容", "Save current content"),
         ShortcutItem("关闭标签页", "Close Tab", keyStroke(KeyEvent.VK_W), "关闭当前标签页", "Close active tab"),
-        ShortcutItem("切换侧边栏", "Toggle Sidebar", keyStroke(KeyEvent.VK_B), "显示或隐藏侧边栏", "Show or hide sidebar"),
-        ShortcutItem("语言菜单", "Language Menu", keyStroke(KeyEvent.VK_L), "打开语言菜单", "Open language menu"),
     )
 
     private val tableModel = object : AbstractTableModel() {
@@ -117,7 +113,7 @@ class KeymapPanel : JPanel(BorderLayout()) {
             exportButton.text = "Export…"
             exportButton.toolTipText = "Feature under development"
         } else {
-            headerLabel.text = "快捷键（规划中）"
+            headerLabel.text = "快捷键"
             hintLabel.text = "<html>当前列表展示默认快捷键，自定义与导出功能规划中。</html>"
             noteButton.text = "添加备注…"
             noteButton.toolTipText = "快捷键自定义功能开发中"

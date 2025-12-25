@@ -141,6 +141,21 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         // 根据工作区状态显示欢迎界面或编辑器内容
         updateEditorContent()
 
+        // 注册快捷键：Command+W (macOS) 或 Ctrl+W (其他系统) 关闭标签页
+        val shortcutMask = java.awt.Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx
+        tabbedPane.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(
+            KeyStroke.getKeyStroke(KeyEvent.VK_W, shortcutMask),
+            "editor.closeTab"
+        )
+        tabbedPane.actionMap.put("editor.closeTab", object : javax.swing.AbstractAction() {
+            override fun actionPerformed(e: java.awt.event.ActionEvent?) {
+                val currentIndex = tabbedPane.selectedIndex
+                if (currentIndex >= 0) {
+                    closeTab(currentIndex)
+                }
+            }
+        })
+
         // 切换标签时更新状态栏与事件
         tabbedPane.addChangeListener {
             val file = getCurrentFile()
