@@ -33,6 +33,7 @@ class KeymapPanel : JPanel(BorderLayout()) {
         ShortcutItem("替换", "Replace", keyStroke(KeyEvent.VK_R), "展开替换行", "Expand replace row"),
         ShortcutItem("保存文件", "Save File", keyStroke(KeyEvent.VK_S), "保存当前编辑内容", "Save current content"),
         ShortcutItem("关闭标签页", "Close Tab", keyStroke(KeyEvent.VK_W), "关闭当前标签页", "Close active tab"),
+        ShortcutItem("格式化文件", "Format File", formatKeyStroke(), "格式化当前文件", "Format current file"),
     )
 
     private val tableModel = object : AbstractTableModel() {
@@ -128,6 +129,18 @@ class KeymapPanel : JPanel(BorderLayout()) {
             val combo = mask or modifiers
             val modText = KeyEvent.getModifiersExText(combo)
             val keyText = KeyEvent.getKeyText(keyCode)
+            return "$modText+$keyText"
+        }
+
+        private fun formatKeyStroke(): String {
+            val isMac = System.getProperty("os.name").lowercase().contains("mac")
+            val modifiers = if (isMac) {
+                InputEvent.ALT_DOWN_MASK or InputEvent.META_DOWN_MASK
+            } else {
+                InputEvent.ALT_DOWN_MASK or InputEvent.CTRL_DOWN_MASK
+            }
+            val modText = KeyEvent.getModifiersExText(modifiers)
+            val keyText = KeyEvent.getKeyText(KeyEvent.VK_L)
             return "$modText+$keyText"
         }
     }

@@ -6,6 +6,7 @@ import editorx.core.util.IconRef
 import editorx.gui.main.MainWindow
 import editorx.gui.main.explorer.Explorer
 import editorx.gui.main.navigationbar.NavigationBar
+import editorx.gui.main.search.GlobalSearchDialog
 import editorx.gui.settings.SettingsDialog
 import org.slf4j.LoggerFactory
 import java.awt.*
@@ -425,6 +426,13 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
 
         add(Box.createHorizontalStrut(6))
 
+        // 全局搜索按钮
+        add(JButton(IconLoader.getIcon(IconRef("icons/search.svg"), ICON_SIZE)).compact("全局搜索") {
+            showGlobalSearch()
+        })
+
+        add(Box.createHorizontalStrut(6))
+
         add(JButton(IconLoader.getIcon(IconRef("icons/settings.svg"), ICON_SIZE)).compact("设置") {
             showSettings()
         })
@@ -479,6 +487,11 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
             return
         }
         SettingsDialog(mainWindow, mainWindow.guiControl, pm, SettingsDialog.Section.APPEARANCE).isVisible = true
+    }
+
+    private fun showGlobalSearch() {
+        val dialog = GlobalSearchDialog(SwingUtilities.getWindowAncestor(this), mainWindow)
+        dialog.showDialog()
     }
 
     private fun toggleFullScreen() {

@@ -1,6 +1,7 @@
 package editorx.plugins.xml
 
 import XmlFileType
+import XmlLanguage
 import editorx.core.plugin.Plugin
 import editorx.core.plugin.PluginContext
 import editorx.core.plugin.PluginInfo
@@ -14,6 +15,7 @@ class XmlPlugin : Plugin {
 
     override fun activate(pluginContext: PluginContext) {
         pluginContext.gui()?.registerFileType(XmlFileType)
+        pluginContext.gui()?.registerFormatter(XmlLanguage, XmlFormatter)
     }
 }
 

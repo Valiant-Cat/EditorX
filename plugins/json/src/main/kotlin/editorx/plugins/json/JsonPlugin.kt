@@ -13,6 +13,7 @@ class JsonPlugin : Plugin {
 
     override fun activate(pluginContext: PluginContext) {
         pluginContext.gui()?.registerFileType(JsonFIleType)
+        pluginContext.gui()?.registerFormatter(JsonLanguage, JsonFormatter)
     }
 }
 

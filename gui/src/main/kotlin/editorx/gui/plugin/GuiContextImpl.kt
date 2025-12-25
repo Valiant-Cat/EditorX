@@ -2,6 +2,8 @@ package editorx.gui.plugin
 
 import editorx.core.filetype.FileType
 import editorx.core.filetype.FileTypeRegistry
+import editorx.core.filetype.Formatter
+import editorx.core.filetype.FormatterRegistry
 import editorx.core.filetype.SyntaxHighlighter
 import editorx.core.filetype.SyntaxHighlighterRegistry
 import editorx.core.lang.Language
@@ -24,5 +26,9 @@ class GuiContextImpl(
 
     override fun registerSyntaxHighlighter(language: Language, syntaxHighlighter: SyntaxHighlighter) {
         SyntaxHighlighterRegistry.registerSyntaxHighlighter(language, syntaxHighlighter, ownerId = pluginContext.pluginId())
+    }
+
+    override fun registerFormatter(language: Language, formatter: Formatter) {
+        FormatterRegistry.registerFormatter(language, formatter, ownerId = pluginContext.pluginId())
     }
 }

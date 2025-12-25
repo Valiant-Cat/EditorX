@@ -1,6 +1,7 @@
 package editorx.gui.main.editor
 
 import editorx.core.filetype.FileTypeRegistry
+import editorx.core.filetype.FormatterRegistry
 import editorx.core.toolchain.JadxTool
 import editorx.core.toolchain.SmaliTool
 import editorx.gui.core.theme.ThemeManager
@@ -153,6 +154,22 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                 if (currentIndex >= 0) {
                     closeTab(currentIndex)
                 }
+            }
+        })
+
+        // 注册快捷键：Option+Command+L (macOS) 或 Alt+Ctrl+L (其他系统) 格式化代码
+        val formatShortcutMask = if (System.getProperty("os.name").lowercase().contains("mac")) {
+            InputEvent.ALT_DOWN_MASK or InputEvent.META_DOWN_MASK
+        } else {
+            InputEvent.ALT_DOWN_MASK or InputEvent.CTRL_DOWN_MASK
+        }
+        tabbedPane.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(
+            KeyStroke.getKeyStroke(KeyEvent.VK_L, formatShortcutMask),
+            "editor.formatCode"
+        )
+        tabbedPane.actionMap.put("editor.formatCode", object : javax.swing.AbstractAction() {
+            override fun actionPerformed(e: java.awt.event.ActionEvent?) {
+                formatCurrentFile()
             }
         })
 
@@ -520,6 +537,22 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                     this@Editor.showReplaceBar()
                 }
             })
+
+            // 安装右键菜单
+            val textAreaForMenu = this
+            addMouseListener(object : MouseAdapter() {
+                override fun mousePressed(e: MouseEvent) {
+                    if (SwingUtilities.isRightMouseButton(e)) {
+                        showTextAreaContextMenu(textAreaForMenu, e.x, e.y)
+                    }
+                }
+
+                override fun mouseReleased(e: MouseEvent) {
+                    if (SwingUtilities.isRightMouseButton(e)) {
+                        showTextAreaContextMenu(textAreaForMenu, e.x, e.y)
+                    }
+                }
+            })
         }
         try {
             // 在装载初始文件内容时静默，不触发脏标记
@@ -816,6 +849,49 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
 
     private fun closeTab(index: Int) {
         if (index >= 0 && index < tabbedPane.tabCount) {
+            // 检查是否有未保存的更改
+            if (dirtyTabs.contains(index)) {
+                val file = tabToFile[index]
+                val fileName = file?.name ?: "未命名文件"
+                
+                // 切换到要关闭的标签页（如果需要保存）
+                val wasSelected = tabbedPane.selectedIndex == index
+                if (!wasSelected) {
+                    tabbedPane.selectedIndex = index
+                }
+                
+                // 显示保存提示对话框
+                val options = arrayOf("保存", "不保存", "取消")
+                val result = JOptionPane.showOptionDialog(
+                    mainWindow,
+                    "您对 \"$fileName\" 的更改尚未保存。\n如果不保存，您的更改将丢失。",
+                    "保存更改？",
+                    JOptionPane.YES_NO_CANCEL_OPTION,
+                    JOptionPane.WARNING_MESSAGE,
+                    null,
+                    options,
+                    options[0] // 默认选择"保存"
+                )
+                
+                when (result) {
+                    JOptionPane.YES_OPTION -> {
+                        // 保存文件
+                        val saved = saveTab(index)
+                        if (!saved) {
+                            // 如果保存失败或用户取消，不关闭标签页
+                            return
+                        }
+                    }
+                    JOptionPane.NO_OPTION -> {
+                        // 不保存，直接关闭
+                    }
+                    JOptionPane.CANCEL_OPTION, JOptionPane.CLOSED_OPTION -> {
+                        // 取消关闭
+                        return
+                    }
+                }
+            }
+            
             val file = tabToFile[index]
             tabbedPane.removeTabAt(index)
             file?.let {
@@ -881,17 +957,46 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
     fun saveCurrent() {
         val idx = tabbedPane.selectedIndex
         if (idx < 0) return
-        val file = tabToFile[idx]
-        val ta = tabTextAreas[idx]
+        saveTab(idx)
+    }
+
+    /**
+     * 保存指定索引的标签页
+     * @return true 如果保存成功或不需要保存，false 如果用户取消保存
+     */
+    private fun saveTab(index: Int): Boolean {
+        if (index < 0 || index >= tabbedPane.tabCount) return false
+        val file = tabToFile[index]
+        val ta = tabTextAreas[index]
         if (ta != null && file != null && file.canWrite()) {
             runCatching { Files.writeString(file.toPath(), ta.text) }
-            dirtyTabs.remove(idx)
-            originalTextByIndex[idx] = ta.text
-            updateTabTitle(idx)
+            dirtyTabs.remove(index)
+            originalTextByIndex[index] = ta.text
+            updateTabTitle(index)
             mainWindow.statusBar.showSuccess("已保存: ${file.name}")
-        } else {
-            saveCurrentAs()
+            return true
+        } else if (ta != null) {
+            // 文件不可写，尝试另存为
+            val chooser = javax.swing.JFileChooser()
+            if (chooser.showSaveDialog(this) == javax.swing.JFileChooser.APPROVE_OPTION) {
+                val newFile = chooser.selectedFile
+                runCatching { Files.writeString(newFile.toPath(), ta.text) }
+                // 更新文件映射
+                tabToFile[index]?.let { fileToTab.remove(it) }
+                tabToFile[index] = newFile
+                fileToTab[newFile] = index
+                updateTabTitle(index)
+                dirtyTabs.remove(index)
+                originalTextByIndex[index] = ta.text
+                mainWindow.guiControl.workspace.addRecentFile(newFile)
+                mainWindow.statusBar.showSuccess("已保存: ${newFile.name}")
+                return true
+            } else {
+                // 用户取消了另存为对话框
+                return false
+            }
         }
+        return true
     }
 
     fun saveCurrentAs() {
@@ -1173,6 +1278,120 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
     private fun getCurrentTextArea(): TextArea? {
         val currentIndex = tabbedPane.selectedIndex
         return if (currentIndex >= 0) tabTextAreas[currentIndex] else null
+    }
+
+    /**
+     * 格式化当前文件
+     */
+    private fun formatCurrentFile() {
+        val file = getCurrentFile() ?: return
+        val textArea = getCurrentTextArea() ?: return
+
+        // 检查文件是否可编辑（非只读）
+        if (!textArea.isEditable) {
+            JOptionPane.showMessageDialog(
+                this,
+                "当前文件为只读，无法格式化",
+                "格式化失败",
+                JOptionPane.WARNING_MESSAGE
+            )
+            return
+        }
+
+        // 获取格式化器
+        val formatter = FormatterRegistry.getFormatter(file)
+        if (formatter == null) {
+            JOptionPane.showMessageDialog(
+                this,
+                "当前文件类型不支持格式化",
+                "格式化失败",
+                JOptionPane.INFORMATION_MESSAGE
+            )
+            return
+        }
+
+        try {
+            // 获取当前内容
+            val currentContent = textArea.text
+
+            // 格式化
+            val formattedContent = formatter.format(currentContent)
+
+            // 如果内容有变化，更新文本区域
+            if (formattedContent != currentContent) {
+                val caretPos = textArea.caretPosition
+                val currentIndex = tabbedPane.selectedIndex
+                
+                textArea.putClientProperty("suppressDirty", true)
+                
+                // 使用 replaceRange 替换整个文本，这样可以保持撤销历史
+                textArea.replaceRange(formattedContent, 0, currentContent.length)
+                
+                textArea.putClientProperty("suppressDirty", false)
+
+                // 手动更新脏标记（因为 suppressDirty 阻止了 DocumentListener 的更新）
+                if (currentIndex >= 0) {
+                    val original = originalTextByIndex[currentIndex]
+                    val isDirty = original != formattedContent
+                    if (isDirty) {
+                        dirtyTabs.add(currentIndex)
+                    } else {
+                        dirtyTabs.remove(currentIndex)
+                    }
+                    updateTabTitle(currentIndex)
+                    updateTabHeaderStyles()
+                }
+
+                // 尝试恢复光标位置（如果可能）
+                val newCaretPos = minOf(caretPos, formattedContent.length)
+                textArea.caretPosition = newCaretPos
+            }
+        } catch (e: Exception) {
+            logger.error("格式化文件失败: ${file.name}", e)
+            JOptionPane.showMessageDialog(
+                this,
+                "格式化失败: ${e.message}",
+                "格式化错误",
+                JOptionPane.ERROR_MESSAGE
+            )
+        }
+    }
+
+    /**
+     * 显示文本区域的右键菜单
+     */
+    private fun showTextAreaContextMenu(textArea: TextArea, x: Int, y: Int) {
+        val menu = JPopupMenu()
+        
+        // 检查是否有格式化器可用
+        val file = getCurrentFile()
+        val hasFormatter = file != null && FormatterRegistry.getFormatter(file) != null
+
+        menu.add(JMenuItem("查找...").apply {
+            accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_F, java.awt.Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx)
+            addActionListener { showFindBar() }
+        })
+        menu.add(JMenuItem("替换...").apply {
+            accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_R, java.awt.Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx)
+            addActionListener { showReplaceBar() }
+        })
+        
+        if (hasFormatter) {
+            menu.addSeparator()
+
+            // 格式化快捷键：Option+Command+L (macOS) 或 Alt+Ctrl+L (其他系统)
+            val formatShortcutMask = if (System.getProperty("os.name").lowercase().contains("mac")) {
+                InputEvent.ALT_DOWN_MASK or InputEvent.META_DOWN_MASK
+            } else {
+                InputEvent.ALT_DOWN_MASK or InputEvent.CTRL_DOWN_MASK
+            }
+            menu.add(JMenuItem("格式化文件").apply {
+                accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_L, formatShortcutMask)
+                addActionListener { formatCurrentFile() }
+            })
+        }
+        
+        menu.show(textArea, x, y)
     }
     
     // 检测并更新 AndroidManifest 底部视图标签

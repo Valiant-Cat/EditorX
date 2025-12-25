@@ -1,6 +1,7 @@
 package editorx.core.plugin.gui
 
 import editorx.core.filetype.FileType
+import editorx.core.filetype.Formatter
 import editorx.core.filetype.SyntaxHighlighter
 import editorx.core.gui.GuiViewProvider
 import editorx.core.lang.Language
@@ -23,4 +24,9 @@ interface GuiContext {
      * 注册语法高亮
      */
     fun registerSyntaxHighlighter(language: Language, syntaxHighlighter: SyntaxHighlighter)
+
+    /**
+     * 注册格式化器
+     */
+    fun registerFormatter(language: Language, formatter: Formatter)
 }
