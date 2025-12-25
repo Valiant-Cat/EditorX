@@ -61,6 +61,39 @@ private fun initializeApplication(timer: StartupTimer) {
         System.setProperty("apple.laf.useScreenMenuBar", "true")
         System.setProperty("com.apple.mrj.application.apple.menu.about.name", "EditorX")
     }
+    
+    // 设置应用图标（使用 Taskbar API，支持 Java 9+）
+    runCatching {
+        val classLoader = Thread.currentThread().contextClassLoader ?: ClassLoader.getSystemClassLoader()
+        val iconUrl = classLoader.getResource("icon.png")
+        if (iconUrl != null) {
+            val image = java.awt.Toolkit.getDefaultToolkit().getImage(iconUrl)
+            // 使用 Taskbar API（Java 9+），这是跨平台的现代方法
+            val taskbar = java.awt.Taskbar.getTaskbar()
+            if (taskbar.isSupported(java.awt.Taskbar.Feature.ICON_IMAGE)) {
+                taskbar.setIconImage(image)
+                LoggerFactory.getLogger("GuiApp").info("成功设置应用图标（Taskbar API）")
+            } else {
+                // 回退到旧方法（仅 macOS）
+                if (System.getProperty("os.name").lowercase().contains("mac")) {
+                    runCatching {
+                        val appClass = Class.forName("com.apple.eawt.Application")
+                        val getApplicationMethod = appClass.getMethod("getApplication")
+                        val application = getApplicationMethod.invoke(null)
+                        val setDockIconImageMethod = appClass.getMethod("setDockIconImage", java.awt.Image::class.java)
+                        setDockIconImageMethod.invoke(application, image)
+                        LoggerFactory.getLogger("GuiApp").info("成功设置 macOS Dock 图标（旧方法）")
+                    }.onFailure { e ->
+                        LoggerFactory.getLogger("GuiApp").warn("无法设置 macOS Dock 图标", e)
+                    }
+                }
+            }
+        } else {
+            LoggerFactory.getLogger("GuiApp").warn("无法找到图标资源: icon.png")
+        }
+    }.onFailure { e ->
+        LoggerFactory.getLogger("GuiApp").warn("无法设置应用图标", e)
+    }
 
     // 安装 Material3 主题到 Swing 默认，确保面板/滚动/标签等遵循统一色板
     ThemeManager.installToSwing()

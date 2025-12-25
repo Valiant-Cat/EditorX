@@ -102,10 +102,23 @@ class MainWindow(val guiControl: GuiEnvironment) : JFrame() {
     }
 
     private fun setApplicationIcon() {
-        val iconUrl = javaClass.classLoader.getResource("icon.png")
+        val classLoader = javaClass.classLoader
+        val iconUrl = classLoader.getResource("icon.png")
         if (iconUrl != null) {
             val image = java.awt.Toolkit.getDefaultToolkit().getImage(iconUrl)
+            // 确保图像加载完成
+            val tracker = java.awt.MediaTracker(this)
+            tracker.addImage(image, 0)
+            try {
+                tracker.waitForID(0)
+            } catch (e: InterruptedException) {
+                Thread.currentThread().interrupt()
+            }
             iconImage = image
+        } else {
+            // 调试：检查资源路径
+            val logger = org.slf4j.LoggerFactory.getLogger("MainWindow")
+            logger.warn("无法找到图标资源: icon.png")
         }
     }
 
