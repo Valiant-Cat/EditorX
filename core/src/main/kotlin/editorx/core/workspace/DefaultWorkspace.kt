@@ -3,19 +3,7 @@ package editorx.core.workspace
 import editorx.core.store.Store
 import java.io.File
 
-/**
- * Workspace model for EditorX (path can be a folder or virtual workspace).
- */
-interface WorkspaceManager {
-    fun getWorkspaceRoot(): File?
-    fun openWorkspace(root: File)
-    fun recentFiles(): List<File>
-    fun addRecentFile(file: File)
-    fun recentWorkspaces(): List<File>
-    fun addRecentWorkspace(workspace: File)
-}
-
-class DefaultWorkspaceManager(private val settings: Store) : editorx.core.workspace.WorkspaceManager {
+class DefaultWorkspace(private val settings: Store) : Workspace {
     private var root: File? = null
 
     override fun getWorkspaceRoot(): File? = root

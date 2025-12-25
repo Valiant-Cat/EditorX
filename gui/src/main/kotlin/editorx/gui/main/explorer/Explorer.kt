@@ -4,8 +4,8 @@ import editorx.core.filetype.FileTypeRegistry
 import editorx.core.util.IconRef
 import editorx.gui.main.MainWindow
 import editorx.core.service.DecompilerService
-import editorx.core.toolchain.ApkTool
-import editorx.core.toolchain.JadxTool
+import editorx.core.external.ApkTool
+import editorx.core.external.Jadx
 import editorx.core.util.IconLoader
 import editorx.core.util.IconUtils
 import java.awt.*
@@ -1193,14 +1193,14 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                     mapOf("cancelSignal" to { isTaskCancelled || Thread.currentThread().isInterrupted })
                 )
             } else {
-                val fallback = JadxTool.decompile(apkFile, outputDir) {
+                val fallback = Jadx.decompile(apkFile, outputDir) {
                     isTaskCancelled || Thread.currentThread().isInterrupted
                 }
                 when (fallback.status) {
-                    JadxTool.Status.SUCCESS -> DecompilerService.DecompileResult(true, outputDir = outputDir)
-                    JadxTool.Status.CANCELLED -> DecompilerService.DecompileResult(false, "cancelled")
-                    JadxTool.Status.NOT_FOUND -> DecompilerService.DecompileResult(false, "jadx not found")
-                    JadxTool.Status.FAILED -> DecompilerService.DecompileResult(false, fallback.output)
+                    Jadx.Status.SUCCESS -> DecompilerService.DecompileResult(true, outputDir = outputDir)
+                    Jadx.Status.CANCELLED -> DecompilerService.DecompileResult(false, "cancelled")
+                    Jadx.Status.NOT_FOUND -> DecompilerService.DecompileResult(false, "jadx not found")
+                    Jadx.Status.FAILED -> DecompilerService.DecompileResult(false, fallback.output)
                 }
             }
 

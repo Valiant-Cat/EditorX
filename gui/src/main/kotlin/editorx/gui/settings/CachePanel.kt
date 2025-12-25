@@ -18,7 +18,7 @@ class CachePanel(private val guiEnv: GuiContext) : JPanel(BorderLayout()) {
     private data class CacheEntry(val name: String, val nameEn: String, val dir: File, val desc: String, val descEn: String)
 
     private val entries: List<CacheEntry> by lazy {
-        val base = guiEnv.appDirectory()
+        val base = guiEnv.appDir
         listOf(
             CacheEntry("缓存内容", "Cache", File(base, "cache"), "工作区与插件生成缓存", "Workspace and plugin caches"),
             CacheEntry("日志文件", "Logs", File(base, "logs"), "运行日志，便于排查问题", "Runtime logs for troubleshooting"),

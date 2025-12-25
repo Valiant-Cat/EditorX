@@ -8,13 +8,12 @@ import editorx.core.filetype.SyntaxHighlighter
 import editorx.core.filetype.SyntaxHighlighterRegistry
 import editorx.core.filetype.Language
 import editorx.core.gui.GuiContext
-import editorx.core.plugin.PluginContext
-import editorx.core.plugin.gui.PluginGuiContext
+import editorx.core.plugin.gui.PluginGuiClient
 
 class PluginGuiContextImpl(
     private val pluginId: String,
     private val guiContext: GuiContext
-) : PluginGuiContext {
+) : PluginGuiClient {
 
     override fun getWorkspaceRoot(): java.io.File? {
         return guiContext.workspace.getWorkspaceRoot()

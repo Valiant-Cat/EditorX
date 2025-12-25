@@ -2,8 +2,8 @@ package editorx.gui.main.editor
 
 import editorx.core.filetype.FileTypeRegistry
 import editorx.core.filetype.FormatterRegistry
-import editorx.core.toolchain.JadxTool
-import editorx.core.toolchain.SmaliTool
+import editorx.core.external.Jadx
+import editorx.core.external.Smali
 import editorx.gui.core.ui.ThemeManager
 import editorx.gui.main.MainWindow
 import editorx.gui.main.explorer.ExplorerIcons
@@ -2512,14 +2512,14 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             logger.info("开始实时反编译 smali 文件: ${smaliFile.absolutePath}")
             
             // 检查 jadx 和 smali 工具是否可用
-            val jadxPath = JadxTool.locate()
+            val jadxPath = Jadx.locate()
             if (jadxPath == null) {
                 logger.warn("JADX 工具未找到，跳过实时反编译")
                 return null
             }
             logger.info("找到 JADX 工具: $jadxPath")
             
-            val smaliPath = SmaliTool.locate()
+            val smaliPath = Smali.locate()
             if (smaliPath == null) {
                 logger.warn("smali 工具未找到，尝试使用完整 DEX 文件反编译")
                 // 回退到使用完整 DEX 文件的方式
@@ -2548,9 +2548,9 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             System.out.println("输入文件: ${smaliFile.absolutePath}")
             System.out.println("输出文件: ${tempDexFile.absolutePath}")
             
-            val assembleResult = SmaliTool.assemble(smaliFile, tempDexFile)
+            val assembleResult = Smali.assemble(smaliFile, tempDexFile)
             
-            if (assembleResult.status != SmaliTool.Status.SUCCESS) {
+            if (assembleResult.status != Smali.Status.SUCCESS) {
                 logger.error("smali 编译失败 (status=${assembleResult.status}, exitCode=${assembleResult.exitCode})")
                 logger.error("smali 编译错误输出: ${assembleResult.output}")
                 System.err.println("=== SMALI 编译失败 ===")
@@ -2575,9 +2575,9 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             // 步骤2: 使用 JADX 反编译 DEX 文件
             val jadxOutputDir = File(tempDir, "jadx_output")
             logger.debug("使用 JADX 反编译 DEX: ${tempDexFile.absolutePath} -> ${jadxOutputDir.absolutePath}")
-            val decompileResult = JadxTool.decompile(tempDexFile, jadxOutputDir)
+            val decompileResult = Jadx.decompile(tempDexFile, jadxOutputDir)
             
-            if (decompileResult.status != JadxTool.Status.SUCCESS) {
+            if (decompileResult.status != Jadx.Status.SUCCESS) {
                 logger.warn("JADX 反编译失败: ${decompileResult.output}")
                 tempDir.deleteRecursively()
                 return null
@@ -2642,8 +2642,8 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             val tempDir = Files.createTempDirectory("jadx_decompile_").toFile()
             tempDir.deleteOnExit()
             
-            val result = JadxTool.decompile(dexFile, tempDir)
-            if (result.status != JadxTool.Status.SUCCESS) {
+            val result = Jadx.decompile(dexFile, tempDir)
+            if (result.status != Jadx.Status.SUCCESS) {
                 tempDir.deleteRecursively()
                 return null
             }

@@ -1,7 +1,7 @@
 package editorx.gui.main.toolbar
 
 import editorx.core.i18n.I18n
-import editorx.core.toolchain.ApkTool
+import editorx.core.external.ApkTool
 import editorx.core.util.IconLoader
 import editorx.core.util.IconRef
 import editorx.gui.main.MainWindow

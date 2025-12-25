@@ -1,4 +1,4 @@
-package editorx.core.toolchain
+package editorx.core.external
 
 import java.io.File
 import java.nio.file.Files
@@ -7,7 +7,7 @@ import java.nio.file.Files
  * 对 smali 工具的封装：负责定位可执行文件并提供 smali 文件编译能力。
  * 用于将单个 smali 文件编译成 DEX，然后可以用 jadx 反编译为 Java。
  */
-object SmaliTool {
+object Smali {
     enum class Status { SUCCESS, FAILED, NOT_FOUND, CANCELLED }
 
     data class RunResult(val status: Status, val exitCode: Int, val output: String)
@@ -64,7 +64,7 @@ object SmaliTool {
                 val jarDir = jarFile.parentFile
                 val libDir = File(jarDir, "lib")
 
-                val logger = org.slf4j.LoggerFactory.getLogger(SmaliTool::class.java)
+                val logger = org.slf4j.LoggerFactory.getLogger(Smali::class.java)
                 logger.info("smali.jar 路径: $smaliPath")
                 logger.info("jar 目录: ${jarDir.absolutePath}")
                 logger.info("lib 目录: ${libDir.absolutePath}, 存在: ${libDir.exists()}, 是目录: ${libDir.isDirectory}")
@@ -86,7 +86,7 @@ object SmaliTool {
                     logger.warn("lib 目录不存在，只使用 smali.jar")
                     smaliPath
                 }
-                
+
                 System.out.println("=== SMALI 工具信息 ===")
                 System.out.println("smali.jar: $smaliPath")
                 System.out.println("lib 目录: ${libDir.absolutePath} (存在: ${libDir.exists()})")

@@ -1,15 +1,11 @@
-package editorx.core.toolchain
+package editorx.core.external
 
 import java.io.File
 
 /**
- * 对 JADX CLI 的封装：负责定位可执行文件并提供 Java 源码反编译能力。
- *
- * 说明：
- * - 当前实现基于命令行工具（jadx），未嵌入 jadx-core。
- * - 若机器未安装 jadx，可将可执行文件放到项目 `toolchain/jadx/` 或 `tools/jadx` 下。
+ * 对 apktool 的封装，负责定位可执行文件并提供编译/反编译能力。
  */
-object JadxTool {
+object ApkTool {
     enum class Status { SUCCESS, FAILED, NOT_FOUND, CANCELLED }
 
     data class RunResult(val status: Status, val exitCode: Int, val output: String)
@@ -19,24 +15,34 @@ object JadxTool {
 
     fun locate(): String? {
         cachedPath?.let { return it }
-        val resolved = computeJadxPath()
+        val resolved = computeApktoolPath()
         cachedPath = resolved
         return resolved
     }
 
+    fun build(workspaceRoot: File, outputApk: File, cancelSignal: (() -> Boolean)? = null): RunResult {
+        val executable = locate() ?: return RunResult(Status.NOT_FOUND, -1, "apktool not found")
+        val command = listOf(executable, "b", workspaceRoot.absolutePath, "-o", outputApk.absolutePath)
+        return run(command, workspaceRoot, cancelSignal)
+    }
+
     fun decompile(
-        inputFile: File,
+        apkFile: File,
         outputDir: File,
-        cancelSignal: (() -> Boolean)? = null,
+        force: Boolean = true,
+        cancelSignal: (() -> Boolean)? = null
     ): RunResult {
-        val executable = locate() ?: return RunResult(Status.NOT_FOUND, -1, "jadx not found")
-        val command = listOf(
+        val executable = locate() ?: return RunResult(Status.NOT_FOUND, -1, "apktool not found")
+        val command = mutableListOf(
             executable,
-            "-d",
-            outputDir.absolutePath,
-            inputFile.absolutePath,
+            "d",
+            apkFile.absolutePath,
+            "-o",
+            outputDir.absolutePath
         )
-        return run(command, inputFile.parentFile, cancelSignal)
+        if (force) command += "-f"
+        val workingDir = apkFile.parentFile
+        return run(command, workingDir, cancelSignal)
     }
 
     private fun run(command: List<String>, workingDir: File?, cancelSignal: (() -> Boolean)?): RunResult {
@@ -46,7 +52,7 @@ object JadxTool {
         val process = try {
             pb.start()
         } catch (e: Exception) {
-            return RunResult(Status.FAILED, -1, e.message ?: "failed to start jadx")
+            return RunResult(Status.FAILED, -1, e.message ?: "failed to start apktool")
         }
 
         while (true) {
@@ -67,27 +73,29 @@ object JadxTool {
         }
     }
 
-    private fun computeJadxPath(): String? {
+    private fun computeApktoolPath(): String? {
         val projectRoot = File(System.getProperty("user.dir"))
 
-        locateExecutable(File(projectRoot, "toolchain/jadx"), "jadx")?.let { return it }
+        locateExecutable(File(projectRoot, "toolchain/apktool"), "apktool")?.let { return it }
 
-        val legacy = File(projectRoot, "tools/jadx")
+        val legacy = File(projectRoot, "tools/apktool")
         if (legacy.exists() && ensureExecutable(legacy)) {
             return legacy.absolutePath
         }
 
         try {
-            val process = ProcessBuilder("jadx", "--version").start()
-            if (process.waitFor() == 0) return "jadx"
+            val process = ProcessBuilder("apktool", "--version").start()
+            if (process.waitFor() == 0) {
+                return "apktool"
+            }
         } catch (_: Exception) {
         }
 
         val commonPaths = listOf(
-            "/usr/local/bin/jadx",
-            "/opt/homebrew/bin/jadx",
-            "/usr/bin/jadx",
-            System.getProperty("user.home") + "/.local/bin/jadx",
+            "/usr/local/bin/apktool",
+            "/opt/homebrew/bin/apktool",
+            "/usr/bin/apktool",
+            System.getProperty("user.home") + "/.local/bin/apktool"
         )
         for (path in commonPaths) {
             val candidate = File(path)
@@ -104,7 +112,7 @@ object JadxTool {
             File(dir, baseName),
             File(dir, "$baseName.sh"),
             File(dir, "$baseName.bat"),
-            File(dir, "$baseName.cmd"),
+            File(dir, "$baseName.cmd")
         )
         for (candidate in candidates) {
             if (candidate.exists() && ensureExecutable(candidate)) {
@@ -120,4 +128,3 @@ object JadxTool {
         return file.setExecutable(true)
     }
 }
-
