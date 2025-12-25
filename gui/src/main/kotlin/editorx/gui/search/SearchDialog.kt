@@ -1,4 +1,4 @@
-package editorx.gui.main.search
+package editorx.gui.search
 
 import editorx.gui.core.ThemeManager
 import editorx.gui.main.MainWindow
@@ -35,7 +35,7 @@ import javax.swing.SwingWorker
  * 全局搜索弹窗（参考 IDEA 和 Jadx）
  * 支持按类型搜索：类、方法、字段、代码、资源
  */
-class GlobalSearchDialog(
+class SearchDialog(
     owner: java.awt.Window,
     private val mainWindow: MainWindow
 ) : JDialog(owner, "全局搜索", java.awt.Dialog.ModalityType.APPLICATION_MODAL) {
@@ -313,7 +313,7 @@ class GlobalSearchDialog(
 
             val costMs = System.currentTimeMillis() - startedAt
             val base = "完成：扫描 $filesScanned 个文件，找到 $matches 条结果，用时 ${costMs}ms"
-            return if (hitLimit) "$base（结果已达上限 $MAX_RESULTS）" else base
+            return if (hitLimit) "$base（结果已达上限 ${MAX_RESULTS}）" else base
         }
 
         override fun process(chunks: MutableList<SearchMatch>) {

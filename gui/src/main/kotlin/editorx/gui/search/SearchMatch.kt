@@ -1,4 +1,4 @@
-package editorx.gui.main.search
+package editorx.gui.search
 
 import java.io.File
 

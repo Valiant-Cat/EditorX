@@ -1,4 +1,4 @@
-package editorx.gui.main.search
+package editorx.gui.search
 
 import editorx.gui.core.ThemeManager
 import editorx.gui.main.MainWindow
@@ -291,7 +291,7 @@ class SearchView(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
 
             val costMs = System.currentTimeMillis() - startedAt
             val base = "完成：扫描 $filesScanned 个文件，找到 $matches 条结果，用时 ${costMs}ms"
-            return if (hitLimit) "$base（结果已达上限 $MAX_RESULTS）" else base
+            return if (hitLimit) "$base（结果已达上限 ${MAX_RESULTS}）" else base
         }
 
         override fun process(chunks: MutableList<SearchMatch>) {

@@ -7,7 +7,7 @@ import editorx.core.util.IconRef
 import editorx.gui.main.MainWindow
 import editorx.gui.main.explorer.Explorer
 import editorx.gui.main.navigationbar.NavigationBar
-import editorx.gui.main.search.GlobalSearchDialog
+import editorx.gui.search.SearchDialog
 import editorx.gui.settings.SettingsDialog
 import org.slf4j.LoggerFactory
 import java.awt.*
@@ -502,7 +502,7 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
     }
 
     private fun showGlobalSearch() {
-        val dialog = GlobalSearchDialog(SwingUtilities.getWindowAncestor(this), mainWindow)
+        val dialog = SearchDialog(SwingUtilities.getWindowAncestor(this), mainWindow)
         dialog.showDialog()
     }
 

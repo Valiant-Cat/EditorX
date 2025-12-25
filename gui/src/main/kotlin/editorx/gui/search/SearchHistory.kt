@@ -1,4 +1,4 @@
-package editorx.gui.main.search
+package editorx.gui.search
 
 /**
  * 内存中的简单搜索历史，记录最近使用的查询并避免重复。

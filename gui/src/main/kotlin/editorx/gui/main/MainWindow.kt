@@ -20,7 +20,7 @@ import javax.swing.JFileChooser
 import javax.swing.JFrame
 import javax.swing.JSplitPane
 import javax.swing.SwingUtilities
-import editorx.gui.main.search.GlobalSearchDialog
+import editorx.gui.search.SearchDialog
 
 class MainWindow(val guiContext: GuiContext) : JFrame() {
 
@@ -298,7 +298,7 @@ class MainWindow(val guiContext: GuiContext) : JFrame() {
      * 显示全局搜索对话框
      */
     fun showGlobalSearch() {
-        val dialog = GlobalSearchDialog(this, this)
+        val dialog = SearchDialog(this, this)
         dialog.showDialog()
     }
     
