@@ -1,13 +1,14 @@
 package editorx.gui
 
 import com.formdev.flatlaf.FlatLightLaf
+import editorx.core.gui.GuiContext
 import editorx.core.plugin.PluginManager
 import editorx.core.plugin.loader.PluginLoaderImpl
 import editorx.core.settings.SettingsStore
 import editorx.core.util.StartupTimer
 import editorx.gui.core.ui.ThemeManager
 import editorx.gui.main.MainWindow
-import editorx.gui.plugin.GuiContextImpl
+import editorx.gui.plugin.PluginGuiClientImpl
 import java.io.File
 import java.util.Locale
 import javax.swing.SwingUtilities
@@ -104,7 +105,7 @@ private fun initializeApplication(timer: StartupTimer) {
 
 private fun initializeMainWindow(startupTimer: StartupTimer) {
     val appDir = File(System.getProperty("user.home"), ".editorx")
-    val environment = GuiEnvironment(appDir)
+    val environment = GuiContext(appDir)
     val disabled = loadDisabledSet(environment.settings)
     startupTimer.mark("environment.ready")
 
@@ -135,8 +136,8 @@ private fun initializeMainWindow(startupTimer: StartupTimer) {
     val pluginManager = PluginManager()
     pluginManager.setInitialDisabled(disabled)
     pluginManager.registerContextInitializer { pluginContext ->
-        val guiContext = GuiContextImpl(mv, pluginContext)
-        pluginContext.setGuiContext(guiContext)
+        val guiEnvironment = PluginGuiClientImpl(mv, pluginContext)
+        pluginContext.setGuiClient(guiEnvironment)
     }
     mv.pluginManager = pluginManager
     val loadLogger = LoggerFactory.getLogger("StartupTimer")

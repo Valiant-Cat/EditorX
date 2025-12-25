@@ -12,7 +12,7 @@ class AndroidArchivePlugin : Plugin {
     )
 
     override fun activate(pluginContext: PluginContext) {
-        pluginContext.gui()?.registerFileType(AndroidArchiveFileType)
+        pluginContext.guiClient()?.registerFileType(AndroidArchiveFileType)
     }
 }
 

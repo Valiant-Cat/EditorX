@@ -37,7 +37,7 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
     }
     
     private fun debugRecentWorkspaces() {
-        val workspaces = mainWindow.guiControl.workspace.recentWorkspaces()
+        val workspaces = mainWindow.guiContext.workspace.recentWorkspaces()
         println("Debug: recentWorkspaces count = ${workspaces.size}")
         workspaces.forEachIndexed { idx, file ->
             println("  [$idx] ${file.absolutePath} (exists=${file.exists()}, isDirectory=${file.isDirectory})")
@@ -235,7 +235,7 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
         }
         headerPanel.add(titleLabel, BorderLayout.WEST)
         
-        val recentWorkspaces = mainWindow.guiControl.workspace.recentWorkspaces()
+        val recentWorkspaces = mainWindow.guiContext.workspace.recentWorkspaces()
         // Debug: 打印最近项目信息
         if (recentWorkspaces.isNotEmpty()) {
             println("WelcomeView: Found ${recentWorkspaces.size} recent workspaces")
@@ -396,11 +396,11 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
     }
     
     private fun removeRecentWorkspace(workspace: File) {
-        val settings = mainWindow.guiControl.settings
+        val settings = mainWindow.guiContext.settings
         val workspacePath = workspace.absolutePath
         
         // 获取所有最近项目，移除指定的项目
-        val allWorkspaces = mainWindow.guiControl.workspace.recentWorkspaces().toMutableList()
+        val allWorkspaces = mainWindow.guiContext.workspace.recentWorkspaces().toMutableList()
         allWorkspaces.removeAll { it.absolutePath == workspacePath }
         
         // 清除所有旧的键
@@ -428,7 +428,7 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
             val selectedFile = File(dir, fileName)
             if (selectedFile.isFile && selectedFile.canRead()) {
                 mainWindow.editor.openFile(selectedFile)
-                mainWindow.guiControl.workspace.addRecentFile(selectedFile)
+                mainWindow.guiContext.workspace.addRecentFile(selectedFile)
                 mainWindow.editor.showEditorContent()
             }
         }
@@ -469,8 +469,8 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
     }
     
     private fun openWorkspace(workspace: File) {
-        mainWindow.guiControl.workspace.openWorkspace(workspace)
-        mainWindow.guiControl.workspace.addRecentWorkspace(workspace)
+        mainWindow.guiContext.workspace.openWorkspace(workspace)
+        mainWindow.guiContext.workspace.addRecentWorkspace(workspace)
         (mainWindow.sideBar.getView("explorer") as? editorx.gui.main.explorer.Explorer)?.refreshRoot()
         mainWindow.toolBar.updateVcsDisplay()
         // 自动打开资源管理器

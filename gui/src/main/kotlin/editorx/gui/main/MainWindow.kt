@@ -1,6 +1,6 @@
 package editorx.gui.main
 
-import editorx.gui.GuiEnvironment
+import editorx.core.gui.GuiContext
 import editorx.gui.main.editor.Editor
 import editorx.gui.main.explorer.Explorer
 import editorx.gui.main.menubar.MenuBar
@@ -12,7 +12,6 @@ import editorx.core.plugin.PluginState
 import editorx.gui.util.NoLineSplitPaneUI
 import java.awt.BorderLayout
 import java.awt.Dimension
-import java.awt.event.KeyAdapter
 import java.awt.event.KeyEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseMotionAdapter
@@ -23,7 +22,7 @@ import javax.swing.JSplitPane
 import javax.swing.SwingUtilities
 import editorx.gui.main.search.GlobalSearchDialog
 
-class MainWindow(val guiControl: GuiEnvironment) : JFrame() {
+class MainWindow(val guiContext: GuiContext) : JFrame() {
 
     // UI 组件
     val titleBar by lazy { MenuBar(this) }
@@ -262,7 +261,7 @@ class MainWindow(val guiControl: GuiEnvironment) : JFrame() {
         if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
             val file: File = chooser.selectedFile
             editor.openFile(file)
-            guiControl.workspace.addRecentFile(file)
+            guiContext.workspace.addRecentFile(file)
         }
     }
 

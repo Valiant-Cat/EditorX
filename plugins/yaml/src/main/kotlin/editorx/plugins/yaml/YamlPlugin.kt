@@ -14,6 +14,6 @@ class YamlPlugin : Plugin {
     )
 
     override fun activate(pluginContext: PluginContext) {
-        pluginContext.gui()?.registerFileType(YamlFileType)
+        pluginContext.guiClient()?.registerFileType(YamlFileType)
     }
 }

@@ -3,11 +3,10 @@ package editorx.core.plugin.gui
 import editorx.core.filetype.FileType
 import editorx.core.filetype.Formatter
 import editorx.core.filetype.SyntaxHighlighter
-import editorx.core.gui.GuiViewProvider
 import editorx.core.lang.Language
 import java.io.File
 
-interface GuiContext {
+interface PluginGuiClient {
 
     /**
      * 获取工作区根目录

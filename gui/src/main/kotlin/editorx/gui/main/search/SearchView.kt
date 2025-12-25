@@ -231,7 +231,7 @@ class SearchView(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         statusLabel.text = if (root == null) "未打开工作区：只能使用 Ctrl+F 进行文件内查找" else "在工作区内搜索文件内容"
     }
 
-    private fun workspaceRoot(): File? = mainWindow.guiControl.workspace.getWorkspaceRoot()
+    private fun workspaceRoot(): File? = mainWindow.guiContext.workspace.getWorkspaceRoot()
 
     private data class SearchOptions(
         val query: String,

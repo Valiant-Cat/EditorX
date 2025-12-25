@@ -254,7 +254,7 @@ class GlobalSearchDialog(
         dispose()
     }
 
-    private fun workspaceRoot(): File? = mainWindow.guiControl.workspace.getWorkspaceRoot()
+    private fun workspaceRoot(): File? = mainWindow.guiContext.workspace.getWorkspaceRoot()
 
     private fun updateStatusIdle() {
         statusLabel.text = "输入搜索内容并按 Enter 或点击搜索按钮"

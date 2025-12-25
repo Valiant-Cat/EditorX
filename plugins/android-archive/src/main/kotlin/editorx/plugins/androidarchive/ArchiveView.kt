@@ -10,7 +10,6 @@ import java.util.zip.ZipFile
 import javax.swing.*
 import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeModel
-import javax.swing.tree.TreePath
 
 /**
  * 压缩包浏览器视图
@@ -124,7 +123,7 @@ class ArchiveView(private val archiveFile: File, private val mainWindow: MainWin
                 tempFile.deleteOnExit()
                 
                 SwingUtilities.invokeLater {
-                    mainWindow.guiControl.editor.openFile(tempFile)
+                    mainWindow.guiContext.editor.openFile(tempFile)
                 }
             } catch (e: Exception) {
                 SwingUtilities.invokeLater {

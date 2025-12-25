@@ -1,6 +1,6 @@
 package editorx.gui.settings
 
-import editorx.gui.GuiEnvironment
+import editorx.core.gui.GuiContext
 import java.awt.BorderLayout
 import java.awt.FlowLayout
 import java.io.File
@@ -14,7 +14,7 @@ import javax.swing.JTable
 import javax.swing.ListSelectionModel
 import javax.swing.table.AbstractTableModel
 
-class CachePanel(private val guiEnv: GuiEnvironment) : JPanel(BorderLayout()) {
+class CachePanel(private val guiEnv: GuiContext) : JPanel(BorderLayout()) {
     private data class CacheEntry(val name: String, val nameEn: String, val dir: File, val desc: String, val descEn: String)
 
     private val entries: List<CacheEntry> by lazy {

@@ -95,7 +95,7 @@ class PluginManager {
     }
 
     /**
-     * 注册插件上下文初始化器（例如 GUI 层为插件注入 GuiContext）。
+     * 注册插件上下文初始化器（例如 GUI 层为插件注入 GuiEnvironment）。
      * 会对“已加载”的插件立即执行一次。
      */
     fun registerContextInitializer(initializer: (PluginContextImpl) -> Unit) {

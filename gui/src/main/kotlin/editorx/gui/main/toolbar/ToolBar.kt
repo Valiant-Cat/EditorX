@@ -157,7 +157,7 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
     fun updateVcsDisplay() {
         val label = vcsWidgetLabel ?: return
         val iconLabel = vcsWidgetIconLabel ?: return
-        val workspaceRoot = mainWindow.guiControl.workspace.getWorkspaceRoot()
+        val workspaceRoot = mainWindow.guiContext.workspace.getWorkspaceRoot()
 
         label.text = "版本控制"
         iconLabel.icon = null
@@ -273,7 +273,7 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
      * 显示 VCS 弹出菜单（点击 VCS Widget 时）
      */
     private fun showVcsPopupMenu(invoker: java.awt.Component) {
-        val workspaceRoot = mainWindow.guiControl.workspace.getWorkspaceRoot()
+        val workspaceRoot = mainWindow.guiContext.workspace.getWorkspaceRoot()
         val popupMenu = JPopupMenu()
 
         if (workspaceRoot != null && workspaceRoot.exists()) {
@@ -459,8 +459,8 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
         }
         if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
             val selected = chooser.selectedFile
-            mainWindow.guiControl.workspace.openWorkspace(selected)
-            mainWindow.guiControl.workspace.addRecentWorkspace(selected)
+            mainWindow.guiContext.workspace.openWorkspace(selected)
+            mainWindow.guiContext.workspace.addRecentWorkspace(selected)
             (mainWindow.sideBar.getView("explorer") as? Explorer)?.refreshRoot()
             updateProjectDisplay()
             mainWindow.editor.showEditorContent()
@@ -498,7 +498,7 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
             JOptionPane.showMessageDialog(this, "插件系统尚未初始化", "提示", JOptionPane.INFORMATION_MESSAGE)
             return
         }
-        SettingsDialog(mainWindow, mainWindow.guiControl, pm, SettingsDialog.Section.APPEARANCE).isVisible = true
+        SettingsDialog(mainWindow, mainWindow.guiContext, pm, SettingsDialog.Section.APPEARANCE).isVisible = true
     }
 
     private fun showGlobalSearch() {
@@ -529,7 +529,7 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
             return
         }
 
-        val workspaceRoot = mainWindow.guiControl.workspace.getWorkspaceRoot()
+        val workspaceRoot = mainWindow.guiContext.workspace.getWorkspaceRoot()
         if (workspaceRoot == null) {
             JOptionPane.showMessageDialog(mainWindow, "尚未打开工作区", "提示", JOptionPane.INFORMATION_MESSAGE)
             return
@@ -772,7 +772,7 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
      * 跳转到 AndroidManifest.xml
      */
     private fun navigateToAndroidManifest() {
-        val workspaceRoot = mainWindow.guiControl.workspace.getWorkspaceRoot()
+        val workspaceRoot = mainWindow.guiContext.workspace.getWorkspaceRoot()
         if (workspaceRoot == null) {
             JOptionPane.showMessageDialog(mainWindow, "尚未打开工作区", "提示", JOptionPane.INFORMATION_MESSAGE)
             return
@@ -796,7 +796,7 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
      * 跳转到 MainActivity
      */
     private fun navigateToMainActivity() {
-        val workspaceRoot = mainWindow.guiControl.workspace.getWorkspaceRoot()
+        val workspaceRoot = mainWindow.guiContext.workspace.getWorkspaceRoot()
         if (workspaceRoot == null) {
             JOptionPane.showMessageDialog(mainWindow, "尚未打开工作区", "提示", JOptionPane.INFORMATION_MESSAGE)
             return
@@ -853,7 +853,7 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
      * 跳转到 Application
      */
     private fun navigateToApplication() {
-        val workspaceRoot = mainWindow.guiControl.workspace.getWorkspaceRoot()
+        val workspaceRoot = mainWindow.guiContext.workspace.getWorkspaceRoot()
         if (workspaceRoot == null) {
             JOptionPane.showMessageDialog(mainWindow, "尚未打开工作区", "提示", JOptionPane.INFORMATION_MESSAGE)
             return

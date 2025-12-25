@@ -292,7 +292,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
     
     private fun updateEditorContent() {
         removeAll()
-        val workspaceRoot = mainWindow.guiControl.workspace.getWorkspaceRoot()
+        val workspaceRoot = mainWindow.guiContext.workspace.getWorkspaceRoot()
         // 如果没有工作区且没有打开的标签页，显示欢迎界面
         if (workspaceRoot == null && tabbedPane.tabCount == 0) {
             welcomeView.refreshContent()
@@ -585,7 +585,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             textArea.text = Files.readString(file.toPath())
             textArea.discardAllEdits()
             mainWindow.statusBar.setFileInfo(file.name, Files.size(file.toPath()).toString() + " B")
-            mainWindow.guiControl.workspace.addRecentFile(file)
+            mainWindow.guiContext.workspace.addRecentFile(file)
 
             // 在文本加载完成后应用语法高亮
             SwingUtilities.invokeLater {
@@ -1150,7 +1150,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             dirtyTabs.remove(index)
             updateTabTitle(index)
             updateTabHeaderStyles()
-            mainWindow.guiControl.workspace.addRecentFile(newFile)
+            mainWindow.guiContext.workspace.addRecentFile(newFile)
             mainWindow.statusBar.updateNavigation(newFile)
             mainWindow.statusBar.showSuccess("已保存: ${newFile.name}")
             return true
@@ -1192,7 +1192,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             dirtyTabs.remove(idx)
             updateTabTitle(idx)
             updateTabHeaderStyles()
-            mainWindow.guiControl.workspace.addRecentFile(file)
+            mainWindow.guiContext.workspace.addRecentFile(file)
             mainWindow.statusBar.updateNavigation(file)
             mainWindow.statusBar.showSuccess("已保存: ${file.name}")
         }

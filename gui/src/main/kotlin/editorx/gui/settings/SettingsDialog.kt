@@ -2,7 +2,7 @@ package editorx.gui.settings
 
 import editorx.core.i18n.I18n
 import editorx.core.plugin.PluginManager
-import editorx.gui.GuiEnvironment
+import editorx.core.gui.GuiContext
 import editorx.gui.main.MainWindow
 import java.awt.BorderLayout
 import java.awt.CardLayout
@@ -25,11 +25,10 @@ import javax.swing.JSplitPane
 import javax.swing.ListSelectionModel
 import javax.swing.SwingUtilities
 import javax.swing.WindowConstants
-import kotlin.collections.asSequence
 
 class SettingsDialog(
     owner: MainWindow,
-    private val environment: GuiEnvironment,
+    private val environment: GuiContext,
     private val pluginManager: PluginManager,
     private val defaultSection: Section = Section.APPEARANCE,
 ) : JDialog(owner, if (isEnglish()) "Preferences" else "设置", true) {

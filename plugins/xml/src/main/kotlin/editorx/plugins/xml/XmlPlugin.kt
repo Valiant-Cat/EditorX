@@ -14,8 +14,8 @@ class XmlPlugin : Plugin {
     )
 
     override fun activate(pluginContext: PluginContext) {
-        pluginContext.gui()?.registerFileType(XmlFileType)
-        pluginContext.gui()?.registerFormatter(XmlLanguage, XmlFormatter)
+        pluginContext.guiClient()?.registerFileType(XmlFileType)
+        pluginContext.guiClient()?.registerFormatter(XmlLanguage, XmlFormatter)
     }
 }
 

@@ -32,7 +32,7 @@ class NavigationBar(private val mainWindow: MainWindow) : JPanel() {
 
     fun update(currentFile: File?) {
         crumbs.clear()
-        crumbs += buildCrumbs(mainWindow.guiControl.workspace.getWorkspaceRoot(), currentFile)
+        crumbs += buildCrumbs(mainWindow.guiContext.workspace.getWorkspaceRoot(), currentFile)
 
         removeAll()
         if (crumbs.isEmpty()) {
@@ -165,7 +165,7 @@ class NavigationBar(private val mainWindow: MainWindow) : JPanel() {
             })
             menu.add(JMenuItem("设为工作区根目录").apply {
                 addActionListener {
-                    mainWindow.guiControl.workspace.openWorkspace(file)
+                    mainWindow.guiContext.workspace.openWorkspace(file)
                     update(null)
                     (mainWindow.sideBar.getView("explorer") as? Explorer)?.refreshRoot()
                     mainWindow.toolBar.updateProjectDisplay()

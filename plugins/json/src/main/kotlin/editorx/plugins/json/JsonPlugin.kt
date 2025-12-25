@@ -12,8 +12,8 @@ class JsonPlugin : Plugin {
     )
 
     override fun activate(pluginContext: PluginContext) {
-        pluginContext.gui()?.registerFileType(JsonFIleType)
-        pluginContext.gui()?.registerFormatter(JsonLanguage, JsonFormatter)
+        pluginContext.guiClient()?.registerFileType(JsonFIleType)
+        pluginContext.guiClient()?.registerFormatter(JsonLanguage, JsonFormatter)
     }
 }
 
