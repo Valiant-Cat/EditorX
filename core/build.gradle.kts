@@ -3,6 +3,8 @@ plugins {
 }
 
 dependencies {
+    implementation(project(":i18n-keys"))
+    
     implementation("com.fifesoft:rsyntaxtextarea:3.4.0")
     implementation("com.formdev:flatlaf:3.4")
     implementation("com.formdev:flatlaf-extras:3.4")

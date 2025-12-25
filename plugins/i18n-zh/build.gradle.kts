@@ -6,5 +6,6 @@ repositories { mavenCentral() }
 
 dependencies {
     implementation(project(":core"))
+    implementation(project(":i18n-keys"))
 }
 

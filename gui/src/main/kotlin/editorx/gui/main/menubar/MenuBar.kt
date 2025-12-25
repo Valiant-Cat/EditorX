@@ -1,6 +1,7 @@
 package editorx.gui.main.menubar
 
 import editorx.core.i18n.I18n
+import editorx.core.i18n.I18nKeys
 import editorx.gui.main.MainWindow
 import editorx.gui.main.explorer.Explorer
 import java.awt.event.InputEvent
@@ -33,39 +34,39 @@ class MenuBar(private val mainWindow: MainWindow) : JMenuBar() {
 
     private fun createFileMenu(): JMenu {
         val shortcut = java.awt.Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx
-        return JMenu(I18n.translate("menu.file")).apply {
+        return JMenu(I18n.translate(I18nKeys.Menu.FILE)).apply {
             mnemonic = KeyEvent.VK_F
 
-            add(JMenuItem(I18n.translate("action.openFile")).apply {
+            add(JMenuItem(I18n.translate(I18nKeys.Action.OPEN_FILE)).apply {
                 mnemonic = KeyEvent.VK_O
                 accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_O, shortcut)
                 addActionListener { mainWindow.openFileChooserAndOpen() }
             })
-            add(JMenuItem(I18n.translate("action.openFolder")).apply {
+            add(JMenuItem(I18n.translate(I18nKeys.Action.OPEN_FOLDER)).apply {
                 mnemonic = KeyEvent.VK_D
                 accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_D, shortcut)
                 addActionListener { openFolder() }
             })
 
-            add(JMenu(I18n.translate("action.recent")).apply {
+            add(JMenu(I18n.translate(I18nKeys.Action.RECENT)).apply {
                 addMenuListener(RecentFilesMenuListener(this, mainWindow))
             })
 
             addSeparator()
 
-            add(JMenuItem(I18n.translate("action.save")).apply {
+            add(JMenuItem(I18n.translate(I18nKeys.Action.SAVE)).apply {
                 mnemonic = KeyEvent.VK_S
                 accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_S, shortcut)
                 addActionListener { mainWindow.editor.saveCurrent() }
             })
-            add(JMenuItem(I18n.translate("action.saveAs")).apply {
+            add(JMenuItem(I18n.translate(I18nKeys.Action.SAVE_AS)).apply {
                 accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_S, shortcut or InputEvent.SHIFT_DOWN_MASK)
                 addActionListener { mainWindow.editor.saveCurrentAs() }
             })
 
             addSeparator()
 
-            add(JMenuItem(I18n.translate("action.exit")).apply {
+            add(JMenuItem(I18n.translate(I18nKeys.Action.EXIT)).apply {
                 mnemonic = KeyEvent.VK_X
                 accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_Q, shortcut)
                 addActionListener { System.exit(0) }
@@ -74,7 +75,7 @@ class MenuBar(private val mainWindow: MainWindow) : JMenuBar() {
     }
 
     private fun createEditMenu(): JMenu {
-        return JMenu(I18n.translate("menu.edit")).apply {
+        return JMenu(I18n.translate(I18nKeys.Menu.EDIT)).apply {
             val shortcut = java.awt.Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx
             mnemonic = KeyEvent.VK_E
 
@@ -91,12 +92,12 @@ class MenuBar(private val mainWindow: MainWindow) : JMenuBar() {
 
             addSeparator()
 
-            add(JMenuItem(I18n.translate("action.find")).apply {
+            add(JMenuItem(I18n.translate(I18nKeys.Action.FIND)).apply {
                 mnemonic = KeyEvent.VK_F
                 accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_F, shortcut)
                 addActionListener { showFindDialog() }
             })
-            add(JMenuItem(I18n.translate("action.replace")).apply {
+            add(JMenuItem(I18n.translate(I18nKeys.Action.REPLACE)).apply {
                 mnemonic = KeyEvent.VK_R
                 accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_R, shortcut)
                 addActionListener { showReplaceDialog() }
@@ -105,14 +106,14 @@ class MenuBar(private val mainWindow: MainWindow) : JMenuBar() {
     }
 
     private fun createHelpMenu(): JMenu {
-        return JMenu(I18n.translate("menu.help")).apply {
+        return JMenu(I18n.translate(I18nKeys.Menu.HELP)).apply {
             mnemonic = KeyEvent.VK_H
 
-            add(JMenuItem(I18n.translate("action.about")).apply { addActionListener { showAbout() } })
+            add(JMenuItem(I18n.translate(I18nKeys.Action.ABOUT)).apply { addActionListener { showAbout() } })
 
             addSeparator()
 
-            add(JMenuItem(I18n.translate("action.help")).apply {
+            add(JMenuItem(I18n.translate(I18nKeys.Action.HELP)).apply {
                 mnemonic = KeyEvent.VK_F1
                 accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_F1, 0)
                 addActionListener { showHelp() }

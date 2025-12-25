@@ -19,6 +19,7 @@ rootProject.name = "EditorX"
 
 include(":core")
 include(":icons")
+include(":i18n-keys")
 include(":gui")
 include(":plugins:smali")
 include(":plugins:json")

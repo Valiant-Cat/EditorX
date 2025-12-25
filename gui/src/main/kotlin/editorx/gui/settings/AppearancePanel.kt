@@ -1,6 +1,7 @@
 package editorx.gui.settings
 
 import editorx.core.i18n.I18n
+import editorx.core.i18n.I18nKeys
 import editorx.core.store.Store
 import editorx.gui.core.Theme
 import editorx.gui.core.ThemeManager
@@ -71,9 +72,9 @@ class AppearancePanel(private val settings: Store) : JPanel(BorderLayout()) {
         updateLanguageButtons(currentLocale)
         
         // 更新界面文本
-        headerLabel.text = I18n.translate("settings.appearance")
-        languagePanel.border = BorderFactory.createTitledBorder(I18n.translate("settings.language"))
-        themePanel.border = BorderFactory.createTitledBorder(I18n.translate("settings.theme"))
+        headerLabel.text = I18n.translate(I18nKeys.Settings.APPEARANCE)
+        languagePanel.border = BorderFactory.createTitledBorder(I18n.translate(I18nKeys.Settings.LANGUAGE))
+        themePanel.border = BorderFactory.createTitledBorder(I18n.translate(I18nKeys.Settings.THEME))
         
         // 主题设置
         val currentTheme = ThemeManager.currentTheme
@@ -82,9 +83,9 @@ class AppearancePanel(private val settings: Store) : JPanel(BorderLayout()) {
             is Theme.Dark -> darkThemeButton.isSelected = true
         }
         
-        lightThemeButton.text = I18n.translate("theme.light")
-        darkThemeButton.text = I18n.translate("theme.dark")
-        footerLabel.text = I18n.translate("settings.appearance.tip")
+        lightThemeButton.text = I18n.translate(I18nKeys.Theme.LIGHT)
+        darkThemeButton.text = I18n.translate(I18nKeys.Theme.DARK)
+        footerLabel.text = I18n.translate(I18nKeys.Settings.APPEARANCE_TIP)
     }
 
     private fun updateLanguageButtons(currentLocale: Locale) {
@@ -120,7 +121,7 @@ class AppearancePanel(private val settings: Store) : JPanel(BorderLayout()) {
 
     private fun getLanguageDisplayName(locale: Locale): String {
         // 尝试从翻译中获取语言名称
-        val langKey = "lang.${locale.toLanguageTag()}"
+        val langKey = I18nKeys.Lang.forLocale(locale)
         
         val translated = I18n.translate(langKey)
         // 如果翻译返回的是 key 本身，使用 Locale 的显示名称（用当前界面语言显示）

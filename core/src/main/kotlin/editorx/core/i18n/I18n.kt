@@ -74,6 +74,16 @@ object I18n {
         return providers.keys.sortedWith(compareBy { it.toLanguageTag() })
     }
 
+    /**
+     * 获取指定语言的翻译提供器。
+     *
+     * @param locale 语言
+     * @return 翻译提供器，如果不存在则返回 null
+     */
+    internal fun getProvider(locale: Locale): TranslationProvider? {
+        return providers[locale]
+    }
+
     fun addListener(listener: () -> Unit) {
         listeners.add(listener)
     }
