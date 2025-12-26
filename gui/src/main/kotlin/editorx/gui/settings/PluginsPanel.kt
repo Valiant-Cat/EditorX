@@ -8,6 +8,7 @@ import editorx.core.plugin.PluginRecord
 import editorx.core.plugin.PluginState
 import editorx.core.plugin.loader.PluginLoaderImpl
 import editorx.core.store.Store
+import editorx.gui.ThemeManager
 import java.awt.BorderLayout
 import java.awt.Color
 import java.awt.Dimension
@@ -52,11 +53,25 @@ class PluginsPanel(
                 val record = value as? PluginRecord
                 comp.text = record?.let { "${it.name}  (${displayState(it)})" } ?: ""
                 comp.border = BorderFactory.createEmptyBorder(2, 8, 2, 8)
+                
+                // 应用主题颜色
+                val theme = ThemeManager.currentTheme
+                if (isSelected) {
+                    comp.background = theme.primaryContainer
+                    comp.foreground = theme.onPrimaryContainer
+                } else {
+                    comp.background = theme.surface
+                    comp.foreground = theme.onSurface
+                }
+                comp.isOpaque = true
+                
                 return comp
             }
         }
         addListSelectionListener { updateDetails(selectedRecord()) }
     }
+    private var pluginListScrollPane: JScrollPane? = null
+    private var centerPane: JPanel? = null
 
     private val detailName = JLabel().apply { font = font.deriveFont(java.awt.Font.BOLD, 16f) }
     private val detailId = JLabel()
@@ -68,9 +83,9 @@ class PluginsPanel(
         lineWrap = true
         wrapStyleWord = true
         border = BorderFactory.createEmptyBorder()
-        background = javax.swing.UIManager.getColor("Panel.background")
     }
     private val detailErrorLabel = JLabel()
+    private var detailPanel: JPanel? = null
 
     private val statusLabel = JLabel(" ").apply {
         border = BorderFactory.createEmptyBorder(6, 8, 6, 8)
@@ -115,20 +130,22 @@ class PluginsPanel(
             }
         })
 
-        val leftPane = JScrollPane(pluginList).apply {
+        pluginListScrollPane = JScrollPane(pluginList).apply {
             // 只设置最小宽度，不设置 preferredSize，让 JSplitPane 可以自由调整
             // 这样向左拖拽后，可以向右拖拽回来
             minimumSize = Dimension(200, 0)
             // 不设置 preferredSize，避免限制拖拽范围
-            border = BorderFactory.createMatteBorder(1, 1, 1, 1, Color(0xDD, 0xDD, 0xDD))
         }
+        val leftPane = pluginListScrollPane!!
 
         val actionRow = JPanel(FlowLayout(FlowLayout.LEFT, 8, 8)).apply {
+            isOpaque = false
             add(installBtn)
             add(openDirBtn)
         }
 
         val controlRow = JPanel(FlowLayout(FlowLayout.LEFT, 8, 0)).apply {
+            isOpaque = false
             border = BorderFactory.createEmptyBorder(12, 0, 8, 0)
             add(enableBtn)
             add(disableBtn)
@@ -136,21 +153,26 @@ class PluginsPanel(
         }
 
         val detailGrid = JPanel(java.awt.GridLayout(0, 1, 0, 6)).apply {
+            isOpaque = false
             add(detailId)
             add(detailVersion)
             add(detailOrigin)
             add(detailState)
         }
 
-        val detailPanel = JPanel(BorderLayout()).apply {
+        detailPanel = JPanel(BorderLayout()).apply {
             border = BorderFactory.createEmptyBorder(12, 20, 12, 12)
             add(detailName, BorderLayout.NORTH)
             add(
                 JPanel(BorderLayout()).apply {
+                    isOpaque = false
                     add(detailGrid, BorderLayout.NORTH)
                     val pathBlock = JPanel(BorderLayout()).apply {
+                        isOpaque = false
                         border = BorderFactory.createEmptyBorder(12, 0, 0, 0)
-                        add(JLabel("路径 / Path:"), BorderLayout.NORTH)
+                        add(JLabel("路径 / Path:").apply {
+                            foreground = ThemeManager.currentTheme.onSurface
+                        }, BorderLayout.NORTH)
                         add(detailPath, BorderLayout.CENTER)
                     }
                     add(pathBlock, BorderLayout.CENTER)
@@ -159,6 +181,7 @@ class PluginsPanel(
             )
             add(
                 JPanel(BorderLayout()).apply {
+                    isOpaque = false
                     add(
                         detailErrorLabel.apply { border = BorderFactory.createEmptyBorder(8, 0, 4, 0) },
                         BorderLayout.NORTH
@@ -169,8 +192,8 @@ class PluginsPanel(
             )
         }
 
-        val centerPane = JPanel(BorderLayout()).apply {
-            // 关键：显式设置右侧面板最小宽度，避免默认 minSize=preferredSize 随布局变大而“锁死”
+        centerPane = JPanel(BorderLayout()).apply {
+            // 关键：显式设置右侧面板最小宽度，避免默认 minSize=preferredSize 随布局变大而"锁死"
             // JSplitPane 的 maximumDividerLocation 依赖 rightComponent.minimumSize，
             // 如果它跟随当前宽度增长，就会出现向左拖后无法再向右拖回的问题。
             minimumSize = Dimension(0, 0)
@@ -214,7 +237,83 @@ class PluginsPanel(
         add(statusLabel, BorderLayout.SOUTH)
 
         pluginManager.addPluginStateListener(pluginStateListener)
+        
+        // 监听主题变更
+        ThemeManager.addThemeChangeListener { updateTheme() }
+        updateTheme()
+        
         refreshView()
+    }
+    
+    private fun updateTheme() {
+        val theme = ThemeManager.currentTheme
+        
+        // 更新面板背景
+        background = theme.surface
+        isOpaque = true
+        
+        // 更新 centerPane 背景（确保插件详情区域有正确的背景）
+        centerPane?.let { pane ->
+            pane.background = theme.surface
+            pane.isOpaque = true
+        }
+        
+        // 更新插件列表颜色
+        pluginList.background = theme.surface
+        pluginList.foreground = theme.onSurface
+        pluginList.selectionBackground = theme.primaryContainer
+        pluginList.selectionForeground = theme.onPrimaryContainer
+        
+        // 更新插件列表滚动面板颜色
+        pluginListScrollPane?.let { scroll ->
+            scroll.background = theme.surface
+            scroll.viewport.background = theme.surface
+            scroll.viewport.isOpaque = true
+            scroll.border = BorderFactory.createMatteBorder(1, 1, 1, 1, theme.outline)
+        }
+        
+        // 更新详情面板颜色
+        detailPanel?.let { panel ->
+            panel.background = theme.surface
+            panel.isOpaque = true
+        }
+        
+        detailName.foreground = theme.onSurface
+        detailId.foreground = theme.onSurface
+        detailVersion.foreground = theme.onSurface
+        detailOrigin.foreground = theme.onSurface
+        detailState.foreground = theme.onSurface
+        detailPath.background = theme.surface
+        detailPath.foreground = theme.onSurface
+        detailPath.isOpaque = true
+        detailErrorLabel.foreground = theme.error
+        
+        // 更新按钮颜色
+        installBtn.background = theme.surface
+        installBtn.foreground = theme.onSurface
+        installBtn.isOpaque = true
+        openDirBtn.background = theme.surface
+        openDirBtn.foreground = theme.onSurface
+        openDirBtn.isOpaque = true
+        enableBtn.background = theme.surface
+        enableBtn.foreground = theme.onSurface
+        enableBtn.isOpaque = true
+        disableBtn.background = theme.surface
+        disableBtn.foreground = theme.onSurface
+        disableBtn.isOpaque = true
+        uninstallBtn.background = theme.surface
+        uninstallBtn.foreground = theme.onSurface
+        uninstallBtn.isOpaque = true
+        
+        // 更新状态标签颜色
+        statusLabel.foreground = theme.onSurface
+        statusLabel.background = theme.surfaceVariant
+        statusLabel.isOpaque = true
+        
+        // 强制列表重新渲染
+        pluginList.repaint()
+        
+        repaint()
     }
 
     fun disposePanel() {
@@ -225,6 +324,7 @@ class PluginsPanel(
         applyTexts()
         reloadList()
         ensureSelection()
+        updateTheme()
     }
 
     /**

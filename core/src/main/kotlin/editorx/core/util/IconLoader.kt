@@ -59,8 +59,28 @@ object IconLoader {
         return null
     }
 
-    fun getIcon(iconRef: IconRef, size: Int = 16): Icon? {
-        return if (iconRef.isSvg) loadSvg(iconRef, size) else loadRaster(iconRef, size)
+    /**
+     * 加载图标
+     * @param iconRef 图标引用
+     * @param size 图标大小，默认为 16
+     * @param adaptToTheme 是否根据主题自适应颜色，默认为 false
+     * @param getThemeColor 获取主题颜色的函数，仅在 adaptToTheme=true 时使用
+     * @param getDisabledColor 获取禁用状态颜色的函数，仅在 adaptToTheme=true 时使用，如果为 null 则使用 getThemeColor
+     */
+    fun getIcon(
+        iconRef: IconRef, 
+        size: Int = 16,
+        adaptToTheme: Boolean = false,
+        getThemeColor: (() -> java.awt.Color)? = null,
+        getDisabledColor: (() -> java.awt.Color)? = null
+    ): Icon? {
+        val icon = if (iconRef.isSvg) loadSvg(iconRef, size) else loadRaster(iconRef, size)
+        
+        if (adaptToTheme && icon != null && getThemeColor != null) {
+            return ThemeAdaptiveIcon(icon, getThemeColor, getDisabledColor)
+        }
+        
+        return icon
     }
 
     private fun loadRaster(iconRef: IconRef, size: Int): Icon? {

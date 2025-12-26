@@ -143,6 +143,15 @@ abstract class SettingsPanel : JPanel(null) { // 使用 null layout 以便绝对
     }
     
     /**
+     * 清除指定的临时更改
+     */
+    protected fun clearPendingChange(key: String) {
+        pendingChanges.remove(key)
+        updateRevertButtonVisibility()
+        notifyDialogOfChanges()
+    }
+    
+    /**
      * 还原所有更改（由还原按钮调用）
      */
     protected open fun revertChanges() {

@@ -1,5 +1,6 @@
 package editorx.gui.widget
 
+import editorx.gui.ThemeManager
 import java.awt.*
 import javax.swing.BorderFactory
 import javax.swing.UIManager
@@ -19,8 +20,13 @@ class NoLineSplitPaneUI : BasicSplitPaneUI() {
             override fun paint(g: Graphics) {
                 val g2 = g.create() as Graphics2D
                 try {
-                    // 背景
-                    g2.color = splitPane.background
+                    // 背景：对于水平分割（SideBar），使用 SideBar 的背景色；其他情况使用 splitPane 的背景色
+                    val backgroundColor = if (orientation() == JSplitPane.HORIZONTAL_SPLIT) {
+                        ThemeManager.currentTheme.sidebarBackground
+                    } else {
+                        splitPane.background
+                    }
+                    g2.color = backgroundColor
                     g2.fillRect(0, 0, width, height)
 
                     // 三个圆点握柄（Material风格，细腻且低对比）

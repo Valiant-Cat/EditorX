@@ -4,6 +4,7 @@ import editorx.core.filetype.FileType
 import editorx.core.filetype.Formatter
 import editorx.core.filetype.Language
 import editorx.core.filetype.SyntaxHighlighter
+import java.awt.Color
 import java.io.File
 import javax.swing.Icon
 
@@ -54,6 +55,13 @@ interface PluginGuiProvider {
     fun addToolBarItem(id: String, icon: Icon?, text: String, action: () -> Unit)
 
     /**
+     * 设置 ToolBar 按钮的启用/禁用状态
+     * @param id 按钮的唯一标识符
+     * @param enabled 是否启用
+     */
+    fun setToolBarItemEnabled(id: String, enabled: Boolean)
+
+    /**
      * 注册文件类型
      */
     fun registerFileType(fileType: FileType)
@@ -73,4 +81,16 @@ interface PluginGuiProvider {
      * @param handler 文件处理器
      */
     fun registerFileHandler(handler: FileHandler)
+
+    /**
+     * 获取当前主题的文本颜色（用于图标等）
+     * @return 当前主题的文本颜色
+     */
+    fun getThemeTextColor(): Color
+
+    /**
+     * 获取当前主题的禁用状态文本颜色（用于禁用状态的图标等）
+     * @return 当前主题的禁用状态文本颜色
+     */
+    fun getThemeDisabledTextColor(): Color
 }

@@ -1,4 +1,4 @@
-package editorx.gui.main.welcome
+package editorx.gui.main.editor
 
 import editorx.core.i18n.I18n
 import editorx.core.i18n.I18nKeys
@@ -28,7 +28,7 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
 
     init {
         layout = BorderLayout()
-        background = ThemeManager.currentTheme.editorBackground
+        isOpaque = false // 透明背景
         updateTheme()
 
         // 监听主题变更
@@ -57,19 +57,20 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
     }
 
     private fun updateTheme() {
-        background = ThemeManager.currentTheme.editorBackground
-        revalidate()
-        repaint()
+        // 保持透明背景，不设置背景色
+        // 刷新内容以更新按钮的背景颜色
+        refreshContent()
     }
 
     private fun createCenterPanel(): JPanel {
         val panel = JPanel(GridBagLayout()).apply {
-            background = ThemeManager.currentTheme.editorBackground
+            isOpaque = false // 透明背景
             border = EmptyBorder(0, 0, 0, 0)
         }
 
         // 顶部弹性空间
         val topSpacer = JPanel().apply {
+            isOpaque = false // 透明背景
             preferredSize = Dimension(0, 0)
             minimumSize = Dimension(0, 0)
         }
@@ -109,6 +110,7 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
 
         // 底部弹性空间
         val bottomSpacer = JPanel().apply {
+            isOpaque = false // 透明背景
             preferredSize = Dimension(0, 0)
             minimumSize = Dimension(0, 0)
         }
@@ -127,14 +129,19 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
     private fun createActionsPanel(): JPanel {
         val panel = JPanel().apply {
             layout = BoxLayout(this, BoxLayout.X_AXIS)
-            background = ThemeManager.currentTheme.editorBackground
+            isOpaque = false // 透明背景
             border = EmptyBorder(0, 0, 0, 0)
             alignmentX = CENTER_ALIGNMENT
         }
 
         // 新建文件 按钮
         val newFileBtn = createActionButton(
-            icon = IconLoader.getIcon(IconRef("icons/common/addFile.svg"), 24),
+            icon = IconLoader.getIcon(
+                IconRef("icons/common/addFile.svg"), 
+                24,
+                adaptToTheme = true,
+                getThemeColor = { ThemeManager.currentTheme.onSurface }
+            ),
             text = I18n.translate(I18nKeys.Welcome.NEW_FILE),
             onClick = { newFile() }
         )
@@ -144,7 +151,12 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
 
         // 打开文件 按钮
         val openFileBtn = createActionButton(
-            icon = IconLoader.getIcon(IconRef("icons/common/anyType.svg"), 24),
+            icon = IconLoader.getIcon(
+                IconRef("icons/common/anyType.svg"), 
+                24,
+                adaptToTheme = false,
+                getThemeColor = { ThemeManager.currentTheme.onSurface }
+            ),
             text = I18n.translate(I18nKeys.Welcome.OPEN_FILE),
             onClick = { openFile() }
         )
@@ -154,7 +166,12 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
 
         // 打开项目 按钮
         val openProjectBtn = createActionButton(
-            icon = IconLoader.getIcon(IconRef("icons/common/folder.svg"), 24),
+            icon = IconLoader.getIcon(
+                IconRef("icons/common/folder.svg"), 
+                24,
+                adaptToTheme = false,
+                getThemeColor = { ThemeManager.currentTheme.onSurface }
+            ),
             text = I18n.translate(I18nKeys.Welcome.OPEN_PROJECT),
             onClick = { openProject() }
         )
@@ -186,7 +203,7 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
             isOpaque = false // 设置为 false，因为我们自己绘制背景
             isContentAreaFilled = false
             isBorderPainted = false
-            background = Color(0xF2, 0xF2, 0xF2) // #f2f2f2
+            background = ThemeManager.currentTheme.cardBackground
             preferredSize = Dimension(120, 80)
             maximumSize = Dimension(120, 80)
             border = EmptyBorder(12, 16, 12, 16)
@@ -211,15 +228,15 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
 
             addActionListener { onClick() }
 
-            // 悬停效果
+            // 悬停效果：使用主题的 surfaceVariant 作为悬停背景
             addMouseListener(object : java.awt.event.MouseAdapter() {
                 override fun mouseEntered(e: java.awt.event.MouseEvent) {
-                    background = Color(0xE0, 0xE0, 0xE0) // 稍深的灰色
+                    background = ThemeManager.currentTheme.surfaceVariant
                     repaint()
                 }
 
                 override fun mouseExited(e: java.awt.event.MouseEvent) {
-                    background = Color(0xF2, 0xF2, 0xF2) // 恢复 #f2f2f2
+                    background = ThemeManager.currentTheme.cardBackground
                     repaint()
                 }
             })
@@ -229,7 +246,7 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
 
     private fun createRecentProjectsPanel(): JPanel {
         val panel = JPanel(BorderLayout()).apply {
-            background = ThemeManager.currentTheme.editorBackground
+            isOpaque = false // 透明背景
             border = EmptyBorder(0, 0, 0, 0)
             preferredSize = Dimension(410, 300)
             minimumSize = Dimension(410, 200)
@@ -237,7 +254,7 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
         }
 
         val headerPanel = JPanel(BorderLayout()).apply {
-            background = ThemeManager.currentTheme.editorBackground
+            isOpaque = false // 透明背景
             border = EmptyBorder(0, 0, 20, 0)
         }
 
@@ -279,7 +296,7 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
     private fun createProjectsList(projects: List<File>): JPanel {
         val panel = JPanel().apply {
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
-            background = ThemeManager.currentTheme.editorBackground
+            isOpaque = false // 透明背景
         }
 
         if (projects.isEmpty()) {
@@ -304,7 +321,7 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
 
     private fun createProjectItem(project: File): JPanel {
         val panel = JPanel(BorderLayout()).apply {
-            background = ThemeManager.currentTheme.editorBackground
+            isOpaque = false // 透明背景
             border = EmptyBorder(8, 12, 8, 12)
             preferredSize = Dimension(0, 48)
             minimumSize = Dimension(0, 48)
@@ -313,13 +330,16 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
 
             addMouseListener(object : java.awt.event.MouseAdapter() {
                 override fun mouseEntered(e: java.awt.event.MouseEvent) {
+                    // 悬停时显示半透明背景
+                    isOpaque = true
                     background =
                         Color(ThemeManager.currentTheme.editorBackground.rgb and 0xFFFFFF or 0x10000000.toInt())
                     repaint()
                 }
 
                 override fun mouseExited(e: java.awt.event.MouseEvent) {
-                    background = ThemeManager.currentTheme.editorBackground
+                    // 恢复透明背景
+                    isOpaque = false
                     repaint()
                 }
 

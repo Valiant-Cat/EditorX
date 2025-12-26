@@ -3,6 +3,7 @@ package editorx.gui.settings
 import editorx.core.i18n.I18n
 import editorx.core.i18n.I18nKeys
 import editorx.core.gui.GuiContext
+import editorx.gui.ThemeManager
 import java.awt.BorderLayout
 import java.awt.FlowLayout
 import java.io.File
@@ -15,6 +16,7 @@ import javax.swing.JScrollPane
 import javax.swing.JTable
 import javax.swing.ListSelectionModel
 import javax.swing.table.AbstractTableModel
+import javax.swing.table.DefaultTableCellRenderer
 
 class CachePanel(private val guiEnv: GuiContext) : JPanel(BorderLayout()) {
     private data class CacheEntry(val name: String, val nameEn: String, val dir: File, val desc: String, val descEn: String)
@@ -32,6 +34,7 @@ class CachePanel(private val guiEnv: GuiContext) : JPanel(BorderLayout()) {
     private val refreshButton = JButton()
     private val clearButton = JButton()
     private val openButton = JButton()
+    private var tableScrollPane: JScrollPane? = null
 
     private val tableModel = object : AbstractTableModel() {
         private var sizes: List<Long> = entries.map { computeSize(it.dir) }
@@ -67,6 +70,32 @@ class CachePanel(private val guiEnv: GuiContext) : JPanel(BorderLayout()) {
         setShowGrid(false)
         tableHeader.reorderingAllowed = false
         selectionModel.selectionMode = ListSelectionModel.SINGLE_SELECTION
+        
+        // 设置自定义单元格渲染器以应用主题颜色
+        setDefaultRenderer(Any::class.java, object : DefaultTableCellRenderer() {
+            override fun getTableCellRendererComponent(
+                table: JTable?,
+                value: Any?,
+                isSelected: Boolean,
+                hasFocus: Boolean,
+                row: Int,
+                column: Int
+            ): java.awt.Component {
+                val c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column) as JLabel
+                val theme = ThemeManager.currentTheme
+                
+                if (isSelected) {
+                    c.background = theme.primaryContainer
+                    c.foreground = theme.onPrimaryContainer
+                } else {
+                    c.background = theme.surface
+                    c.foreground = theme.onSurface
+                }
+                c.isOpaque = true
+                
+                return c
+            }
+        })
     }
 
     init {
@@ -81,15 +110,21 @@ class CachePanel(private val guiEnv: GuiContext) : JPanel(BorderLayout()) {
         openButton.addActionListener { openSelectedDir() }
 
         val buttonBar = JPanel(FlowLayout(FlowLayout.LEFT, 8, 0)).apply {
+            isOpaque = false
             add(refreshButton)
             add(clearButton)
             add(openButton)
         }
 
+        tableScrollPane = JScrollPane(table).apply { 
+            border = BorderFactory.createEmptyBorder()
+        }
+
         add(headerLabel, BorderLayout.NORTH)
-        add(JScrollPane(table).apply { border = BorderFactory.createEmptyBorder() }, BorderLayout.CENTER)
+        add(tableScrollPane, BorderLayout.CENTER)
         add(
             JPanel(BorderLayout()).apply {
+                isOpaque = false
                 border = BorderFactory.createEmptyBorder(12, 0, 0, 0)
                 add(hintLabel, BorderLayout.NORTH)
                 add(buttonBar, BorderLayout.CENTER)
@@ -98,11 +133,66 @@ class CachePanel(private val guiEnv: GuiContext) : JPanel(BorderLayout()) {
         )
 
         applyTexts()
+        
+        // 监听主题变更
+        ThemeManager.addThemeChangeListener { updateTheme() }
+        updateTheme()
+    }
+    
+    private fun updateTheme() {
+        val theme = ThemeManager.currentTheme
+        
+        // 更新面板背景
+        background = theme.surface
+        isOpaque = true
+        
+        // 更新标签颜色
+        headerLabel.foreground = theme.onSurface
+        hintLabel.foreground = theme.onSurfaceVariant
+        
+        // 更新表格颜色
+        table.background = theme.surface
+        table.foreground = theme.onSurface
+        table.selectionBackground = theme.primaryContainer
+        table.selectionForeground = theme.onPrimaryContainer
+        table.gridColor = theme.outline
+        table.isOpaque = true
+        
+        // 更新表格表头颜色
+        table.tableHeader.background = theme.surfaceVariant
+        table.tableHeader.foreground = theme.onSurfaceVariant
+        table.tableHeader.isOpaque = true
+        
+        // 更新滚动面板颜色
+        tableScrollPane?.let { scroll ->
+            scroll.background = theme.surface
+            scroll.viewport.background = theme.surface
+            scroll.viewport.isOpaque = true
+            scroll.border = BorderFactory.createEmptyBorder()
+        }
+        
+        // 更新按钮颜色
+        refreshButton.background = theme.surface
+        refreshButton.foreground = theme.onSurface
+        refreshButton.isOpaque = true
+        clearButton.background = theme.surface
+        clearButton.foreground = theme.onSurface
+        clearButton.isOpaque = true
+        openButton.background = theme.surface
+        openButton.foreground = theme.onSurface
+        openButton.isOpaque = true
+        
+        // 强制表格重新渲染
+        table.repaint()
+        table.tableHeader.repaint()
+        
+        repaint()
     }
 
     fun refresh() {
         tableModel.refreshSizes()
         applyTexts()
+        updateTheme()
     }
 
     private fun clearSelected() {

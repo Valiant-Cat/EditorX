@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Files
 import javax.swing.JOptionPane
+import javax.swing.Timer
 
 /**
  * Android 插件：提供 Android 项目快速跳转功能
@@ -27,13 +28,22 @@ class AndroidPlugin : Plugin {
         version = "0.0.1",
     )
 
+    private var workspaceCheckTimer: Timer? = null
+    private var lastWorkspaceState: Boolean = false
+
     override fun activate(pluginContext: PluginContext) {
         val gui = pluginContext.gui() ?: return
 
         // 注册 AndroidManifest.xml 跳转按钮
         gui.addToolBarItem(
             id = "android.manifest",
-            icon = IconLoader.getIcon(IconRef("icons/gui/android-manifest.svg"), ICON_SIZE),
+            icon = IconLoader.getIcon(
+                IconRef("icons/gui/android-manifest.svg"),
+                ICON_SIZE,
+                adaptToTheme = true,
+                getThemeColor = { gui.getThemeTextColor() },
+                getDisabledColor = { gui.getThemeDisabledTextColor() }
+            ),
             text = I18n.translate(I18nKeys.Toolbar.GOTO_MANIFEST),
             action = {
                 navigateToAndroidManifest(gui)
@@ -43,7 +53,13 @@ class AndroidPlugin : Plugin {
         // 注册 MainActivity 跳转按钮
         gui.addToolBarItem(
             id = "android.mainactivity",
-            icon = IconLoader.getIcon(IconRef("icons/gui/main-activity.svg"), ICON_SIZE),
+            icon = IconLoader.getIcon(
+                IconRef("icons/gui/main-activity.svg"),
+                ICON_SIZE,
+                adaptToTheme = true,
+                getThemeColor = { gui.getThemeTextColor() },
+                getDisabledColor = { gui.getThemeDisabledTextColor() }
+            ),
             text = I18n.translate(I18nKeys.Toolbar.GOTO_MAIN_ACTIVITY),
             action = {
                 navigateToMainActivity(gui)
@@ -53,15 +69,57 @@ class AndroidPlugin : Plugin {
         // 注册 Application 跳转按钮
         gui.addToolBarItem(
             id = "android.application",
-            icon = IconLoader.getIcon(IconRef("icons/gui/application.svg"), ICON_SIZE),
+            icon = IconLoader.getIcon(
+                IconRef("icons/gui/application.svg"),
+                ICON_SIZE,
+                adaptToTheme = true,
+                getThemeColor = { gui.getThemeTextColor() },
+                getDisabledColor = { gui.getThemeDisabledTextColor() }
+            ),
             text = I18n.translate(I18nKeys.Toolbar.GOTO_APPLICATION),
             action = {
                 navigateToApplication(gui)
             }
         )
 
+        // 初始时禁用所有按钮（因为没有打开工作区）
+        updateToolBarButtonsState(gui, enabled = false)
+
+        // 启动定时器，定期检查工作区状态
+        startWorkspaceStateChecker(gui)
+
         // 注册 APK 文件处理器
         gui.registerFileHandler(ApkFileHandler(gui))
+    }
+
+    override fun deactivate() {
+        // 停止定时器
+        workspaceCheckTimer?.stop()
+        workspaceCheckTimer = null
+    }
+
+    /**
+     * 启动工作区状态检查器
+     */
+    private fun startWorkspaceStateChecker(gui: editorx.core.plugin.gui.PluginGuiProvider) {
+        workspaceCheckTimer = Timer(500) { // 每 500ms 检查一次
+            val hasWorkspace = gui.getWorkspaceRoot() != null
+            if (hasWorkspace != lastWorkspaceState) {
+                lastWorkspaceState = hasWorkspace
+                updateToolBarButtonsState(gui, hasWorkspace)
+            }
+        }
+        workspaceCheckTimer?.isRepeats = true
+        workspaceCheckTimer?.start()
+    }
+
+    /**
+     * 更新 ToolBar 按钮的启用/禁用状态
+     */
+    private fun updateToolBarButtonsState(gui: editorx.core.plugin.gui.PluginGuiProvider, enabled: Boolean) {
+        gui.setToolBarItemEnabled("android.manifest", enabled)
+        gui.setToolBarItemEnabled("android.mainactivity", enabled)
+        gui.setToolBarItemEnabled("android.application", enabled)
     }
 
     /**

@@ -38,6 +38,18 @@ class SideBar(private val mainWindow: MainWindow) : JPanel() {
         background = ThemeManager.currentTheme.sidebarBackground
         revalidate()
         repaint()
+        // 触发父容器 JSplitPane 的拖拽条重绘
+        var current = parent
+        while (current != null) {
+            if (current is javax.swing.JSplitPane) {
+                val splitPane = current
+                // 通过 UI 访问 divider 并触发重绘
+                (splitPane.ui as? javax.swing.plaf.basic.BasicSplitPaneUI)?.divider?.repaint()
+                splitPane.repaint() // 也触发整个 splitPane 的重绘，确保 divider 更新
+                break
+            }
+            current = current.parent
+        }
     }
 
     fun showView(id: String, component: JComponent? = null, autoShow: Boolean = true) {

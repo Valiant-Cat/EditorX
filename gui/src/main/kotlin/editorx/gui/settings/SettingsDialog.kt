@@ -6,6 +6,7 @@ import editorx.core.plugin.PluginManager
 import editorx.core.gui.GuiContext
 import editorx.gui.main.MainWindow
 import editorx.gui.core.RestartHelper
+import editorx.gui.ThemeManager
 import java.awt.BorderLayout
 import java.awt.CardLayout
 import java.awt.Color
@@ -95,6 +96,14 @@ class SettingsDialog(
     // 用于限制 SettingsDialog 的 JSplitPane 最大 dividerLocation
     private var mainSplitPane: JSplitPane? = null
     private val minContentWidthForPlugins = 600 // 插件面板需要的最小宽度
+    
+    // 保存组件引用以便更新主题
+    private var navigationPane: JPanel? = null
+    private var navigationTitle: JLabel? = null
+    private var navigationScroll: JScrollPane? = null
+    private var contentWrapper: JPanel? = null
+    private var contentInner: JPanel? = null
+    private var footerPanel: JPanel? = null
 
     private val listModel = DefaultListModel<SectionItem>().apply {
         addElement(SectionItem(Section.APPEARANCE, I18nKeys.Settings.APPEARANCE))
@@ -107,6 +116,8 @@ class SettingsDialog(
         selectionMode = ListSelectionModel.SINGLE_SELECTION
         fixedCellHeight = 28
         border = BorderFactory.createEmptyBorder()
+        background = ThemeManager.currentTheme.surface
+        foreground = ThemeManager.currentTheme.onSurface
         cellRenderer = object : DefaultListCellRenderer() {
             override fun getListCellRendererComponent(
                 list: JList<*>,
@@ -125,13 +136,14 @@ class SettingsDialog(
                 val hasChanges = currentPanel is SettingsPanel && currentPanel.hasPendingChanges()
                 
                 // 设置选中项的颜色
+                val theme = ThemeManager.currentTheme
                 if (isSelected) {
-                    c.background = Color(0x3D, 0x8E, 0xF6) // 蓝色背景
-                    c.foreground = Color.WHITE // 白色文字
+                    c.background = theme.primary // 主题主色背景
+                    c.foreground = theme.onPrimary // 主题主色上的文字
                 } else {
-                    c.background = Color.WHITE
-                    // 如果有待保存的更改，文字显示为蓝色
-                    c.foreground = if (hasChanges) Color(0x3D, 0x8E, 0xF6) else Color.BLACK
+                    c.background = theme.surface
+                    // 如果有待保存的更改，文字显示为主题主色
+                    c.foreground = if (hasChanges) theme.primary else theme.onSurface
                 }
                 c.isOpaque = true
                 
@@ -195,12 +207,81 @@ class SettingsDialog(
         setupEscKeyBinding()
 
         I18n.addListener(i18nListener)
+        
+        // 监听主题变更
+        ThemeManager.addThemeChangeListener { updateTheme() }
+        updateTheme()
+        
         addWindowListener(object : java.awt.event.WindowAdapter() {
             override fun windowClosed(e: java.awt.event.WindowEvent?) {
                 pluginsPanel.disposePanel()
                 I18n.removeListener(i18nListener)
             }
         })
+    }
+    
+    private fun updateTheme() {
+        val theme = ThemeManager.currentTheme
+        background = theme.surface
+        
+        // 更新导航面板
+        navigationPane?.let { pane ->
+            pane.background = theme.surface
+            pane.border = BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, 0, 1, theme.outline),
+                BorderFactory.createEmptyBorder(12, 12, 12, 12)
+            )
+        }
+        
+        // 更新导航标题
+        navigationTitle?.foreground = theme.onSurface
+        
+        // 更新导航滚动 pane
+        navigationScroll?.let { scroll ->
+            scroll.border = BorderFactory.createMatteBorder(1, 1, 1, 1, theme.outline)
+            scroll.background = theme.surface
+            scroll.viewport.background = theme.surface
+            scroll.viewport.isOpaque = true
+        }
+        
+        // 更新导航列表背景色
+        navigation.background = theme.surface
+        navigation.foreground = theme.onSurface
+        
+        // 更新内容包装器
+        contentWrapper?.background = theme.surfaceVariant
+        
+        // 更新内容内层
+        contentInner?.let { inner ->
+            inner.border = BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(1, 1, 1, 1, theme.outline),
+                BorderFactory.createEmptyBorder(24, 28, 28, 28)
+            )
+            inner.background = theme.surface
+        }
+        
+        // 更新页脚
+        footerPanel?.border = BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(1, 0, 0, 0, theme.outline),
+            BorderFactory.createEmptyBorder(6, 12, 6, 12)
+        )
+        
+        // 更新页脚按钮颜色
+        footerPanel?.components?.forEach { panel ->
+            if (panel is JPanel) {
+                panel.components.forEach { component ->
+                    if (component is JButton) {
+                        component.background = theme.surface
+                        component.foreground = theme.onSurface
+                    }
+                }
+            }
+        }
+        
+        // 更新导航列表（需要重新渲染）
+        navigation.repaint()
+        
+        repaint()
     }
     
     private fun setupEscKeyBinding() {
@@ -217,38 +298,42 @@ class SettingsDialog(
     }
 
     private fun buildBody(): JComponent {
-        val navigationPane = JPanel(BorderLayout()).apply {
-            background = Color.WHITE
+        val theme = ThemeManager.currentTheme
+        
+        navigationPane = JPanel(BorderLayout()).apply {
+            background = theme.surface
             border = BorderFactory.createCompoundBorder(
-                BorderFactory.createMatteBorder(0, 0, 0, 1, Color(0xD0, 0xD0, 0xD0)),
+                BorderFactory.createMatteBorder(0, 0, 0, 1, theme.outline),
                 BorderFactory.createEmptyBorder(12, 12, 12, 12)
             )
-            val title = JLabel(I18n.translate(I18nKeys.Settings.PREFERENCES)).apply {
+            navigationTitle = JLabel(I18n.translate(I18nKeys.Settings.PREFERENCES)).apply {
                 font = font.deriveFont(Font.BOLD, 13f)
                 border = BorderFactory.createEmptyBorder(0, 0, 6, 0)
+                foreground = theme.onSurface
             }
-            val scroll = JScrollPane(navigation).apply {
-                border = BorderFactory.createMatteBorder(1, 1, 1, 1, Color(0xDD, 0xDD, 0xDD))
-                background = Color.WHITE
-                viewport.background = Color.WHITE
+            navigationScroll = JScrollPane(navigation).apply {
+                border = BorderFactory.createMatteBorder(1, 1, 1, 1, theme.outline)
+                background = theme.surface
+                viewport.background = theme.surface
+                viewport.isOpaque = true
                 horizontalScrollBarPolicy = JScrollPane.HORIZONTAL_SCROLLBAR_NEVER
             }
-            add(title, BorderLayout.NORTH)
-            add(scroll, BorderLayout.CENTER)
+            add(navigationTitle, BorderLayout.NORTH)
+            add(navigationScroll, BorderLayout.CENTER)
         }
 
-        val contentWrapper = JPanel(BorderLayout()).apply {
-            background = Color(0xF3, 0xF4, 0xF6)
+        contentWrapper = JPanel(BorderLayout()).apply {
+            background = theme.surfaceVariant
             border = BorderFactory.createEmptyBorder(16, 16, 16, 24)
-            val inner = JPanel(BorderLayout()).apply {
+            contentInner = JPanel(BorderLayout()).apply {
                 border = BorderFactory.createCompoundBorder(
-                    BorderFactory.createMatteBorder(1, 1, 1, 1, Color(0xD0, 0xD0, 0xD0)),
+                    BorderFactory.createMatteBorder(1, 1, 1, 1, theme.outline),
                     BorderFactory.createEmptyBorder(24, 28, 28, 28)
                 )
-                background = Color.WHITE
+                background = theme.surface
                 add(contentPanel, BorderLayout.CENTER)
             }
-            add(inner, BorderLayout.CENTER)
+            add(contentInner, BorderLayout.CENTER)
         }
 
         val mainSplitPane = JSplitPane(JSplitPane.HORIZONTAL_SPLIT, navigationPane, contentWrapper).apply {
@@ -312,54 +397,66 @@ class SettingsDialog(
     }
 
     private fun buildFooter(): JComponent {
+        val theme = ThemeManager.currentTheme
+        val resetButton = JButton(I18n.translate(I18nKeys.Action.RESET)).apply {
+            isFocusable = false
+            background = theme.surface
+            foreground = theme.onSurface
+            addActionListener { onResetPressed() }
+        }
+        val cancelButton = JButton(I18n.translate(I18nKeys.Action.CANCEL)).apply {
+            background = theme.surface
+            foreground = theme.onSurface
+            addActionListener { dispose() }
+        }
+        val confirmButton = JButton(I18n.translate(I18nKeys.Action.CONFIRM)).apply {
+            background = theme.surface
+            foreground = theme.onSurface
+            addActionListener {
+                // 应用所有面板的更改
+                var needRestart = false
+                
+                // 应用外观设置的更改
+                needRestart = appearancePanel.applyChanges() || needRestart
+                
+                // 应用其他面板的更改（如果它们继承 SettingsPanel）
+                (keymapPanel as? SettingsPanel)?.apply { needRestart = applyChanges() || needRestart }
+                (pluginsPanel as? SettingsPanel)?.apply { needRestart = applyChanges() || needRestart }
+                (cachePanel as? SettingsPanel)?.apply { needRestart = applyChanges() || needRestart }
+                
+                // 同步所有设置
+                environment.getSettings().sync()
+                
+                // 如果语言改变需要重启，显示提示对话框
+                if (needRestart && appearancePanel.showRestartDialog()) {
+                    // 用户选择重启，执行重启
+                    dispose()
+                    editorx.gui.core.RestartHelper.restart()
+                } else {
+                    dispose()
+                }
+            }
+        }
+        
         val resetPanel = JPanel(FlowLayout(FlowLayout.LEFT, 12, 6)).apply {
             isOpaque = false
-            add(JButton(I18n.translate(I18nKeys.Action.RESET)).apply {
-                isFocusable = false
-                addActionListener { onResetPressed() }
-            })
+            add(resetButton)
         }
         val actionPanel = JPanel(FlowLayout(FlowLayout.RIGHT, 12, 6)).apply {
             isOpaque = false
-            add(JButton(I18n.translate(I18nKeys.Action.CANCEL)).apply {
-                addActionListener { dispose() }
-            })
-            add(JButton(I18n.translate(I18nKeys.Action.CONFIRM)).apply {
-                addActionListener {
-                    // 应用所有面板的更改
-                    var needRestart = false
-                    
-                    // 应用外观设置的更改
-                    needRestart = appearancePanel.applyChanges() || needRestart
-                    
-                    // 应用其他面板的更改（如果它们继承 SettingsPanel）
-                    (keymapPanel as? SettingsPanel)?.apply { needRestart = applyChanges() || needRestart }
-                    (pluginsPanel as? SettingsPanel)?.apply { needRestart = applyChanges() || needRestart }
-                    (cachePanel as? SettingsPanel)?.apply { needRestart = applyChanges() || needRestart }
-                    
-                    // 同步所有设置
-                    environment.getSettings().sync()
-                    
-                    // 如果语言改变需要重启，显示提示对话框
-                    if (needRestart && appearancePanel.showRestartDialog()) {
-                        // 用户选择重启，执行重启
-                        dispose()
-                        editorx.gui.core.RestartHelper.restart()
-                    } else {
-                        dispose()
-                    }
-                }
-            })
+            add(cancelButton)
+            add(confirmButton)
         }
-        return JPanel(BorderLayout()).apply {
+        footerPanel = JPanel(BorderLayout()).apply {
             border = BorderFactory.createCompoundBorder(
-                BorderFactory.createMatteBorder(1, 0, 0, 0, Color(0xD0, 0xD0, 0xD0)),
+                BorderFactory.createMatteBorder(1, 0, 0, 0, theme.outline),
                 BorderFactory.createEmptyBorder(6, 12, 6, 12)
             )
             isOpaque = false
             add(resetPanel, BorderLayout.WEST)
             add(actionPanel, BorderLayout.EAST)
         }
+        return footerPanel!!
     }
 
     private fun showSection(section: Section) {

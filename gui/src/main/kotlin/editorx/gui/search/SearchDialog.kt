@@ -73,13 +73,18 @@ class SearchDialog(
     }
 
     private val statusLabel = JLabel(" ").apply {
-        foreground = Color(0x66, 0x66, 0x66)
+        foreground = ThemeManager.currentTheme.onSurfaceVariant
         font = font.deriveFont(Font.PLAIN, 12f)
         border = BorderFactory.createEmptyBorder(6, 8, 6, 8)
     }
 
     private var worker: SearchWorker? = null
     private var searchToken: Int = 0
+    
+    // 保存组件引用以便更新主题
+    private var resultScrollPane: JScrollPane? = null
+    private var searchLabel: JLabel? = null
+    private var searchDefLabel: JLabel? = null
 
     init {
         defaultCloseOperation = DISPOSE_ON_CLOSE
@@ -88,18 +93,80 @@ class SearchDialog(
         setLocationRelativeTo(owner)
 
         layout = BorderLayout()
-        background = Color.WHITE
-
+        
         add(buildTopPanel(), BorderLayout.NORTH)
-        add(JScrollPane(resultList).apply {
-            border = BorderFactory.createMatteBorder(1, 1, 1, 1, ThemeManager.separator)
-            background = Color.WHITE
-            viewport.background = Color.WHITE
-        }, BorderLayout.CENTER)
+        resultScrollPane = JScrollPane(resultList).apply {
+            border = BorderFactory.createMatteBorder(1, 1, 1, 1, ThemeManager.currentTheme.outline)
+            background = ThemeManager.currentTheme.surface
+            viewport.background = ThemeManager.currentTheme.surface
+        }
+        add(resultScrollPane, BorderLayout.CENTER)
         add(statusLabel, BorderLayout.SOUTH)
+
+        // 监听主题变更
+        ThemeManager.addThemeChangeListener { updateTheme() }
+        updateTheme()
 
         installListeners()
         updateStatusIdle()
+    }
+    
+    private fun updateTheme() {
+        val theme = ThemeManager.currentTheme
+        background = theme.surface
+        
+        // 更新滚动 pane
+        resultScrollPane?.let { scroll ->
+            scroll.border = BorderFactory.createMatteBorder(1, 1, 1, 1, theme.outline)
+            scroll.background = theme.surface
+            scroll.viewport.background = theme.surface
+            scroll.viewport.isOpaque = true
+        }
+        
+        // 更新状态标签
+        statusLabel.foreground = theme.onSurfaceVariant
+        statusLabel.background = theme.surface
+        statusLabel.isOpaque = true
+        
+        // 更新搜索标签
+        searchLabel?.foreground = theme.onSurface
+        searchDefLabel?.foreground = theme.onSurface
+        
+        // 更新输入框
+        queryField.background = theme.surface
+        queryField.foreground = theme.onSurface
+        queryField.isOpaque = true
+        
+        // 更新按钮
+        searchButton.background = theme.surface
+        searchButton.foreground = theme.onSurface
+        searchButton.isOpaque = true
+        stopButton.background = theme.surface
+        stopButton.foreground = theme.onSurface
+        stopButton.isOpaque = true
+        
+        // 更新复选框
+        searchClass.background = theme.surface
+        searchClass.foreground = theme.onSurface
+        searchMethod.background = theme.surface
+        searchMethod.foreground = theme.onSurface
+        searchField.background = theme.surface
+        searchField.foreground = theme.onSurface
+        searchCode.background = theme.surface
+        searchCode.foreground = theme.onSurface
+        searchResource.background = theme.surface
+        searchResource.foreground = theme.onSurface
+        
+        // 更新结果列表
+        resultList.background = theme.surface
+        resultList.foreground = theme.onSurface
+        resultList.selectionBackground = theme.primaryContainer
+        resultList.selectionForeground = theme.onPrimaryContainer
+        
+        // 更新列表（触发重新渲染）
+        resultList.repaint()
+        
+        repaint()
     }
 
     fun showDialog() {
@@ -111,14 +178,17 @@ class SearchDialog(
     }
 
     private fun buildTopPanel(): JPanel {
+        val theme = ThemeManager.currentTheme
+        
         // 第一行：搜索输入框和按钮
         val row1 = JPanel(BorderLayout(6, 0)).apply {
             isOpaque = false
             border = BorderFactory.createEmptyBorder(8, 8, 8, 8)
-            add(JLabel("搜索：").apply { 
-                foreground = Color(0x44, 0x44, 0x44)
+            searchLabel = JLabel("搜索：").apply { 
+                foreground = theme.onSurface
                 preferredSize = Dimension(50, 28)
-            }, BorderLayout.WEST)
+            }
+            add(searchLabel, BorderLayout.WEST)
             add(queryField, BorderLayout.CENTER)
             add(
                 JPanel(FlowLayout(FlowLayout.RIGHT, 6, 0)).apply {
@@ -134,9 +204,10 @@ class SearchDialog(
         val row2 = JPanel(FlowLayout(FlowLayout.LEFT, 12, 6)).apply {
             isOpaque = false
             border = BorderFactory.createEmptyBorder(0, 8, 8, 8)
-            add(JLabel("搜索定义：").apply { 
-                foreground = Color(0x44, 0x44, 0x44)
-            })
+            searchDefLabel = JLabel("搜索定义：").apply { 
+                foreground = theme.onSurface
+            }
+            add(searchDefLabel)
             add(searchClass)
             add(searchMethod)
             add(searchField)
@@ -468,6 +539,7 @@ class SearchDialog(
             val comp = super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus) as JLabel
             val match = value as? SearchMatch ?: return comp
 
+            val theme = ThemeManager.currentTheme
             val root = workspaceRoot
             val relPath = if (root != null) {
                 try {
@@ -478,6 +550,16 @@ class SearchDialog(
             } else {
                 match.file.name
             }
+
+            // 应用主题颜色
+            if (isSelected) {
+                comp.background = theme.primaryContainer
+                comp.foreground = theme.onPrimaryContainer
+            } else {
+                comp.background = theme.surface
+                comp.foreground = theme.onSurface
+            }
+            comp.isOpaque = true
 
             comp.text = "<html><b>$relPath</b>:${match.line}:${match.column + 1} - ${match.preview}</html>"
             comp.border = BorderFactory.createEmptyBorder(4, 8, 4, 8)

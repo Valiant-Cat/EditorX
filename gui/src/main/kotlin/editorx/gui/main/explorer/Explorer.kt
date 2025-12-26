@@ -6,6 +6,7 @@ import editorx.core.plugin.gui.FileHandlerRegistry
 import editorx.core.util.IconLoader
 import editorx.core.util.IconRef
 import editorx.core.util.IconUtils
+import editorx.gui.ThemeManager
 import editorx.gui.main.MainWindow
 import java.awt.*
 import java.awt.datatransfer.DataFlavor
@@ -38,11 +39,15 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
     private val treeModel = DefaultTreeModel(treeRoot)
     private val tree = JTree(treeModel)
     private var locateButton: JButton? = null
+    private var refreshButton: JButton? = null
+    private var collapseButton: JButton? = null
     private var lastKnownFile: File? = null
 
     // 任务取消机制
     private var currentTask: Thread? = null
     private var isTaskCancelled = false
+
+    private var titleLabel: JLabel? = null
 
     init {
         isOpaque = false  // 使 Explorer 透明，显示 SideBar 的背景色
@@ -50,6 +55,33 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         installListeners()
         installFileDropTarget()
         showEmptyRoot()
+        
+        // 监听主题变更
+        ThemeManager.addThemeChangeListener { updateTheme() }
+    }
+    
+    private fun updateTheme() {
+        val theme = ThemeManager.currentTheme
+        // 更新标题标签颜色
+        titleLabel?.apply {
+            foreground = theme.onSurface
+            repaint()
+        }
+        // 更新按钮图标以适配主题
+        refreshButton?.icon = IconLoader.getIcon(
+            IconRef("icons/common/refresh.svg"),
+            TOP_BAR_ICON_SIZE,
+            adaptToTheme = true,
+            getThemeColor = { theme.onSurface }
+        )
+        collapseButton?.icon = IconLoader.getIcon(
+            IconRef("icons/common/collapseAll.svg"),
+            TOP_BAR_ICON_SIZE,
+            adaptToTheme = true,
+            getThemeColor = { theme.onSurface }
+        )
+        // 刷新文件树以更新文本颜色
+        tree.updateUI()
     }
 
     /**
@@ -99,14 +131,14 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         /*
         Left - 可收缩部分
         */
-        val titleLabel = JLabel("资源管理器").apply {
+        titleLabel = JLabel("资源管理器").apply {
             font = font.deriveFont(Font.BOLD, 12f)
-            foreground = Color(0x333333)
+            foreground = ThemeManager.currentTheme.onSurface
             border = EmptyBorder(0, 8, 0, 8)
             // 允许标签收缩，但设置最小宽度为0
             minimumSize = Dimension(0, preferredSize.height)
         }
-        toolBar.add(titleLabel)
+        toolBar.add(titleLabel!!)
 
         /*
         Expanded - 可伸缩空间
@@ -123,18 +155,30 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
             addActionListener { locateCurrentFile() }
         }
         toolBar.add(locateButton!!)
-        toolBar.add(JButton(IconLoader.getIcon(IconRef("icons/common/refresh.svg"), TOP_BAR_ICON_SIZE)).apply {
+        refreshButton = JButton(IconLoader.getIcon(
+            IconRef("icons/common/refresh.svg"),
+            TOP_BAR_ICON_SIZE,
+            adaptToTheme = true,
+            getThemeColor = { ThemeManager.currentTheme.onSurface }
+        )).apply {
             toolTipText = "刷新文件树..."
             isFocusable = false
             margin = Insets(4, 4, 4, 4)
             addActionListener { refreshRootPreserveSelection() }
-        })
-        toolBar.add(JButton(IconLoader.getIcon(IconRef("icons/common/collapseAll.svg"), TOP_BAR_ICON_SIZE)).apply {
+        }
+        toolBar.add(refreshButton!!)
+        collapseButton = JButton(IconLoader.getIcon(
+            IconRef("icons/common/collapseAll.svg"),
+            TOP_BAR_ICON_SIZE,
+            adaptToTheme = true,
+            getThemeColor = { ThemeManager.currentTheme.onSurface }
+        )).apply {
             toolTipText = "全部收起..."
             isFocusable = false
             margin = Insets(4, 4, 4, 4)
             addActionListener { collapseAll() }
-        })
+        }
+        toolBar.add(collapseButton!!)
 
         return toolBar
     }
@@ -1363,9 +1407,9 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                 icon = getIconForFile(file)
                 text = node.displayName
             }
-            // 设置文本颜色为 #333333（如果未选中）
+            // 设置文本颜色为主题颜色（如果未选中）
             if (!sel) {
-                foreground = Color(0x333333)
+                foreground = ThemeManager.currentTheme.onSurface
             }
             return c
         }

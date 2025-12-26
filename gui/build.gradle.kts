@@ -9,7 +9,7 @@ dependencies {
     implementation(project(":i18n-keys"))
     implementation(project(":plugins:i18n-zh"))
     implementation(project(":plugins:i18n-en"))
-    implementation(project(":plugins:android"))
+    runtimeOnly(project(":plugins:android"))
     implementation(project(":plugins:smali"))
     implementation(project(":plugins:json"))
     implementation(project(":plugins:yaml"))

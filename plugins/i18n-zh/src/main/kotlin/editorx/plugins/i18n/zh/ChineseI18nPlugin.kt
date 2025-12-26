@@ -165,7 +165,7 @@ private val dictionary = buildMap {
     put(I18nKeys.Toolbar.BUILD, "构建")
     put(I18nKeys.Toolbar.TOGGLE_SIDEBAR, "切换侧边栏")
     put(I18nKeys.Toolbar.GLOBAL_SEARCH, "全局搜索")
-    put(I18nKeys.Toolbar.SETTINGS, "设置")
+    put(I18nKeys.Toolbar.SETTINGS, "打开设置")
     put(I18nKeys.Toolbar.DOUBLE_SHIFT, "双击Shift")
 
     put(I18nKeys.Search.SEARCH, "搜索")
@@ -232,11 +232,11 @@ private val dictionary = buildMap {
     put(I18nKeys.ToolbarMessage.SIGN_EXCEPTION, "签名时发生未知错误")
     put(I18nKeys.ToolbarMessage.MANIFEST_NOT_FOUND, "未找到 AndroidManifest.xml 文件\n路径: %s")
     put(I18nKeys.ToolbarMessage.MAINACTIVITY_NOT_FOUND, "未找到 AndroidManifest.xml 文件，无法定位 MainActivity")
-    put(I18nKeys.ToolbarMessage.MAINACTIVITY_NOT_FOUND_DETAIL, "在 AndroidManifest.xml 中未找到 MainActivity（未找到包含 MAIN action 的 Activity）")
+    put(I18nKeys.ToolbarMessage.MAINACTIVITY_NOT_FOUND_DETAIL, "在 AndroidManifest.xml 中未找到 MainActivity")
     put(I18nKeys.ToolbarMessage.MAINACTIVITY_SMALI_NOT_FOUND, "未找到 MainActivity 对应的 smali 文件\n类名: %s\n预期路径: %s")
     put(I18nKeys.ToolbarMessage.PARSE_MANIFEST_FAILED, "解析 AndroidManifest.xml 失败: %s")
     put(I18nKeys.ToolbarMessage.APPLICATION_NOT_FOUND, "未找到 AndroidManifest.xml 文件，无法定位 Application")
-    put(I18nKeys.ToolbarMessage.APPLICATION_NOT_FOUND_DETAIL, "在 AndroidManifest.xml 中未找到自定义 Application 类（使用默认 Application）")
+    put(I18nKeys.ToolbarMessage.APPLICATION_NOT_FOUND_DETAIL, "在 AndroidManifest.xml 中未找到自定义 Application")
     put(I18nKeys.ToolbarMessage.APPLICATION_SMALI_NOT_FOUND, "未找到 Application 对应的 smali 文件\n类名: %s\n预期路径: %s")
 
     put(I18nKeys.Cache.CACHE_CONTENT, "缓存内容")

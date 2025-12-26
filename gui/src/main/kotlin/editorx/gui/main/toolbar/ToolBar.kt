@@ -1,5 +1,6 @@
 package editorx.gui.main.toolbar
 
+import editorx.gui.ThemeManager
 import editorx.gui.main.MainWindow
 import org.slf4j.LoggerFactory
 import java.awt.Color
@@ -20,14 +21,24 @@ class ToolBar(private val mainWindow: MainWindow) : JPanel() {
     private val itemOrder = mutableListOf<String>() // 保持添加顺序
 
     init {
-        val separator = Color(0xDE, 0xDE, 0xDE)
-        border = BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(0, 0, 1, 0, separator),
-            BorderFactory.createEmptyBorder(4, 8, 4, 8),
-        )
         layout = BoxLayout(this, BoxLayout.X_AXIS)
+        isOpaque = true
         // 初始时没有 item，隐藏 ToolBar
         isVisible = false
+        updateTheme()
+        
+        // 监听主题变更
+        ThemeManager.addThemeChangeListener { updateTheme() }
+    }
+    
+    private fun updateTheme() {
+        background = ThemeManager.currentTheme.toolbarBackground
+        border = BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(0, 0, 1, 0, ThemeManager.currentTheme.statusBarSeparator),
+            BorderFactory.createEmptyBorder(4, 8, 4, 8),
+        )
+        revalidate()
+        repaint()
     }
 
     /**
@@ -74,6 +85,17 @@ class ToolBar(private val mainWindow: MainWindow) : JPanel() {
         }
         if (pluginItems.isEmpty()) {
             itemsByPlugin.remove(pluginId)
+        }
+    }
+
+    /**
+     * 设置按钮的启用/禁用状态
+     * @param id 按钮的唯一标识符
+     * @param enabled 是否启用
+     */
+    fun setItemEnabled(id: String, enabled: Boolean) {
+        itemsByPlugin.values.forEach { pluginItems ->
+            pluginItems[id]?.isEnabled = enabled
         }
     }
 

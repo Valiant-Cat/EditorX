@@ -5,6 +5,7 @@ import editorx.core.i18n.I18nKeys
 import editorx.core.util.IconLoader
 import editorx.core.util.IconRef
 import editorx.core.workspace.Workspace
+import editorx.gui.ThemeManager
 import org.slf4j.LoggerFactory
 import java.awt.Component
 import java.awt.Dimension
@@ -35,6 +36,12 @@ class VcsWidget(private val workspace: Workspace) : JPanel() {
     private val textLabel = JLabel().apply {
         font = font.deriveFont(Font.PLAIN, 12f)
         horizontalAlignment = SwingConstants.LEFT
+    }
+    
+    private val arrowLabel = JLabel().apply {
+        horizontalAlignment = SwingConstants.CENTER
+        verticalAlignment = SwingConstants.CENTER
+        preferredSize = Dimension(14, 14)
     }
 
     init {
@@ -77,20 +84,37 @@ class VcsWidget(private val workspace: Workspace) : JPanel() {
         add(Box.createHorizontalStrut(4))
 
         // 下拉箭头图标（右侧）
-        val arrowLabel = JLabel().apply {
-            icon = IconLoader.getIcon(IconRef("icons/common/chevron-down.svg"), 14)
-            horizontalAlignment = SwingConstants.CENTER
-            verticalAlignment = SwingConstants.CENTER
-            preferredSize = Dimension(14, 14)
-            addMouseListener(mouseListener)
-        }
+        arrowLabel.icon = IconLoader.getIcon(
+            IconRef("icons/common/chevron-down.svg"), 
+            14,
+            adaptToTheme = true,
+            getThemeColor = { ThemeManager.currentTheme.onSurface }
+        )
+        arrowLabel.addMouseListener(mouseListener)
         add(arrowLabel)
 
         // 添加鼠标监听器到整个面板
         addMouseListener(mouseListener)
+        
+        // 监听主题变更
+        ThemeManager.addThemeChangeListener { updateIcons() }
 
         // 初始更新显示
         updateDisplay()
+    }
+    
+    /**
+     * 更新图标以适配当前主题
+     */
+    private fun updateIcons() {
+        arrowLabel.icon = IconLoader.getIcon(
+            IconRef("icons/common/chevron-down.svg"), 
+            14,
+            adaptToTheme = true,
+            getThemeColor = { ThemeManager.currentTheme.onSurface }
+        )
+        iconLabel.icon = loadVcsIcon()
+        repaint()
     }
 
     /**
@@ -133,8 +157,13 @@ class VcsWidget(private val workspace: Workspace) : JPanel() {
      */
     private fun loadVcsIcon(): Icon? {
         return try {
-            // 尝试从主资源加载
-            IconLoader.getIcon(IconRef("icons/gui/git-branch.svg"), 12)
+            // 尝试从主资源加载，使用主题自适应
+            IconLoader.getIcon(
+                IconRef("icons/gui/git-branch.svg"), 
+                12,
+                adaptToTheme = true,
+                getThemeColor = { ThemeManager.currentTheme.onSurface }
+            )
         } catch (e: Exception) {
             null
         }

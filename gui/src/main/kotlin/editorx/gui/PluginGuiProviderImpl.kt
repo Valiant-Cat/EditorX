@@ -50,6 +50,10 @@ class PluginGuiProviderImpl(
         mainWindow?.toolBar?.addItem(pluginId, id, icon, text, action)
     }
 
+    override fun setToolBarItemEnabled(id: String, enabled: Boolean) {
+        mainWindow?.toolBar?.setItemEnabled(id, enabled)
+    }
+
     override fun registerFileType(fileType: FileType) {
         FileTypeRegistry.registerFileType(fileType, ownerId = pluginId)
     }
@@ -68,5 +72,13 @@ class PluginGuiProviderImpl(
 
     override fun registerFileHandler(handler: FileHandler) {
         FileHandlerRegistry.register(handler)
+    }
+
+    override fun getThemeTextColor(): java.awt.Color {
+        return ThemeManager.currentTheme.onSurface
+    }
+
+    override fun getThemeDisabledTextColor(): java.awt.Color {
+        return ThemeManager.currentTheme.onSurfaceVariant
     }
 }

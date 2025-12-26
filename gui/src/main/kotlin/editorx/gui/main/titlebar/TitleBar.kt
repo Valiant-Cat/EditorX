@@ -29,6 +29,9 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
     }
 
     private var toggleSideBarButton: JButton? = null
+    private var buildButton: JButton? = null
+    private var searchButton: JButton? = null
+    private var settingsButton: JButton? = null
     private var compileTask: Thread? = null
     private var titleLabel: JLabel? = null
 
@@ -37,11 +40,6 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
 
     init {
         isFloatable = false
-        val separator = Color(0xDE, 0xDE, 0xDE)
-        border = BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(0, 0, 1, 0, separator),
-            BorderFactory.createEmptyBorder(2, 5, 2, 5),
-        )
         layout = BoxLayout(this, BoxLayout.X_AXIS)
         isOpaque = true
         updateTheme()
@@ -70,8 +68,35 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
     }
 
     private fun updateTheme() {
-        background = ThemeManager.currentTheme.toolbarBackground
-        titleLabel?.foreground = ThemeManager.currentTheme.onSurface
+        val theme = ThemeManager.currentTheme
+        background = theme.toolbarBackground
+        titleLabel?.foreground = theme.onSurface
+        border = BorderFactory.createCompoundBorder(
+            BorderFactory.createMatteBorder(0, 0, 1, 0, theme.statusBarSeparator),
+            BorderFactory.createEmptyBorder(2, 5, 2, 5),
+        )
+        
+        // 更新所有按钮的图标
+        buildButton?.icon = IconLoader.getIcon(
+            IconRef("icons/common/build.svg"),
+            ICON_SIZE,
+            adaptToTheme = true,
+            getThemeColor = { theme.onSurface }
+        )
+        searchButton?.icon = IconLoader.getIcon(
+            IconRef("icons/common/search.svg"),
+            ICON_SIZE,
+            adaptToTheme = true,
+            getThemeColor = { theme.onSurface }
+        )
+        settingsButton?.icon = IconLoader.getIcon(
+            IconRef("icons/common/settings.svg"),
+            ICON_SIZE,
+            adaptToTheme = true,
+            getThemeColor = { theme.onSurface }
+        )
+        toggleSideBarButton?.icon = getSideBarIcon()
+        
         revalidate()
         repaint()
     }
@@ -139,15 +164,17 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
     }
 
     private fun setupRightActions() {
-        add(
-            JButton(
-                IconLoader.getIcon(
-                    IconRef("icons/common/build.svg"),
-                    ICON_SIZE
-                )
-            ).compact(I18n.translate(I18nKeys.Toolbar.BUILD)) {
-                compileWorkspaceApk()
-            })
+        buildButton = JButton(
+            IconLoader.getIcon(
+                IconRef("icons/common/build.svg"),
+                ICON_SIZE,
+                adaptToTheme = true,
+                getThemeColor = { ThemeManager.currentTheme.onSurface }
+            )
+        ).compact(I18n.translate(I18nKeys.Toolbar.BUILD)) {
+            compileWorkspaceApk()
+        }
+        add(buildButton)
 
         add(Box.createHorizontalStrut(12))
         addSeparator()
@@ -162,27 +189,31 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
 
         // 全局搜索按钮（双击 Shift）
         val doubleShiftText = I18n.translate(I18nKeys.Toolbar.DOUBLE_SHIFT)
-        add(
-            JButton(
-                IconLoader.getIcon(
-                    IconRef("icons/common/search.svg"),
-                    ICON_SIZE
-                )
-            ).compactWithShortcut(I18n.translate(I18nKeys.Toolbar.GLOBAL_SEARCH), doubleShiftText) {
-                showGlobalSearch()
-            })
+        searchButton = JButton(
+            IconLoader.getIcon(
+                IconRef("icons/common/search.svg"),
+                ICON_SIZE,
+                adaptToTheme = true,
+                getThemeColor = { ThemeManager.currentTheme.onSurface }
+            )
+        ).compactWithShortcut(I18n.translate(I18nKeys.Toolbar.GLOBAL_SEARCH), doubleShiftText) {
+            showGlobalSearch()
+        }
+        add(searchButton)
 
         add(Box.createHorizontalStrut(6))
 
-        add(
-            JButton(
-                IconLoader.getIcon(
-                    IconRef("icons/common/settings.svg"),
-                    ICON_SIZE
-                )
-            ).compact(I18n.translate(I18nKeys.Toolbar.SETTINGS)) {
-                showSettings()
-            })
+        settingsButton = JButton(
+            IconLoader.getIcon(
+                IconRef("icons/common/settings.svg"),
+                ICON_SIZE,
+                adaptToTheme = true,
+                getThemeColor = { ThemeManager.currentTheme.onSurface }
+            )
+        ).compact(I18n.translate(I18nKeys.Toolbar.SETTINGS)) {
+            showSettings()
+        }
+        add(settingsButton)
 
         add(Box.createHorizontalStrut(12))
     }
@@ -203,15 +234,18 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
     }
 
     fun updateSideBarIcon(sideBarVisible: Boolean) {
-        val iconName =
-            if (sideBarVisible) "icons/gui/layout-sidebar-left.svg" else "icons/gui/layout-sidebar-left-off.svg"
-        toggleSideBarButton?.icon = IconLoader.getIcon(IconRef(iconName), ICON_SIZE)
+        toggleSideBarButton?.icon = getSideBarIcon()
     }
 
     private fun getSideBarIcon(): Icon? {
         val isVisible = mainWindow.sideBar.isSideBarVisible()
         val iconName = if (isVisible) "icons/gui/layout-sidebar-left.svg" else "icons/gui/layout-sidebar-left-off.svg"
-        return IconLoader.getIcon(IconRef(iconName), ICON_SIZE)
+        return IconLoader.getIcon(
+            IconRef(iconName), 
+            ICON_SIZE,
+            adaptToTheme = true,
+            getThemeColor = { ThemeManager.currentTheme.onSurface }
+        )
     }
 
     private fun toggleSideBar() {

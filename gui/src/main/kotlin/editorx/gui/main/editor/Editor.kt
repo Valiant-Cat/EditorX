@@ -84,7 +84,8 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
     }
     private val findReplaceBars = mutableMapOf<File, FindReplaceBar>()
     private val smaliLoadingPanels = mutableMapOf<File, JPanel>()
-    private val welcomeView = editorx.gui.main.welcome.WelcomeView(mainWindow)
+    private val welcomeView = WelcomeView(mainWindow)
+    private val emptyEditorView = EmptyEditorView(mainWindow)
     private val editorContentPanel = JPanel(BorderLayout()).apply {
         add(tabbedPane, BorderLayout.CENTER)
         add(bottomContainer, BorderLayout.SOUTH)
@@ -235,7 +236,34 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
     }
 
     private fun updateTheme() {
-        background = ThemeManager.currentTheme.editorBackground
+        val theme = ThemeManager.currentTheme
+        background = theme.editorBackground
+        
+        // 更新所有已存在的 TextArea 和 RTextScrollPane 的背景色
+        for (i in 0 until tabbedPane.tabCount) {
+            val tabContent = tabbedPane.getComponentAt(i) as? TabContent ?: continue
+            val scrollPane = tabContent.scrollPane
+            
+            // 更新 RTextScrollPane 的背景色
+            scrollPane.background = theme.editorBackground
+            scrollPane.viewport.background = theme.editorBackground
+            
+            // 更新滚动条的背景色
+            scrollPane.verticalScrollBar.background = theme.editorBackground
+            scrollPane.horizontalScrollBar.background = theme.editorBackground
+            
+            // 更新 TextArea 的背景色和前景色
+            val textArea = tabTextAreas[i] ?: continue
+            textArea.background = theme.editorBackground
+            textArea.foreground = theme.onSurface
+        }
+        
+        // 更新所有 tab header 的样式
+        updateTabHeaderStyles()
+        
+        // 触发 tabbedPane 的重绘，更新 tab 背景
+        tabbedPane.repaint()
+        
         revalidate()
         repaint()
     }
@@ -247,6 +275,10 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         if (workspaceRoot == null && tabbedPane.tabCount == 0) {
             welcomeView.refreshContent()
             add(welcomeView, BorderLayout.CENTER)
+        } else if (tabbedPane.tabCount == 0) {
+            // 如果有工作区但没有打开的标签页，显示快捷键列表
+            emptyEditorView.refreshContent()
+            add(emptyEditorView, BorderLayout.CENTER)
         } else {
             add(editorContentPanel, BorderLayout.CENTER)
         }
@@ -260,7 +292,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
 
     // VSCode 风格的 Tab 头：固定槽位 + hover/选中显示 close 按钮
     private fun createVSCodeTabHeader(file: File): JPanel = JPanel().apply {
-        layout = java.awt.BorderLayout(); isOpaque = true; background = Color.WHITE
+        layout = java.awt.BorderLayout(); isOpaque = true; background = ThemeManager.currentTheme.surface
         val header = this
         var hovering = false
         val titleLabel = JLabel(file.name).apply {
@@ -284,7 +316,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                         // 极淡的白色半透明填充 + 细描边，避免出现深色块
                         g2.color = java.awt.Color(255, 255, 255, 20)
                         g2.fillRoundRect(0, 0, width, height, 6, 6)
-                        g2.color = ThemeManager.separator
+                        g2.color = ThemeManager.currentTheme.outline
                         g2.stroke = java.awt.BasicStroke(1f)
                         g2.drawRoundRect(1, 1, width - 2, height - 2, 6, 6)
                     } finally {
@@ -462,6 +494,8 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
 
         val textArea = TextArea().apply {
             font = Font("Consolas", Font.PLAIN, 14)
+            background = ThemeManager.currentTheme.editorBackground
+            foreground = ThemeManager.currentTheme.onSurface
             addCaretListener {
                 val caretPos = caretPosition
                 val line = try {
@@ -553,10 +587,13 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             textArea.text = "无法读取文件: ${e.message}"
             textArea.isEditable = false
         }
+        val theme = ThemeManager.currentTheme
         val scroll = RTextScrollPane(textArea).apply {
             border = javax.swing.BorderFactory.createEmptyBorder()
-            background = Color.WHITE
-            viewport.background = Color.WHITE
+            background = theme.editorBackground
+            viewport.background = theme.editorBackground
+            verticalScrollBar.background = theme.editorBackground
+            horizontalScrollBar.background = theme.editorBackground
         }
         // 让新建的编辑器视图也支持文件拖入
         installFileDropTarget(scroll)
@@ -604,6 +641,8 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
 
         val textArea = TextArea().apply {
             font = Font("Consolas", Font.PLAIN, 14)
+            background = ThemeManager.currentTheme.editorBackground
+            foreground = ThemeManager.currentTheme.onSurface
             text = ""  // 空内容
             addCaretListener {
                 val caretPos = caretPosition
@@ -667,10 +706,13 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             })
         }
 
+        val theme = ThemeManager.currentTheme
         val scroll = RTextScrollPane(textArea).apply {
             border = javax.swing.BorderFactory.createEmptyBorder()
-            background = Color.WHITE
-            viewport.background = Color.WHITE
+            background = theme.editorBackground
+            viewport.background = theme.editorBackground
+            verticalScrollBar.background = theme.editorBackground
+            horizontalScrollBar.background = theme.editorBackground
         }
         installFileDropTarget(scroll)
         installFileDropTarget(textArea)
@@ -814,7 +856,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
     }
 
     private fun createTabHeader(file: File): JPanel = JPanel().apply {
-        layout = java.awt.BorderLayout(); isOpaque = true; background = Color.WHITE
+        layout = java.awt.BorderLayout(); isOpaque = true; background = ThemeManager.currentTheme.surface
         val titleLabel = JLabel(file.name).apply {
             border = BorderFactory.createEmptyBorder(0, 8, 0, 6)
             horizontalAlignment = JLabel.LEFT
@@ -903,11 +945,12 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
     }
 
     private fun updateTabHeaderStyles() {
+        val theme = ThemeManager.currentTheme
         for (i in 0 until tabbedPane.tabCount) {
             val comp = tabbedPane.getTabComponentAt(i) as? JPanel ?: continue
             val isSelected = (i == tabbedPane.selectedIndex)
             comp.isOpaque = true
-            comp.background = Color.WHITE
+            comp.background = theme.surface
 
             // 文本颜色区分选中与未选中
             val label = comp.getClientProperty("titleLabel") as? JLabel
@@ -1602,12 +1645,13 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                         val g2d = g.create() as Graphics2D
                         try {
                             if (isSelected) {
-                                // 选中状态：白色背景
-                                g2d.color = Color.WHITE
+                                // 选中状态：使用主题背景色
+                                val theme = ThemeManager.currentTheme
+                                g2d.color = theme.surface
                                 g2d.fillRect(x, y, w, h)
 
-                                // 蓝色底部边框
-                                g2d.color = Color(0, 120, 212)
+                                // 主题主色底部边框
+                                g2d.color = theme.primary
                                 g2d.fillRect(x, y + h - 2, w, 2)
                             } else {
                                 // 未选中状态：透明背景
@@ -2119,19 +2163,16 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             val content = Files.readString(file.toPath())
             smaliOriginalContent = content
 
-            // 创建底部标签面板（参考 jadx 样式）
+            // 创建底部标签面板（简洁样式）
             smaliViewTabs = JTabbedPane().apply {
                 tabPlacement = JTabbedPane.TOP
                 tabLayoutPolicy = JTabbedPane.SCROLL_TAB_LAYOUT
                 border = BorderFactory.createMatteBorder(1, 0, 0, 0, Color(220, 220, 220))
                 background = Color(250, 250, 250)
-                preferredSize = Dimension(0, 40)
-                minimumSize = Dimension(0, 40)
-                maximumSize = Dimension(Int.MAX_VALUE, 40)
-                isVisible = true
-                isOpaque = true
+                preferredSize = Dimension(0, 36)
+                maximumSize = Dimension(Int.MAX_VALUE, 36)
 
-                // 设置简洁的标签页样式（参考 jadx）
+                // 设置简洁的标签页样式
                 setUI(object : javax.swing.plaf.basic.BasicTabbedPaneUI() {
                     override fun installDefaults() {
                         super.installDefaults()
@@ -2154,12 +2195,13 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                         val g2d = g.create() as Graphics2D
                         try {
                             if (isSelected) {
-                                // 选中状态：白色背景
-                                g2d.color = Color.WHITE
+                                // 选中状态：使用主题背景色
+                                val theme = ThemeManager.currentTheme
+                                g2d.color = theme.surface
                                 g2d.fillRect(x, y, w, h)
 
-                                // 蓝色底部边框
-                                g2d.color = Color(0, 120, 212)
+                                // 主题主色底部边框
+                                g2d.color = theme.primary
                                 g2d.fillRect(x, y + h - 2, w, 2)
                             } else {
                                 // 未选中状态：透明背景
