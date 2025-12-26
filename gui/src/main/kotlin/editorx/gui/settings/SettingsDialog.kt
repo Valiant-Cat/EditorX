@@ -8,6 +8,7 @@ import editorx.gui.main.MainWindow
 import java.awt.BorderLayout
 import java.awt.CardLayout
 import java.awt.Color
+import java.awt.Container
 import java.awt.Dimension
 import java.awt.FlowLayout
 import java.awt.Font
@@ -23,9 +24,13 @@ import javax.swing.JList
 import javax.swing.JPanel
 import javax.swing.JScrollPane
 import javax.swing.JSplitPane
+import javax.swing.InputMap
+import javax.swing.KeyStroke
 import javax.swing.ListSelectionModel
 import javax.swing.SwingUtilities
 import javax.swing.WindowConstants
+import java.awt.event.ActionEvent
+import java.awt.event.KeyEvent
 
 class SettingsDialog(
     owner: MainWindow,
@@ -74,6 +79,22 @@ class SettingsDialog(
                 val item = value as? SectionItem
                 c.text = item?.label() ?: ""
                 c.border = BorderFactory.createEmptyBorder(4, 12, 4, 12)
+                
+                // 检查当前面板是否有待保存的更改
+                val currentPanel = getPanelForSection(item?.section)
+                val hasChanges = currentPanel is SettingsPanel && currentPanel.hasPendingChanges()
+                
+                // 设置选中项的颜色
+                if (isSelected) {
+                    c.background = Color(0x3D, 0x8E, 0xF6) // 蓝色背景
+                    c.foreground = Color.WHITE // 白色文字
+                } else {
+                    c.background = Color.WHITE
+                    // 如果有待保存的更改，文字显示为蓝色
+                    c.foreground = if (hasChanges) Color(0x3D, 0x8E, 0xF6) else Color.BLACK
+                }
+                c.isOpaque = true
+                
                 return c
             }
         }
@@ -81,6 +102,26 @@ class SettingsDialog(
             val item = selectedValue ?: return@addListSelectionListener
             showSection(item.section)
         }
+    }
+    
+    /**
+     * 根据 Section 获取对应的面板
+     */
+    private fun getPanelForSection(section: Section?): JPanel? {
+        return when (section) {
+            Section.APPEARANCE -> appearancePanel
+            Section.KEYMAP -> keymapPanel
+            Section.PLUGINS -> pluginsPanel
+            Section.CACHE -> cachePanel
+            null -> null
+        }
+    }
+    
+    /**
+     * 当面板的更改状态更新时调用（由 SettingsPanel 调用）
+     */
+    fun onPanelChangesUpdated() {
+        navigation.repaint()
     }
 
     private val i18nListener = {
@@ -110,11 +151,27 @@ class SettingsDialog(
         navigation.selectedIndex = listModel.elements().asSequence().indexOfFirst { it.section == defaultSection }
             .takeIf { it >= 0 } ?: 0
 
+        // 注册 ESC 键关闭对话框
+        setupEscKeyBinding()
+
         I18n.addListener(i18nListener)
         addWindowListener(object : java.awt.event.WindowAdapter() {
             override fun windowClosed(e: java.awt.event.WindowEvent?) {
                 pluginsPanel.disposePanel()
                 I18n.removeListener(i18nListener)
+            }
+        })
+    }
+    
+    private fun setupEscKeyBinding() {
+        val escKey = KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0)
+        val inputMap = rootPane.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT)
+        val actionMap = rootPane.actionMap
+        
+        inputMap.put(escKey, "closeDialog")
+        actionMap.put("closeDialog", object : javax.swing.AbstractAction() {
+            override fun actionPerformed(e: ActionEvent?) {
+                dispose()
             }
         })
     }
@@ -154,13 +211,36 @@ class SettingsDialog(
             add(inner, BorderLayout.CENTER)
         }
 
-        return JSplitPane(JSplitPane.HORIZONTAL_SPLIT, navigationPane, contentWrapper).apply {
+        val mainSplitPane = JSplitPane(JSplitPane.HORIZONTAL_SPLIT, navigationPane, contentWrapper).apply {
             setDividerLocation(240)
             setResizeWeight(0.0)
             isOneTouchExpandable = false
             setContinuousLayout(true)
             border = BorderFactory.createEmptyBorder()
         }
+        
+        // 在 SettingsDialog 的 JSplitPane divider 上添加鼠标监听器
+        // 检查鼠标是否在 PluginsPanel 区域内，如果是则阻止拖拽
+        val mainDivider = (mainSplitPane.ui as? javax.swing.plaf.basic.BasicSplitPaneUI)?.divider
+        mainDivider?.addMouseListener(object : java.awt.event.MouseAdapter() {
+            override fun mousePressed(e: java.awt.event.MouseEvent) {
+                // 检查鼠标是否在 PluginsPanel 的 JSplitPane divider 区域内
+                if (isMouseOverPluginsPanelDivider(e)) {
+                    e.consume()
+                }
+            }
+        })
+        
+        mainDivider?.addMouseMotionListener(object : java.awt.event.MouseMotionAdapter() {
+            override fun mouseDragged(e: java.awt.event.MouseEvent) {
+                // 如果正在拖拽 PluginsPanel 的 JSplitPane，则阻止 SettingsDialog 的 JSplitPane 拖拽
+                if (isMouseOverPluginsPanelDivider(e)) {
+                    e.consume()
+                }
+            }
+        })
+        
+        return mainSplitPane
     }
 
     private fun buildFooter(): JComponent {
@@ -178,8 +258,27 @@ class SettingsDialog(
             })
             add(JButton(I18n.translate(I18nKeys.Action.CONFIRM)).apply {
                 addActionListener {
+                    // 应用所有面板的更改
+                    var needRestart = false
+                    
+                    // 应用外观设置的更改
+                    needRestart = appearancePanel.applyChanges() || needRestart
+                    
+                    // 应用其他面板的更改（如果它们继承 SettingsPanel）
+                    (keymapPanel as? SettingsPanel)?.apply { needRestart = applyChanges() || needRestart }
+                    (pluginsPanel as? SettingsPanel)?.apply { needRestart = applyChanges() || needRestart }
+                    (cachePanel as? SettingsPanel)?.apply { needRestart = applyChanges() || needRestart }
+                    
+                    // 同步所有设置
                     environment.settings.sync()
-                    dispose()
+                    
+                    // 如果语言改变需要重启，显示提示对话框
+                    if (needRestart && appearancePanel.showRestartDialog()) {
+                        // 用户选择重启，退出应用
+                        System.exit(0)
+                    } else {
+                        dispose()
+                    }
                 }
             })
         }
@@ -210,6 +309,48 @@ class SettingsDialog(
         navigation.repaint()
         contentPanel.revalidate()
         contentPanel.repaint()
+    }
+    
+    /**
+     * 检查鼠标是否在 PluginsPanel 的 JSplitPane divider 上
+     */
+    private fun isMouseOverPluginsPanelDivider(e: java.awt.event.MouseEvent): Boolean {
+        // 检查当前显示的面板是否是 PluginsPanel
+        // 通过检查 CardLayout 当前显示的组件来判断
+        val currentComponent = contentPanel.components.firstOrNull { it.isVisible } ?: return false
+        if (currentComponent != pluginsPanel) return false
+        
+        // 检查 PluginsPanel 内部是否有 JSplitPane
+        val pluginSplitPane = findJSplitPane(pluginsPanel) ?: return false
+        
+        // 获取 PluginsPanel 的 JSplitPane divider
+        val pluginDivider = (pluginSplitPane.ui as? javax.swing.plaf.basic.BasicSplitPaneUI)?.divider ?: return false
+        
+        // 将鼠标坐标转换为 PluginsPanel 的 JSplitPane divider 的坐标系统
+        val point = SwingUtilities.convertPoint(e.component, e.point, pluginDivider)
+        
+        // 检查鼠标是否在 divider 的边界内（包括一些容差范围，因为 divider 可能很窄）
+        val bounds = pluginDivider.bounds
+        val tolerance = 5 // 5像素容差
+        return point.x >= bounds.x - tolerance && 
+               point.x <= bounds.x + bounds.width + tolerance &&
+               point.y >= bounds.y - tolerance && 
+               point.y <= bounds.y + bounds.height + tolerance
+    }
+    
+    /**
+     * 递归查找组件中的第一个 JSplitPane
+     */
+    private fun findJSplitPane(component: java.awt.Component): JSplitPane? {
+        if (component is JSplitPane) {
+            return component
+        }
+        if (component is Container) {
+            for (i in 0 until component.componentCount) {
+                findJSplitPane(component.getComponent(i))?.let { return it }
+            }
+        }
+        return null
     }
 
 }

@@ -13,22 +13,32 @@ import javax.swing.Box
 import javax.swing.BoxLayout
 import javax.swing.ButtonGroup
 import javax.swing.JLabel
+import javax.swing.JOptionPane
 import javax.swing.JPanel
 import javax.swing.JRadioButton
+import javax.swing.SwingUtilities
 
-class AppearancePanel(private val settings: Store) : JPanel(BorderLayout()) {
+class AppearancePanel(private val settings: Store) : SettingsPanel() {
+    
+    // 保存原始值，用于比较是否有实际更改
+    private var originalLocale: Locale? = null
+    private var originalTheme: Theme? = null
     private val languageButtons = mutableMapOf<Locale, JRadioButton>()
     private val languageGroup = ButtonGroup()
     private val lightThemeButton = JRadioButton()
     private val darkThemeButton = JRadioButton()
     private val headerLabel = JLabel()
-    private val footerLabel = JLabel()
     private val languagePanel = JPanel()
     private val themePanel = JPanel()
+    
+    companion object {
+        private const val LOCALE_KEY = "ui.locale"
+        private const val THEME_KEY = "ui.theme"
+        private const val PENDING_LOCALE = "pending.locale"
+        private const val PENDING_THEME = "pending.theme"
+    }
 
     init {
-        border = BorderFactory.createEmptyBorder(16, 16, 16, 16)
-
         headerLabel.font = headerLabel.font.deriveFont(Font.BOLD, 16f)
         headerLabel.border = BorderFactory.createEmptyBorder(0, 0, 12, 0)
         
@@ -48,8 +58,6 @@ class AppearancePanel(private val settings: Store) : JPanel(BorderLayout()) {
         themePanel.add(lightThemeButton)
         themePanel.add(Box.createVerticalStrut(8))
         themePanel.add(darkThemeButton)
-
-        footerLabel.border = BorderFactory.createEmptyBorder(12, 0, 0, 0)
         
         val mainPanel = JPanel().apply {
             layout = BoxLayout(this, BoxLayout.Y_AXIS)
@@ -58,34 +66,59 @@ class AppearancePanel(private val settings: Store) : JPanel(BorderLayout()) {
             add(themePanel)
         }
 
-        add(headerLabel, BorderLayout.NORTH)
-        add(mainPanel, BorderLayout.CENTER)
-        add(footerLabel, BorderLayout.SOUTH)
+        contentPanel.add(headerLabel, BorderLayout.NORTH)
+        contentPanel.add(mainPanel, BorderLayout.CENTER)
 
         refresh()
     }
 
-    fun refresh() {
-        val currentLocale = I18n.locale()
+    override fun refresh() {
+        // 从设置中读取保存的语言（可能是未生效的新语言）
+        val savedLocaleTag = settings.get(LOCALE_KEY, null)
+        val savedLocale = savedLocaleTag?.let { 
+            runCatching { Locale.forLanguageTag(it) }.getOrNull() 
+        } ?: I18n.locale()
+        
+        // 保存原始值
+        originalLocale = savedLocale
+        originalTheme = ThemeManager.currentTheme
+        
+        // 如果有待保存的语言，使用待保存的；否则使用保存的
+        val displayLocale = getPendingChange<Locale>(PENDING_LOCALE) ?: savedLocale
         
         // 更新语言选项按钮
-        updateLanguageButtons(currentLocale)
+        updateLanguageButtons(displayLocale)
         
-        // 更新界面文本
+        // 更新界面文本（使用当前运行时的语言）
         headerLabel.text = I18n.translate(I18nKeys.Settings.APPEARANCE)
         languagePanel.border = BorderFactory.createTitledBorder(I18n.translate(I18nKeys.Settings.LANGUAGE))
         themePanel.border = BorderFactory.createTitledBorder(I18n.translate(I18nKeys.Settings.THEME))
         
-        // 主题设置
-        val currentTheme = ThemeManager.currentTheme
-        when (currentTheme) {
+        // 主题设置：如果有待保存的主题，使用待保存的；否则使用当前的
+        val displayTheme = getPendingChange<Theme>(PENDING_THEME) ?: ThemeManager.currentTheme
+        when (displayTheme) {
             is Theme.Light -> lightThemeButton.isSelected = true
             is Theme.Dark -> darkThemeButton.isSelected = true
         }
         
         lightThemeButton.text = I18n.translate(I18nKeys.Theme.LIGHT)
         darkThemeButton.text = I18n.translate(I18nKeys.Theme.DARK)
-        footerLabel.text = I18n.translate(I18nKeys.Settings.APPEARANCE_TIP)
+        
+        // 更新按钮可见性
+        updateRevertButtonVisibility()
+    }
+    
+    /**
+     * 检查是否有实际的待保存更改（与原始值比较）
+     */
+    override fun hasActualPendingChanges(): Boolean {
+        val pendingLocale = getPendingChange<Locale>(PENDING_LOCALE)
+        val pendingTheme = getPendingChange<Theme>(PENDING_THEME)
+        
+        val localeChanged = pendingLocale != null && pendingLocale != originalLocale
+        val themeChanged = pendingTheme != null && pendingTheme != originalTheme
+        
+        return localeChanged || themeChanged
     }
 
     private fun updateLanguageButtons(currentLocale: Locale) {
@@ -135,34 +168,98 @@ class AppearancePanel(private val settings: Store) : JPanel(BorderLayout()) {
     }
 
     private fun changeLocale(locale: Locale) {
-        if (I18n.locale() == locale) return
-        I18n.setLocale(locale)
-        settings.put(LOCALE_KEY, locale.toLanguageTag())
-        settings.sync()
+        // 只更新UI选中状态，不立即保存
+        languageButtons.values.forEach { it.isSelected = false }
+        languageButtons[locale]?.isSelected = true
+        
+        // 记录待保存的语言
+        setPendingChange(PENDING_LOCALE, locale)
     }
     
     private fun changeTheme(theme: Theme) {
-        if (ThemeManager.currentTheme == theme) return
-        ThemeManager.currentTheme = theme
-        settings.put(THEME_KEY, ThemeManager.getThemeName(theme))
+        // 只更新UI选中状态，不立即保存
+        when (theme) {
+            is Theme.Light -> lightThemeButton.isSelected = true
+            is Theme.Dark -> darkThemeButton.isSelected = true
+        }
+        
+        // 记录待保存的主题
+        setPendingChange(PENDING_THEME, theme)
+    }
+    
+    /**
+     * 应用并保存所有更改
+     * @return 如果语言改变需要重启，返回 true
+     */
+    override fun applyChanges(): Boolean {
+        var needRestart = false
+        
+        // 保存语言设置
+        getPendingChange<Locale>(PENDING_LOCALE)?.let { locale ->
+            val currentLocaleTag = settings.get(LOCALE_KEY, null)
+            val currentLocale = currentLocaleTag?.let { 
+                runCatching { Locale.forLanguageTag(it) }.getOrNull() 
+            }
+            
+            if (currentLocale != locale) {
+                settings.put(LOCALE_KEY, locale.toLanguageTag())
+                needRestart = true
+            }
+        }
+        
+        // 保存主题设置
+        getPendingChange<Theme>(PENDING_THEME)?.let { theme ->
+            if (ThemeManager.currentTheme != theme) {
+                ThemeManager.currentTheme = theme
+                settings.put(THEME_KEY, ThemeManager.getThemeName(theme))
+            }
+        }
+        
+        // 清除所有待保存的更改
+        clearPendingChanges()
+        
         settings.sync()
+        return needRestart
+    }
+    
+    /**
+     * 显示重启提示对话框
+     * @return 如果用户选择重启，返回 true
+     */
+    fun showRestartDialog(): Boolean {
+        val options = arrayOf(
+            I18n.translate(I18nKeys.Dialog.RESTART),
+            I18n.translate(I18nKeys.Dialog.LATER)
+        )
+        
+        val result = JOptionPane.showOptionDialog(
+            SwingUtilities.getWindowAncestor(this),
+            I18n.translate(I18nKeys.Dialog.RESTART_REQUIRED_MESSAGE),
+            I18n.translate(I18nKeys.Dialog.RESTART_REQUIRED),
+            JOptionPane.YES_NO_OPTION,
+            JOptionPane.QUESTION_MESSAGE,
+            null,
+            options,
+            options[0] // 默认选中"重启"
+        )
+        
+        return result == JOptionPane.YES_OPTION
     }
 
     fun resetToDefault() {
         val defaultLocale = Locale.SIMPLIFIED_CHINESE
-        if (I18n.getAvailableLocales().contains(defaultLocale)) {
-            changeLocale(defaultLocale)
+        val localeToSet = if (I18n.getAvailableLocales().contains(defaultLocale)) {
+            defaultLocale
         } else {
             // 如果没有简体中文，使用第一个可用语言
-            I18n.getAvailableLocales().firstOrNull()?.let { changeLocale(it) }
+            I18n.getAvailableLocales().firstOrNull() ?: return
         }
-        lightThemeButton.isSelected = true
-        changeTheme(Theme.Light)
+        
+        // 先刷新界面
         refresh()
-    }
-
-    companion object {
-        private const val LOCALE_KEY = "ui.locale"
-        private const val THEME_KEY = "ui.theme"
+        
+        // 然后设置待保存的值
+        changeLocale(localeToSet)
+        changeTheme(Theme.Light)
     }
 }

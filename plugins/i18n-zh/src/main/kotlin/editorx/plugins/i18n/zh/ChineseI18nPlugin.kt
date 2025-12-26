@@ -50,6 +50,7 @@ private val dictionary = buildMap {
     put(I18nKeys.Action.ENABLE, "启用")
     put(I18nKeys.Action.DISABLE, "禁用")
     put(I18nKeys.Action.UNINSTALL, "卸载")
+    put(I18nKeys.Action.REVERT_CHANGES, "还原更改")
 
     put(I18nKeys.Settings.TITLE, "设置")
     put(I18nKeys.Settings.PREFERENCES, "设置项")
@@ -261,6 +262,12 @@ private val dictionary = buildMap {
     put(I18nKeys.Dialog.DELETE_RECENT_PROJECT, "删除最近项目")
     put(I18nKeys.Dialog.OPEN_APK_FILE, "打开 APK 文件")
     put(I18nKeys.Dialog.DETECTED_APK, "检测到 APK 文件。是否要将其转换为项目（反编译）？")
+    put(I18nKeys.Dialog.LANGUAGE_CHANGED, "语言已更改")
+    put(I18nKeys.Dialog.LANGUAGE_CHANGED_MESSAGE, "新的语言将在下次应用程序启动时显示。")
+    put(I18nKeys.Dialog.RESTART_REQUIRED, "需要重启")
+    put(I18nKeys.Dialog.RESTART_REQUIRED_MESSAGE, "重启 EditorX 以使更改生效")
+    put(I18nKeys.Dialog.RESTART, "重启")
+    put(I18nKeys.Dialog.LATER, "以后再说")
 
     // 语言名称使用动态生成的 key
     put(I18nKeys.Lang.forLocale(Locale.forLanguageTag("zh")), "中文")

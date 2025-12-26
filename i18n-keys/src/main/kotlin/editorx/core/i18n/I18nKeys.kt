@@ -67,6 +67,7 @@ object I18nKeys {
         const val ENABLE = "action.enable"
         const val DISABLE = "action.disable"
         const val UNINSTALL = "action.uninstall"
+        const val REVERT_CHANGES = "action.revertChanges"
     }
 
     /**
@@ -211,6 +212,12 @@ object I18nKeys {
         const val DELETE_RECENT_PROJECT = "dialog.deleteRecentProject"
         const val OPEN_APK_FILE = "dialog.openApkFile"
         const val DETECTED_APK = "dialog.detectedApk"
+        const val LANGUAGE_CHANGED = "dialog.languageChanged"
+        const val LANGUAGE_CHANGED_MESSAGE = "dialog.languageChangedMessage"
+        const val RESTART_REQUIRED = "dialog.restartRequired"
+        const val RESTART_REQUIRED_MESSAGE = "dialog.restartRequiredMessage"
+        const val RESTART = "dialog.restart"
+        const val LATER = "dialog.later"
     }
 
     /**

@@ -39,6 +39,7 @@ class KeymapPanel : JPanel(BorderLayout()) {
             ShortcutItem("保存文件", "Save File", keyStroke(KeyEvent.VK_S), "保存当前编辑内容", "Save current content"),
             ShortcutItem("关闭标签页", "Close Tab", keyStroke(KeyEvent.VK_W), "关闭当前标签页", "Close active tab"),
             ShortcutItem("格式化文件", "Format File", formatKeyStroke(), "格式化当前文件", "Format current file"),
+            ShortcutItem("打开设置", "Open Settings", keyStroke(KeyEvent.VK_COMMA), "打开设置对话框", "Open settings dialog"),
         )
     }
 

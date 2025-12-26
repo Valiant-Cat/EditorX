@@ -113,6 +113,25 @@ class PluginsPanel(
     init {
         applyTexts()
         border = BorderFactory.createEmptyBorder(12, 12, 12, 12)
+        
+        // 在插件列表区域禁用对话框的拖拽功能，避免与插件面板内部的拖拽操作冲突
+        // 注意：这不会影响对话框标题栏的拖拽功能
+        pluginList.addMouseListener(object : java.awt.event.MouseAdapter() {
+            override fun mousePressed(e: java.awt.event.MouseEvent) {
+                // 在插件列表区域，阻止事件传播到对话框，避免触发对话框拖拽
+                if (e.source == pluginList) {
+                    e.consume()
+                }
+            }
+        })
+        pluginList.addMouseMotionListener(object : java.awt.event.MouseMotionAdapter() {
+            override fun mouseDragged(e: java.awt.event.MouseEvent) {
+                // 在插件列表区域拖拽时，阻止事件传播到对话框
+                if (e.source == pluginList) {
+                    e.consume()
+                }
+            }
+        })
 
         val leftPane = JScrollPane(pluginList).apply {
             preferredSize = Dimension(260, 0)
@@ -170,13 +189,57 @@ class PluginsPanel(
             add(detailPanel, BorderLayout.CENTER)
         }
 
-        add(actionRow, BorderLayout.NORTH)
-        add(JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftPane, centerPane).apply {
+        val pluginSplitPane = JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftPane, centerPane).apply {
             setDividerLocation(260)
             setResizeWeight(0.0)
             setContinuousLayout(true)
             border = BorderFactory.createEmptyBorder()
-        }, BorderLayout.CENTER)
+        }
+        
+        // 在插件列表的 JSplitPane 分割条上添加鼠标事件监听器
+        // 防止 SettingsDialog 的 JSplitPane 拖拽操作干扰插件列表的拖拽
+        // 通过 UI 获取 divider 组件
+        val divider = (pluginSplitPane.ui as? javax.swing.plaf.basic.BasicSplitPaneUI)?.divider
+        divider?.addMouseListener(object : java.awt.event.MouseAdapter() {
+            override fun mousePressed(e: java.awt.event.MouseEvent) {
+                // 阻止事件传播到父容器，避免触发 SettingsDialog 的 JSplitPane 拖拽
+                e.consume()
+            }
+            
+            override fun mouseReleased(e: java.awt.event.MouseEvent) {
+                // 阻止事件传播到父容器
+                e.consume()
+            }
+        })
+        
+        divider?.addMouseMotionListener(object : java.awt.event.MouseMotionAdapter() {
+            override fun mouseDragged(e: java.awt.event.MouseEvent) {
+                // 阻止事件传播到父容器，确保只有插件列表的 JSplitPane 响应拖拽
+                e.consume()
+            }
+        })
+        
+        // 在整个插件 JSplitPane 上添加鼠标监听器，确保拖拽时阻止事件传播
+        pluginSplitPane.addMouseListener(object : java.awt.event.MouseAdapter() {
+            override fun mousePressed(e: java.awt.event.MouseEvent) {
+                // 如果鼠标在 divider 上，阻止事件传播
+                if (e.source == divider || e.component == divider) {
+                    e.consume()
+                }
+            }
+        })
+        
+        pluginSplitPane.addMouseMotionListener(object : java.awt.event.MouseMotionAdapter() {
+            override fun mouseDragged(e: java.awt.event.MouseEvent) {
+                // 如果正在拖拽 divider，阻止事件传播
+                if (e.source == divider || e.component == divider) {
+                    e.consume()
+                }
+            }
+        })
+        
+        add(actionRow, BorderLayout.NORTH)
+        add(pluginSplitPane, BorderLayout.CENTER)
         add(statusLabel, BorderLayout.SOUTH)
 
         pluginManager.addListener(listener)

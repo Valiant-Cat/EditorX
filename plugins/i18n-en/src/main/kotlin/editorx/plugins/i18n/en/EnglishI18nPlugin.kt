@@ -50,6 +50,7 @@ private val dictionary = buildMap {
     put(I18nKeys.Action.ENABLE, "Enable")
     put(I18nKeys.Action.DISABLE, "Disable")
     put(I18nKeys.Action.UNINSTALL, "Uninstall")
+    put(I18nKeys.Action.REVERT_CHANGES, "Revert Changes")
 
     put(I18nKeys.Settings.TITLE, "Preferences")
     put(I18nKeys.Settings.PREFERENCES, "Preferences")
@@ -261,6 +262,12 @@ Developed by: XiaMao Tools""")
     put(I18nKeys.Dialog.DELETE_RECENT_PROJECT, "Delete Recent Project")
     put(I18nKeys.Dialog.OPEN_APK_FILE, "Open APK File")
     put(I18nKeys.Dialog.DETECTED_APK, "APK file detected. Convert to project (decompile)?")
+    put(I18nKeys.Dialog.LANGUAGE_CHANGED, "Language Changed")
+    put(I18nKeys.Dialog.LANGUAGE_CHANGED_MESSAGE, "The new language will be displayed the next time the application starts.")
+    put(I18nKeys.Dialog.RESTART_REQUIRED, "Restart Required")
+    put(I18nKeys.Dialog.RESTART_REQUIRED_MESSAGE, "Restart EditorX to make changes take effect")
+    put(I18nKeys.Dialog.RESTART, "Restart")
+    put(I18nKeys.Dialog.LATER, "Later")
     
     // 语言名称使用动态生成的 key
     put(I18nKeys.Lang.forLocale(Locale.forLanguageTag("zh")), "Chinese")

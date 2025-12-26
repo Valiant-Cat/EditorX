@@ -20,7 +20,11 @@ import javax.swing.JFileChooser
 import javax.swing.JFrame
 import javax.swing.JSplitPane
 import javax.swing.SwingUtilities
+import javax.swing.JOptionPane
 import editorx.gui.search.SearchDialog
+import editorx.gui.settings.SettingsDialog
+import editorx.core.i18n.I18n
+import editorx.core.i18n.I18nKeys
 
 class MainWindow(val guiContext: GuiContext) : JFrame() {
 
@@ -75,6 +79,7 @@ class MainWindow(val guiContext: GuiContext) : JFrame() {
         setupExplorer()
         setupDoubleShiftShortcut()
         setupCommandNShortcut()
+        setupCommandCommaShortcut()
     }
 
     private fun setupWindow() {
@@ -321,5 +326,42 @@ class MainWindow(val guiContext: GuiContext) : JFrame() {
                 false // 不消费事件
             }
         }
+    }
+
+    /**
+     * 设置 Command+, 快捷键（打开设置）
+     */
+    private fun setupCommandCommaShortcut() {
+        val focusManager = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager()
+        val shortcutMask = java.awt.Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx
+        focusManager.addKeyEventDispatcher { e ->
+            if (e.id == KeyEvent.KEY_PRESSED && 
+                e.keyCode == KeyEvent.VK_COMMA && 
+                (e.modifiersEx and shortcutMask) == shortcutMask &&
+                !e.isConsumed) {
+                SwingUtilities.invokeLater {
+                    showSettings()
+                }
+                true // 消费事件
+            } else {
+                false // 不消费事件
+            }
+        }
+    }
+
+    /**
+     * 显示设置对话框
+     */
+    fun showSettings() {
+        val pm = pluginManager ?: run {
+            JOptionPane.showMessageDialog(
+                this,
+                I18n.translate(I18nKeys.Dialog.PLUGIN_SYSTEM_NOT_INIT),
+                I18n.translate(I18nKeys.Dialog.TIP),
+                JOptionPane.INFORMATION_MESSAGE
+            )
+            return
+        }
+        SettingsDialog(this, guiContext, pm, SettingsDialog.Section.APPEARANCE).isVisible = true
     }
 }
