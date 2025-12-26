@@ -12,8 +12,10 @@ import editorx.gui.core.ShortcutRegistry
 import editorx.gui.main.editor.Editor
 import editorx.gui.main.explorer.Explorer
 import editorx.gui.main.menubar.MenuBar
+import editorx.gui.main.navigationbar.NavigationBar
 import editorx.gui.main.sidebar.SideBar
 import editorx.gui.main.statusbar.StatusBar
+import editorx.gui.main.titlebar.TitleBar
 import editorx.gui.main.toolbar.ToolBar
 import editorx.gui.search.SearchDialog
 import editorx.gui.settings.SettingsDialog
@@ -29,11 +31,13 @@ import javax.swing.*
 class MainWindow(val guiContext: GuiContext) : AppFrame() {
 
     // UI 组件
-    val titleBar by lazy { MenuBar(this) }
+    private val _menuBar by lazy { MenuBar(this) }
+    val titleBar by lazy { TitleBar(this) }
     val toolBar by lazy { ToolBar(this) }
     val sideBar by lazy { SideBar(this) }
     val editor by lazy { Editor(this) }
     val statusBar by lazy { StatusBar(this) }
+    val navigationBar by lazy { NavigationBar(this) }
 
     private val pluginListener = object : PluginManager.Listener {
         override fun onPluginChanged(pluginId: String) {
@@ -195,10 +199,23 @@ class MainWindow(val guiContext: GuiContext) : AppFrame() {
         // 布局
         layout = BorderLayout()
         // 正确安装菜单栏，避免某些 LAF 下作为普通组件加入导致不显示
-        jMenuBar = titleBar
+        jMenuBar = _menuBar
 
-        add(toolBar, BorderLayout.NORTH)
-        add(horizontalSplit, BorderLayout.CENTER)
+        // 将 titleBar 和 toolBar 放在一个垂直容器中
+        val topContainer = JPanel(BorderLayout()).apply {
+            isOpaque = false
+            add(titleBar, BorderLayout.NORTH)
+            add(toolBar, BorderLayout.SOUTH)
+        }
+        add(topContainer, BorderLayout.NORTH)
+
+        // 将 navigationBar 和 horizontalSplit 放在一个容器中
+        val centerContainer = JPanel(BorderLayout()).apply {
+            isOpaque = false
+            add(navigationBar, BorderLayout.NORTH)
+            add(horizontalSplit, BorderLayout.CENTER)
+        }
+        add(centerContainer, BorderLayout.CENTER)
         add(statusBar, BorderLayout.SOUTH)
     }
 
@@ -218,7 +235,7 @@ class MainWindow(val guiContext: GuiContext) : AppFrame() {
             horizontalSplit.dividerSize = if (visible) 4 else 0
 
             // 同步更新ToolBar中的侧边栏toggle按钮
-            toolBar.updateSideBarIcon(visible)
+            titleBar.updateSideBarIcon(visible)
         }
 
         // 添加自定义拖拽功能：在 SideBar 右边缘和 Editor 左边缘检测拖拽
@@ -355,5 +372,12 @@ class MainWindow(val guiContext: GuiContext) : AppFrame() {
         }
 
         SettingsDialog.showOrBringToFront(this, guiContext, pm, SettingsDialog.Section.APPEARANCE)
+    }
+
+    /**
+     * 更新面包屑导航栏
+     */
+    fun updateNavigation(currentFile: File?) {
+        navigationBar.update(currentFile)
     }
 }

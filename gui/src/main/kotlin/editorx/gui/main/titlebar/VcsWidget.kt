@@ -1,4 +1,4 @@
-package editorx.gui.main.statusbar
+package editorx.gui.main.titlebar
 
 import editorx.core.i18n.I18n
 import editorx.core.i18n.I18nKeys
@@ -21,12 +21,13 @@ import javax.swing.*
 class VcsWidget(private val workspace: Workspace) : JPanel() {
     companion object {
         private val logger = LoggerFactory.getLogger(VcsWidget::class.java)
+        private const val ICON_SIZE = 14
     }
 
     private val iconLabel = JLabel().apply {
-        preferredSize = Dimension(14, 14)
-        maximumSize = Dimension(14, 14)
-        minimumSize = Dimension(14, 14)
+        preferredSize = Dimension(ICON_SIZE, ICON_SIZE)
+        maximumSize = Dimension(ICON_SIZE, ICON_SIZE)
+        minimumSize = Dimension(ICON_SIZE, ICON_SIZE)
         horizontalAlignment = SwingConstants.CENTER
         verticalAlignment = SwingConstants.CENTER
     }

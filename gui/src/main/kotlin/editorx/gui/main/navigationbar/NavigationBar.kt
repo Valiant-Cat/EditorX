@@ -28,20 +28,23 @@ class NavigationBar(private val mainWindow: MainWindow) : JPanel() {
     init {
         layout = BoxLayout(this, BoxLayout.X_AXIS)
         isOpaque = true
-        preferredSize = java.awt.Dimension(0, 28)
+        isVisible = true
+        // 只设置最小高度，宽度由内容决定
         minimumSize = java.awt.Dimension(0, 28)
         updateTheme()
-        border = BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(0, 0, 1, 0, Color(0xDE, 0xDE, 0xDE)),
-            EmptyBorder(4, 8, 4, 12)
-        )
+        // 移除底部边框，因为它在 StatusBar 中，不需要单独边框
+        border = EmptyBorder(4, 8, 4, 12)
 
         // 监听主题变更
         ThemeManager.addThemeChangeListener { updateTheme() }
+        
+        // 初始化显示"未打开文件"
+        this@NavigationBar.update(null as File?)
     }
 
     private fun updateTheme() {
-        background = ThemeManager.currentTheme.editorBackground
+        // 使用 StatusBar 的背景色，使其与 StatusBar 融为一体
+        background = ThemeManager.currentTheme.statusBarBackground
         revalidate()
         repaint()
     }
@@ -61,6 +64,9 @@ class NavigationBar(private val mainWindow: MainWindow) : JPanel() {
                 }
             }
         }
+        // 确保组件可见
+        isVisible = true
+        // 让布局管理器重新计算大小
         revalidate()
         repaint()
     }

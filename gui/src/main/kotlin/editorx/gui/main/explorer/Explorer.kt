@@ -1150,7 +1150,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                             mainWindow.guiContext.workspace.openWorkspace(outputDir)
                             mainWindow.editor.updateNavigation(null)
                             refreshRoot()
-                            mainWindow.statusBar.updateVcsDisplay()
+                            mainWindow.titleBar.updateVcsDisplay()
                             mainWindow.statusBar.setMessage("已打开项目: ${outputDir.name}")
                         }
                         return
@@ -1186,7 +1186,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                             mainWindow.guiContext.workspace.openWorkspace(outputDir)
                             mainWindow.editor.updateNavigation(null)
                             refreshRoot()
-                            mainWindow.statusBar.updateVcsDisplay()
+                            mainWindow.titleBar.updateVcsDisplay()
                             mainWindow.statusBar.setMessage("APK反编译完成: ${outputDir.name}")
 
                             // 提示是否创建 Git 仓库
@@ -1493,7 +1493,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                                 mainWindow.guiContext.workspace.openWorkspace(dir)
                                 mainWindow.editor.updateNavigation(null)
                                 refreshRoot()
-                                mainWindow.statusBar.updateVcsDisplay()
+                                mainWindow.titleBar.updateVcsDisplay()
                                 mainWindow.statusBar.setMessage("已打开文件夹: ${dir.name}")
                                 dtde.dropComplete(true)
                             } else {

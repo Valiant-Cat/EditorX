@@ -23,9 +23,6 @@ class StatusBar(private val mainWindow: MainWindow) : JPanel() {
 
     private var currentMessageTimer: Timer? = null
 
-    // VCS Widget
-    private val vcsWidget = VcsWidget(mainWindow.guiContext.workspace)
-
     /////////////////////
     // 右侧子组件
     /////////////////////
@@ -87,11 +84,9 @@ class StatusBar(private val mainWindow: MainWindow) : JPanel() {
         preferredSize = Dimension(0, 28)
 
         // 安装子组件
-        add(Box.createHorizontalStrut(12))
         setupLeftComponents()
         add(Box.createHorizontalGlue())
         setupRightComponents()
-        add(Box.createHorizontalStrut(12))
 
         // 监听主题变更
         ThemeManager.addThemeChangeListener { updateTheme() }
@@ -113,13 +108,7 @@ class StatusBar(private val mainWindow: MainWindow) : JPanel() {
     }
 
     private fun setupLeftComponents() {
-//        add(statusLabel)
-//        add(Box.createHorizontalStrut(8))
-//        add(fileInfoLabel)
-//        add(Box.createHorizontalStrut(12))
-
-        // VCS Widget
-        add(vcsWidget)
+        add(mainWindow.navigationBar)
     }
 
     private fun setupRightComponents() {
@@ -314,12 +303,5 @@ class StatusBar(private val mainWindow: MainWindow) : JPanel() {
                 }
             }
         }
-    }
-
-    /**
-     * 更新 VCS Widget 的显示内容（显示 git 分支或"版本控制"）
-     */
-    fun updateVcsDisplay() {
-        vcsWidget.updateDisplay()
     }
 }

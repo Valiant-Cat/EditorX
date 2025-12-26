@@ -539,7 +539,7 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
         mainWindow.guiContext.workspace.openWorkspace(workspace)
         mainWindow.guiContext.workspace.addRecentWorkspace(workspace)
         (mainWindow.sideBar.getView("explorer") as? editorx.gui.main.explorer.Explorer)?.refreshRoot()
-        mainWindow.statusBar.updateVcsDisplay()
+        mainWindow.titleBar.updateVcsDisplay()
         // 自动打开资源管理器
         mainWindow.sideBar.showView("explorer")
         mainWindow.editor.showEditorContent()
