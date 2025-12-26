@@ -2,7 +2,6 @@ package editorx.gui.main.welcome
 
 import editorx.core.i18n.I18n
 import editorx.core.i18n.I18nKeys
-import editorx.core.plugin.gui.FileHandlerRegistry
 import editorx.core.util.IconLoader
 import editorx.core.util.IconRef
 import editorx.gui.ThemeManager
@@ -454,12 +453,8 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
             return
         }
 
-        // 先询问文件处理器是否要处理该文件
-        if (FileHandlerRegistry.handleOpenFile(selectedFile)) {
-            return
-        }
-
-        // 直接打开文件
+        // 直接调用 editor.openFile，让它统一处理文件处理器检查
+        // 这样可以避免重复调用文件处理器
         mainWindow.editor.openFile(selectedFile)
         mainWindow.guiContext.getWorkspace().addRecentFile(selectedFile)
         mainWindow.editor.showEditorContent()
