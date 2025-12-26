@@ -26,30 +26,46 @@ class ApkFileHandler(private val gui: PluginGuiProvider) : FileHandler {
     }
 
     override fun handleOpenFile(file: File): Boolean {
-        // 在 EDT 线程中显示对话框
-        SwingUtilities.invokeLater {
-            val result = JOptionPane.showConfirmDialog(
+        // 同步等待用户选择，避免异步操作导致的循环调用问题
+        var result: Int = JOptionPane.CLOSED_OPTION
+        if (SwingUtilities.isEventDispatchThread()) {
+            // 如果已经在 EDT 线程，直接显示对话框
+            result = JOptionPane.showConfirmDialog(
                 null,
                 I18n.translate(I18nKeys.Dialog.DETECTED_APK),
                 I18n.translate(I18nKeys.Dialog.OPEN_APK_FILE),
                 JOptionPane.YES_NO_OPTION,
                 JOptionPane.QUESTION_MESSAGE
             )
-
-            when (result) {
-                JOptionPane.YES_OPTION -> {
-                    // 转为项目：反编译 APK
-                    handleApkFileConversion(file)
-                }
-                JOptionPane.NO_OPTION -> {
-                    // 直接打开文件
-                    gui.openFile(file)
-                }
-                // 其他情况（关闭对话框）：什么都不做
+        } else {
+            // 如果不在 EDT 线程，使用 invokeAndWait 同步等待
+            SwingUtilities.invokeAndWait {
+                result = JOptionPane.showConfirmDialog(
+                    null,
+                    I18n.translate(I18nKeys.Dialog.DETECTED_APK),
+                    I18n.translate(I18nKeys.Dialog.OPEN_APK_FILE),
+                    JOptionPane.YES_NO_OPTION,
+                    JOptionPane.QUESTION_MESSAGE
+                )
             }
         }
-        // 返回 true 表示已处理（无论用户选择什么，都不再继续默认处理）
-        return true
+
+        when (result) {
+            JOptionPane.YES_OPTION -> {
+                // 转为项目：反编译 APK
+                handleApkFileConversion(file)
+                return true // 已处理，不再继续
+            }
+            JOptionPane.NO_OPTION -> {
+                // 直接打开文件，返回 false 让 Editor 的默认逻辑处理
+                // 由于 FileHandlerRegistry 会跟踪正在处理的文件，不会再次触发处理器
+                return false
+            }
+            else -> {
+                // 用户取消或关闭对话框：什么都不做
+                return true // 已处理（用户取消了），不再继续
+            }
+        }
     }
 
     /**
