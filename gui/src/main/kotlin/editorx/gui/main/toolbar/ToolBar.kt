@@ -5,6 +5,7 @@ import editorx.core.i18n.I18nKeys
 import editorx.core.external.ApkTool
 import editorx.core.util.IconLoader
 import editorx.core.util.IconRef
+import editorx.core.util.SystemUtils
 import editorx.gui.ThemeManager
 import editorx.gui.main.MainWindow
 import editorx.gui.main.explorer.Explorer
@@ -65,10 +66,6 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
         })
     }
 
-    private fun isMacOS(): Boolean {
-        return System.getProperty("os.name").lowercase().contains("mac")
-    }
-
     private fun updateTheme() {
         background = ThemeManager.currentTheme.toolbarBackground
         revalidate()
@@ -117,7 +114,7 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
     }
 
     private fun setupLeftActions() {
-        if (isMacOS()) {
+        if (SystemUtils.isMacOS()) {
             // macOS 模式：左侧留空（给系统控制按钮），中间显示标题，右侧显示按钮
             add(Box.createHorizontalStrut(70)) // 为 macOS 交通灯按钮留空间
         }

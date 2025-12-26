@@ -6,6 +6,7 @@ import editorx.core.plugin.PluginManager
 import editorx.core.plugin.loader.PluginLoaderImpl
 import editorx.core.store.Store
 import editorx.core.util.StartupTimer
+import editorx.core.util.SystemUtils
 import editorx.gui.main.MainWindow
 import editorx.gui.plugin.PluginGuiClientImpl
 import org.slf4j.LoggerFactory
@@ -18,23 +19,13 @@ import javax.swing.SwingUtilities
  */
 fun main() {
     val startupTimer = StartupTimer("EditorX")
-    // 将日志写入用户目录，便于排查问题（slf4j-simple 需在首次获取 Logger 前设置）
-    runCatching {
-        val appDir = File(System.getProperty("user.home"), ".editorx")
-        val logDir = File(appDir, "logs")
-        logDir.mkdirs()
-        System.setProperty("org.slf4j.simpleLogger.logFile", File(logDir, "editorx.log").absolutePath)
-        System.setProperty("org.slf4j.simpleLogger.showDateTime", "true")
-        System.setProperty("org.slf4j.simpleLogger.dateTimeFormat", "yyyy-MM-dd HH:mm:ss.SSS")
-        System.setProperty("org.slf4j.simpleLogger.showThreadName", "true")
-        System.setProperty("org.slf4j.simpleLogger.defaultLogLevel", "info")
-        // 同时输出到控制台
-        System.setProperty("org.slf4j.simpleLogger.showLogName", "false")
-        System.setProperty("org.slf4j.simpleLogger.showShortLogName", "true")
-    }
 
-    Thread.setDefaultUncaughtExceptionHandler { _, exception ->
-        LoggerFactory.getLogger("UncaughtException").error("未捕获的异常", exception)
+    // 初始化日志系统
+    setupLogging()
+
+    // 全局未捕获异常处理器
+    Thread.setDefaultUncaughtExceptionHandler { _, ex ->
+        LoggerFactory.getLogger("UncaughtException").error("未捕获的异常", ex)
     }
 
     SwingUtilities.invokeLater {
@@ -48,54 +39,39 @@ fun main() {
     }
 }
 
+private fun setupLogging() {
+    runCatching {
+        val logFile = File(System.getProperty("user.home"), ".editorx/logs/editorx.log").apply { parentFile.mkdirs() }
+        with(System.getProperties()) {
+            setProperty("org.slf4j.simpleLogger.logFile", logFile.absolutePath)
+            setProperty("org.slf4j.simpleLogger.showDateTime", "true")
+            setProperty("org.slf4j.simpleLogger.dateTimeFormat", "yyyy-MM-dd HH:mm:ss.SSS")
+            setProperty("org.slf4j.simpleLogger.showThreadName", "true")
+            setProperty("org.slf4j.simpleLogger.defaultLogLevel", "info")
+            setProperty("org.slf4j.simpleLogger.showShortLogName", "true")
+            setProperty("org.slf4j.simpleLogger.showLogName", "false")
+        }
+    }.onFailure { e ->
+        System.err.println("无法初始化日志目录: ${e.message}")
+    }
+}
+
 private fun initializeApplication(timer: StartupTimer) {
-    try {
+    // 设置 Look and Feel
+    runCatching {
         FlatLightLaf.setup()
-    } catch (e: Exception) {
-        LoggerFactory.getLogger("GuiApp").warn("无法设置系统外观", e)
+    }.onFailure { e ->
+        LoggerFactory.getLogger("GuiApp").warn("无法设置 FlatLaf 外观", e)
     }
     timer.mark("laf.setup")
 
-    // 在 macOS 上将菜单集成到系统顶栏；其他平台保留在窗口内
-    if (System.getProperty("os.name").lowercase().contains("mac")) {
+    // macOS 系统菜单集成
+    if (SystemUtils.isMacOS()) {
         System.setProperty("apple.laf.useScreenMenuBar", "true")
         System.setProperty("com.apple.mrj.application.apple.menu.about.name", "EditorX")
     }
 
-    // 设置应用图标（使用 Taskbar API，支持 Java 9+）
-    runCatching {
-        val classLoader = Thread.currentThread().contextClassLoader ?: ClassLoader.getSystemClassLoader()
-        val iconUrl = classLoader.getResource("icon_round_128.png")
-        if (iconUrl != null) {
-            val image = java.awt.Toolkit.getDefaultToolkit().getImage(iconUrl)
-            // 使用 Taskbar API（Java 9+），这是跨平台的现代方法
-            val taskbar = java.awt.Taskbar.getTaskbar()
-            if (taskbar.isSupported(java.awt.Taskbar.Feature.ICON_IMAGE)) {
-                taskbar.setIconImage(image)
-                LoggerFactory.getLogger("GuiApp").info("成功设置应用图标（Taskbar API）")
-            } else {
-                // 回退到旧方法（仅 macOS）
-                if (System.getProperty("os.name").lowercase().contains("mac")) {
-                    runCatching {
-                        val appClass = Class.forName("com.apple.eawt.Application")
-                        val getApplicationMethod = appClass.getMethod("getApplication")
-                        val application = getApplicationMethod.invoke(null)
-                        val setDockIconImageMethod = appClass.getMethod("setDockIconImage", java.awt.Image::class.java)
-                        setDockIconImageMethod.invoke(application, image)
-                        LoggerFactory.getLogger("GuiApp").info("成功设置 macOS Dock 图标（旧方法）")
-                    }.onFailure { e ->
-                        LoggerFactory.getLogger("GuiApp").warn("无法设置 macOS Dock 图标", e)
-                    }
-                }
-            }
-        } else {
-            LoggerFactory.getLogger("GuiApp").warn("无法找到图标资源: icon.png")
-        }
-    }.onFailure { e ->
-        LoggerFactory.getLogger("GuiApp").warn("无法设置应用图标", e)
-    }
-
-    // 安装 Material3 主题到 Swing 默认，确保面板/滚动/标签等遵循统一色板
+    // 安装全局主题
     ThemeManager.installToSwing()
     timer.mark("theme.installed")
 
@@ -105,59 +81,54 @@ private fun initializeApplication(timer: StartupTimer) {
 private fun initializeMainWindow(startupTimer: StartupTimer) {
     val appDir = File(System.getProperty("user.home"), ".editorx")
     val guiContext = GuiContext(appDir)
-    val disabled = loadDisabledSet(guiContext.settings)
     startupTimer.mark("environment.ready")
 
-    // 加载保存的主题
-    guiContext.settings.get("ui.theme", null)?.let { themeName ->
-        val theme = ThemeManager.loadTheme(themeName)
-        ThemeManager.currentTheme = theme
-    }
-
-    // 加载保存的语言
+    // 恢复保存的语言
     guiContext.settings.get("ui.locale", null)?.let { tag ->
         runCatching { Locale.forLanguageTag(tag) }
             .getOrNull()
             ?.takeIf { it.language.isNotBlank() }
-            ?.let { locale ->
-                if (editorx.core.i18n.I18n.locale() != locale) {
-                    editorx.core.i18n.I18n.setLocale(locale)
-                }
-            }
+            ?.takeIf { it != editorx.core.i18n.I18n.locale() }
+            ?.let { editorx.core.i18n.I18n.setLocale(it) }
     }
 
-    // 初始化插件框架
-    val pluginManager = PluginManager()
-    pluginManager.setInitialDisabled(disabled)
-    pluginManager.registerContextInitializer { pluginContext ->
-        val pluginGuiClient = PluginGuiClientImpl(pluginContext.pluginId(), guiContext)
-        pluginContext.setGuiClient(pluginGuiClient)
+    // 恢复保存的主题
+    guiContext.settings.get("ui.theme", null)?.let { name ->
+        ThemeManager.loadTheme(name).let { theme ->
+            ThemeManager.currentTheme = theme
+        }
     }
-    val loadLogger = LoggerFactory.getLogger("StartupTimer")
-    val loadTimer = StartupTimer("PluginLoad")
-    pluginManager.loadAll(PluginLoaderImpl())
-    loadTimer.mark("scanned")
+
+    // 初始化插件化框架
+    val disabledPlugins = loadDisabledSet(guiContext.settings)
+    val pluginManager = PluginManager().apply {
+        setInitialDisabled(disabledPlugins)
+        registerContextInitializer { ctx ->
+            ctx.setGuiClient(PluginGuiClientImpl(ctx.pluginId(), guiContext))
+        }
+    }
 
     SwingUtilities.invokeLater {
-        // 在打开主窗口前，初始化需要在启动时机激活的插件
-        startupTimer.mark("plugins.loaded")
+        // 扫描并启动需在应用初始化时激活的插件（如语言包）
+        pluginManager.scanPlugins(PluginLoaderImpl())
         pluginManager.triggerStartup()
         startupTimer.mark("plugins.started")
-        loadTimer.mark("started")
-        loadTimer.dump(loadLogger)
-        startupTimer.dump(loadLogger)
 
-        // 显示主窗口
-        val mv = MainWindow(guiContext)
-        mv.pluginManager = pluginManager
-        mv.isVisible = true
+        // 创建并显示主窗口
+        val mainWindow = MainWindow(guiContext)
+        mainWindow.pluginManager = pluginManager
+        mainWindow.isVisible = true
         startupTimer.mark("window.visible")
+
+        // 打印启动计时日志
+        val startupLogger = LoggerFactory.getLogger("StartupTimer")
+        startupTimer.dump(startupLogger)
     }
 }
 
 private fun loadDisabledSet(settings: Store): Set<String> {
     return settings.get("plugins.disabled", "")
-        ?.split(',')
+        ?.splitToSequence(',')
         ?.map { it.trim() }
         ?.filter { it.isNotEmpty() }
         ?.toSet()

@@ -335,7 +335,7 @@ class PluginsPanel(
 
     private fun scanPlugins() {
         val before = pluginManager.listPlugins().map { it.id }.toSet()
-        pluginManager.loadAll(PluginLoaderImpl())
+        pluginManager.scanPlugins(PluginLoaderImpl())
         reloadList()
         val after = pluginManager.listPlugins().map { it.id }
         val newlyLoaded = after.filterNot { before.contains(it) }
@@ -460,7 +460,7 @@ class PluginsPanel(
         }
 
         val before = pluginManager.listPlugins().map { it.id }.toSet()
-        pluginManager.loadAll(PluginLoaderImpl())
+        pluginManager.scanPlugins(PluginLoaderImpl())
         val newRecords = pluginManager.listPlugins().filterNot { before.contains(it.id) }
         newRecords.forEach { pluginManager.startPlugin(it.id) }
         reloadList()

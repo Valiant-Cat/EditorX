@@ -440,53 +440,64 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
         if (fileName != null && dir != null) {
             val selectedFile = File(dir, fileName)
             if (selectedFile.isFile && selectedFile.canRead()) {
-                val ext = selectedFile.extension.lowercase()
+                handleOpenFile(selectedFile)
+            }
+        }
+    }
 
-                // 检查是否为 APK 文件（目前仅支持 APK）
-                if (ext == "apk") {
-                    // 提示是否转为项目
-                    val result = JOptionPane.showConfirmDialog(
-                        mainWindow,
-                        "检测到 APK 文件。是否要将其转换为项目（反编译）？",
-                        "打开 APK 文件",
-                        JOptionPane.YES_NO_OPTION,
-                        JOptionPane.QUESTION_MESSAGE
-                    )
+    /**
+     * 处理打开文件的逻辑（可被 openFile 和拖拽使用）
+     */
+    private fun handleOpenFile(selectedFile: File) {
+        if (!selectedFile.isFile || !selectedFile.canRead()) {
+            return
+        }
 
-                    when (result) {
-                        JOptionPane.YES_OPTION -> {
-                            // 转为项目：使用 Explorer 的处理方法
-                            val explorer = mainWindow.sideBar.getView("explorer") as? editorx.gui.main.explorer.Explorer
-                            if (explorer != null) {
-                                explorer.handleApkFileConversion(selectedFile)
-                                // 显示资源管理器
-                                mainWindow.sideBar.showView("explorer")
-                                mainWindow.editor.showEditorContent()
-                            } else {
-                                JOptionPane.showMessageDialog(
-                                    mainWindow,
-                                    "无法获取 Explorer 实例，请稍后重试",
-                                    "错误",
-                                    JOptionPane.ERROR_MESSAGE
-                                )
-                            }
-                        }
+        val ext = selectedFile.extension.lowercase()
 
-                        JOptionPane.NO_OPTION -> {
-                            // 直接打开文件
-                            mainWindow.editor.openFile(selectedFile)
-                            mainWindow.guiContext.workspace.addRecentFile(selectedFile)
-                            mainWindow.editor.showEditorContent()
-                        }
-                        // 其他情况（关闭对话框）：什么都不做
+        // 检查是否为 APK 文件（目前仅支持 APK）
+        if (ext == "apk") {
+            // 提示是否转为项目
+            val result = JOptionPane.showConfirmDialog(
+                mainWindow,
+                "检测到 APK 文件。是否要将其转换为项目（反编译）？",
+                "打开 APK 文件",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE
+            )
+
+            when (result) {
+                JOptionPane.YES_OPTION -> {
+                    // 转为项目：使用 Explorer 的处理方法
+                    val explorer = mainWindow.sideBar.getView("explorer") as? editorx.gui.main.explorer.Explorer
+                    if (explorer != null) {
+                        explorer.handleApkFileConversion(selectedFile)
+                        // 显示资源管理器
+                        mainWindow.sideBar.showView("explorer")
+                        mainWindow.editor.showEditorContent()
+                    } else {
+                        JOptionPane.showMessageDialog(
+                            mainWindow,
+                            "无法获取 Explorer 实例，请稍后重试",
+                            "错误",
+                            JOptionPane.ERROR_MESSAGE
+                        )
                     }
-                } else {
+                }
+
+                JOptionPane.NO_OPTION -> {
                     // 直接打开文件
                     mainWindow.editor.openFile(selectedFile)
                     mainWindow.guiContext.workspace.addRecentFile(selectedFile)
                     mainWindow.editor.showEditorContent()
                 }
+                // 其他情况（关闭对话框）：什么都不做
             }
+        } else {
+            // 直接打开文件
+            mainWindow.editor.openFile(selectedFile)
+            mainWindow.guiContext.workspace.addRecentFile(selectedFile)
+            mainWindow.editor.showEditorContent()
         }
     }
 
@@ -577,21 +588,30 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
                         @Suppress("UNCHECKED_CAST")
                         val files = transferable.getTransferData(flavor) as List<File>
 
-                        // 检查是否有文件夹可以打开为工作区
+                        if (files.isEmpty()) {
+                            dtde.dropComplete(false)
+                            return
+                        }
+
+                        // 优先处理文件夹（与 openProject 相同效果）
                         val dir = files.firstOrNull { it.isDirectory }
                         if (dir != null) {
                             openWorkspace(dir)
                             mainWindow.statusBar.setMessage("已打开文件夹: ${dir.name}")
                             dtde.dropComplete(true)
-                        } else {
-                            JOptionPane.showMessageDialog(
-                                mainWindow,
-                                "请拖拽一个文件夹到此处",
-                                "提示",
-                                JOptionPane.INFORMATION_MESSAGE
-                            )
-                            dtde.dropComplete(false)
+                            return
                         }
+
+                        // 处理文件（与 openFile 相同效果）
+                        val file = files.firstOrNull { it.isFile && it.canRead() }
+                        if (file != null) {
+                            handleOpenFile(file)
+                            dtde.dropComplete(true)
+                            return
+                        }
+
+                        // 如果没有可处理的文件或文件夹
+                        dtde.dropComplete(false)
                     } catch (e: Exception) {
                         dtde.dropComplete(false)
                         JOptionPane.showMessageDialog(
@@ -614,11 +634,11 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
         val hasList = flavors.any { it.isFlavorJavaFileListType }
         if (!hasList) return false
 
-        // 检查是否包含文件夹
+        // 检查是否包含文件或文件夹
         try {
             val files = e.transferable.getTransferData(DataFlavor.javaFileListFlavor) as? List<File>
-            if (files != null) {
-                return files.any { it.isDirectory }
+            if (files != null && files.isNotEmpty()) {
+                return files.any { it.isDirectory || (it.isFile && it.canRead()) }
             }
         } catch (e: Exception) {
             // 忽略异常，继续检查
@@ -632,11 +652,11 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
         val hasList = flavors.any { it.isFlavorJavaFileListType }
         if (!hasList) return false
 
-        // 检查是否包含文件夹
+        // 检查是否包含文件或文件夹
         try {
             val files = e.transferable.getTransferData(DataFlavor.javaFileListFlavor) as? List<File>
-            if (files != null) {
-                return files.any { it.isDirectory }
+            if (files != null && files.isNotEmpty()) {
+                return files.any { it.isDirectory || (it.isFile && it.canRead()) }
             }
         } catch (e: Exception) {
             // 忽略异常，继续检查

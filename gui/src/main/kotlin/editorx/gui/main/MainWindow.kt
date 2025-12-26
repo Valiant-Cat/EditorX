@@ -5,6 +5,8 @@ import editorx.core.i18n.I18n
 import editorx.core.i18n.I18nKeys
 import editorx.core.plugin.PluginManager
 import editorx.core.plugin.PluginState
+import editorx.core.util.SystemUtils
+import editorx.gui.AppFrame
 import editorx.gui.core.ShortcutIds
 import editorx.gui.core.ShortcutRegistry
 import editorx.gui.main.editor.Editor
@@ -24,7 +26,7 @@ import java.awt.event.MouseMotionAdapter
 import java.io.File
 import javax.swing.*
 
-class MainWindow(val guiContext: GuiContext) : JFrame() {
+class MainWindow(val guiContext: GuiContext) : AppFrame() {
 
     // UI 组件
     val titleBar by lazy { MenuBar(this) }
@@ -156,7 +158,7 @@ class MainWindow(val guiContext: GuiContext) : JFrame() {
         // 设置窗口图标
         setApplicationIcon()
 
-        if (isMacOS()) {
+        if (SystemUtils.isMacOS()) {
             // 启用 macOS 外观
             System.setProperty("apple.laf.useScreenMenuBar", "true")
             System.setProperty("com.apple.mrj.application.apple.menu.about.name", "EditorX")
@@ -187,10 +189,6 @@ class MainWindow(val guiContext: GuiContext) : JFrame() {
             val logger = org.slf4j.LoggerFactory.getLogger("MainWindow")
             logger.warn("无法找到图标资源: icon.png")
         }
-    }
-
-    private fun isMacOS(): Boolean {
-        return System.getProperty("os.name").lowercase().contains("mac")
     }
 
     private fun setupLayout() {

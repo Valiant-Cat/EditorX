@@ -2,7 +2,6 @@ package editorx.core.plugin
 
 import editorx.core.filetype.FileTypeRegistry
 import editorx.core.filetype.SyntaxHighlighterRegistry
-import editorx.core.i18n.I18n
 import editorx.core.plugin.loader.DiscoveredPlugin
 import editorx.core.plugin.loader.PluginLoader
 import editorx.core.service.MutableServiceRegistry
@@ -107,7 +106,7 @@ class PluginManager {
      * 发现并加载全部插件（不自动启动）。
      * 若希望重新扫描，可先调用 [unloadAll] 再调用本方法。
      */
-    fun loadAll(pluginLoader: PluginLoader) {
+    fun scanPlugins(pluginLoader: PluginLoader) {
         val closeablesByClassLoader: IdentityHashMap<ClassLoader, AutoCloseable> = IdentityHashMap()
         val loadedCounts: IdentityHashMap<ClassLoader, Int> = IdentityHashMap()
 
