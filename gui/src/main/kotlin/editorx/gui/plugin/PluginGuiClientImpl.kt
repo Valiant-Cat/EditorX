@@ -1,4 +1,4 @@
-package editorx.gui
+package editorx.gui.plugin
 
 import editorx.core.filetype.*
 import editorx.core.gui.GuiContext

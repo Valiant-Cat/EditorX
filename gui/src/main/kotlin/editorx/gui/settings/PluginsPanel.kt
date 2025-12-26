@@ -39,6 +39,8 @@ class PluginsPanel(
     private val settings: Store,
 ) : JPanel(BorderLayout()) {
 
+    private val pluginSplitPane: JSplitPane
+    
     private val disabledSet: MutableSet<String> = settings.get(DISABLED_KEY, "")
         ?.split(',')
         ?.map { it.trim() }
@@ -134,7 +136,10 @@ class PluginsPanel(
         })
 
         val leftPane = JScrollPane(pluginList).apply {
-            preferredSize = Dimension(260, 0)
+            // 只设置最小宽度，不设置 preferredSize，让 JSplitPane 可以自由调整
+            // 这样向左拖拽后，可以向右拖拽回来
+            minimumSize = Dimension(200, 0)
+            // 不设置 preferredSize，避免限制拖拽范围
             border = BorderFactory.createMatteBorder(1, 1, 1, 1, Color(0xDD, 0xDD, 0xDD))
         }
 
@@ -185,58 +190,44 @@ class PluginsPanel(
         }
 
         val centerPane = JPanel(BorderLayout()).apply {
+            // 关键：显式设置右侧面板最小宽度，避免默认 minSize=preferredSize 随布局变大而“锁死”
+            // JSplitPane 的 maximumDividerLocation 依赖 rightComponent.minimumSize，
+            // 如果它跟随当前宽度增长，就会出现向左拖后无法再向右拖回的问题。
+            minimumSize = Dimension(0, 0)
             border = BorderFactory.createEmptyBorder(0, 12, 0, 0)
             add(detailPanel, BorderLayout.CENTER)
         }
 
-        val pluginSplitPane = JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftPane, centerPane).apply {
+        pluginSplitPane = JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftPane, centerPane).apply {
             setDividerLocation(260)
+            // 使用 0.0 的 resizeWeight 意味着左侧面板大小固定，右侧面板会随 JSplitPane 大小变化
             setResizeWeight(0.0)
             setContinuousLayout(true)
             border = BorderFactory.createEmptyBorder()
         }
         
-        // 在插件列表的 JSplitPane 分割条上添加鼠标事件监听器
-        // 防止 SettingsDialog 的 JSplitPane 拖拽操作干扰插件列表的拖拽
-        // 通过 UI 获取 divider 组件
-        val divider = (pluginSplitPane.ui as? javax.swing.plaf.basic.BasicSplitPaneUI)?.divider
-        divider?.addMouseListener(object : java.awt.event.MouseAdapter() {
-            override fun mousePressed(e: java.awt.event.MouseEvent) {
-                // 阻止事件传播到父容器，避免触发 SettingsDialog 的 JSplitPane 拖拽
-                e.consume()
-            }
-            
-            override fun mouseReleased(e: java.awt.event.MouseEvent) {
-                // 阻止事件传播到父容器
-                e.consume()
-            }
-        })
-        
-        divider?.addMouseMotionListener(object : java.awt.event.MouseMotionAdapter() {
-            override fun mouseDragged(e: java.awt.event.MouseEvent) {
-                // 阻止事件传播到父容器，确保只有插件列表的 JSplitPane 响应拖拽
-                e.consume()
-            }
-        })
-        
-        // 在整个插件 JSplitPane 上添加鼠标监听器，确保拖拽时阻止事件传播
-        pluginSplitPane.addMouseListener(object : java.awt.event.MouseAdapter() {
-            override fun mousePressed(e: java.awt.event.MouseEvent) {
-                // 如果鼠标在 divider 上，阻止事件传播
-                if (e.source == divider || e.component == divider) {
-                    e.consume()
+        // 监听父容器大小变化，确保 JSplitPane 可以正常调整 dividerLocation
+        addComponentListener(object : java.awt.event.ComponentAdapter() {
+            override fun componentResized(e: java.awt.event.ComponentEvent?) {
+                // 当父容器大小变化时，确保 dividerLocation 在合理范围内
+                SwingUtilities.invokeLater {
+                    val currentLocation = pluginSplitPane.dividerLocation
+                    val minLocation = pluginSplitPane.minimumDividerLocation
+                    val maxLocation = pluginSplitPane.maximumDividerLocation
+                    
+                    // 如果当前位置超出范围，调整到合理位置
+                    if (currentLocation < minLocation || currentLocation > maxLocation) {
+                        val targetLocation = currentLocation.coerceIn(minLocation, maxLocation)
+                        if (targetLocation != currentLocation) {
+                            pluginSplitPane.dividerLocation = targetLocation
+                        }
+                    }
                 }
             }
         })
         
-        pluginSplitPane.addMouseMotionListener(object : java.awt.event.MouseMotionAdapter() {
-            override fun mouseDragged(e: java.awt.event.MouseEvent) {
-                // 如果正在拖拽 divider，阻止事件传播
-                if (e.source == divider || e.component == divider) {
-                    e.consume()
-                }
-            }
-        })
+        // 完全移除所有事件 consume，让 JSplitPane 完全正常工作
+        // 嵌套拖拽冲突的解决完全在 SettingsDialog 层面处理
         
         add(actionRow, BorderLayout.NORTH)
         add(pluginSplitPane, BorderLayout.CENTER)
@@ -254,6 +245,22 @@ class PluginsPanel(
         applyTexts()
         reloadList()
         ensureSelection()
+    }
+    
+    /**
+     * 恢复 PluginsPanel 的 JSplitPane 到合理的位置
+     */
+    private fun restorePluginSplitPaneLocation() {
+        val currentLocation = pluginSplitPane.dividerLocation
+        val maxLocation = pluginSplitPane.maximumDividerLocation
+        // 如果当前位置明显小于最大位置（可能之前被挤压过），尝试恢复到更合理的位置
+        if (currentLocation < maxLocation && currentLocation < 400 && maxLocation >= 400) {
+            // 恢复到至少 400 像素，或者最大位置，取较小值
+            val targetLocation = 400.coerceAtMost(maxLocation)
+            if (targetLocation > currentLocation) {
+                pluginSplitPane.dividerLocation = targetLocation
+            }
+        }
     }
 
     private fun reloadList() {

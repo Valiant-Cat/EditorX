@@ -1,30 +1,28 @@
 package editorx.gui.main
 
 import editorx.core.gui.GuiContext
+import editorx.core.i18n.I18n
+import editorx.core.i18n.I18nKeys
+import editorx.core.plugin.PluginManager
+import editorx.core.plugin.PluginState
+import editorx.gui.core.ShortcutRegistry.registerCustomShortcut
+import editorx.gui.core.ShortcutRegistry.registerDoubleShortcut
 import editorx.gui.main.editor.Editor
 import editorx.gui.main.explorer.Explorer
 import editorx.gui.main.menubar.MenuBar
 import editorx.gui.main.sidebar.SideBar
 import editorx.gui.main.statusbar.StatusBar
 import editorx.gui.main.toolbar.ToolBar
-import editorx.core.plugin.PluginManager
-import editorx.core.plugin.PluginState
-import editorx.gui.core.ui.NoLineSplitPaneUI
+import editorx.gui.search.SearchDialog
+import editorx.gui.settings.SettingsDialog
+import editorx.gui.widget.NoLineSplitPaneUI
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.event.KeyEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseMotionAdapter
 import java.io.File
-import javax.swing.JFileChooser
-import javax.swing.JFrame
-import javax.swing.JSplitPane
-import javax.swing.SwingUtilities
-import javax.swing.JOptionPane
-import editorx.gui.search.SearchDialog
-import editorx.gui.settings.SettingsDialog
-import editorx.core.i18n.I18n
-import editorx.core.i18n.I18nKeys
+import javax.swing.*
 
 class MainWindow(val guiContext: GuiContext) : JFrame() {
 
@@ -68,18 +66,37 @@ class MainWindow(val guiContext: GuiContext) : JFrame() {
         }
     }
 
-    // 双击 Shift 快捷键相关
-    private var lastShiftPressTime = 0L
-    private val doubleShiftInterval = 500L // 500ms 内的两次 Shift 视为双击
+    // 快捷键注册表（单例，直接使用 ShortcutRegistry）
+
 
     init {
         setupWindow()
         setupLayout()
         tuneSplitPanes()
         setupExplorer()
-        setupDoubleShiftShortcut()
-        setupCommandNShortcut()
-        setupCommandCommaShortcut()
+        setupShortcuts()
+    }
+
+    /**
+     * 统一设置所有快捷键
+     */
+    private fun setupShortcuts() {
+        // 双击 Shift - 全局搜索
+        registerDoubleShortcut(
+            id = "global.search",
+            keyCode = KeyEvent.VK_SHIFT,
+            descriptionKey = I18nKeys.Shortcut.GLOBAL_SEARCH,
+            action = { showGlobalSearch() }
+        )
+
+        // Command+, - 打开设置
+        val shortcutMask = java.awt.Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx
+        registerCustomShortcut(
+            id = "global.settings",
+            keyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_COMMA, shortcutMask),
+            descriptionKey = I18nKeys.Shortcut.OPEN_SETTINGS,
+            action = { showSettings() }
+        )
     }
 
     private fun setupWindow() {
@@ -152,22 +169,22 @@ class MainWindow(val guiContext: GuiContext) : JFrame() {
             val visible = horizontalSplit.dividerLocation > 0
             // 同步SideBar内部状态与分割条位置
             sideBar.syncVisibilityWithDivider()
-            
+
             // 根据 SideBar 可见性调整拖拽条大小
             horizontalSplit.dividerSize = if (visible) 4 else 0
 
             // 同步更新ToolBar中的侧边栏toggle按钮
             toolBar.updateSideBarIcon(visible)
         }
-        
+
         // 添加自定义拖拽功能：在 SideBar 右边缘和 Editor 左边缘检测拖拽
         setupCustomDrag()
     }
-    
+
     private var isDragging = false
     private var dragStartX = 0
     private var dragStartLocation = 0
-    
+
     private fun setupCustomDrag() {
         // 在 SideBar 右边缘添加鼠标监听器
         sideBar.addMouseListener(object : MouseAdapter() {
@@ -182,7 +199,7 @@ class MainWindow(val guiContext: GuiContext) : JFrame() {
                     sideBar.cursor = java.awt.Cursor(java.awt.Cursor.E_RESIZE_CURSOR)
                 }
             }
-            
+
             override fun mouseReleased(e: java.awt.event.MouseEvent) {
                 if (isDragging) {
                     isDragging = false
@@ -191,7 +208,7 @@ class MainWindow(val guiContext: GuiContext) : JFrame() {
                 }
             }
         })
-        
+
         sideBar.addMouseMotionListener(object : MouseMotionAdapter() {
             override fun mouseDragged(e: java.awt.event.MouseEvent) {
                 if (isDragging) {
@@ -201,7 +218,7 @@ class MainWindow(val guiContext: GuiContext) : JFrame() {
                     horizontalSplit.dividerLocation = newLocation
                 }
             }
-            
+
             override fun mouseMoved(e: java.awt.event.MouseEvent) {
                 val rightEdge = sideBar.width
                 val mouseX = e.x
@@ -212,7 +229,7 @@ class MainWindow(val guiContext: GuiContext) : JFrame() {
                 }
             }
         })
-        
+
         // 在 Editor 左边缘添加鼠标监听器
         editor.addMouseListener(object : MouseAdapter() {
             override fun mousePressed(e: java.awt.event.MouseEvent) {
@@ -225,7 +242,7 @@ class MainWindow(val guiContext: GuiContext) : JFrame() {
                     editor.cursor = java.awt.Cursor(java.awt.Cursor.E_RESIZE_CURSOR)
                 }
             }
-            
+
             override fun mouseReleased(e: java.awt.event.MouseEvent) {
                 if (isDragging) {
                     isDragging = false
@@ -234,7 +251,7 @@ class MainWindow(val guiContext: GuiContext) : JFrame() {
                 }
             }
         })
-        
+
         editor.addMouseMotionListener(object : MouseMotionAdapter() {
             override fun mouseDragged(e: java.awt.event.MouseEvent) {
                 if (isDragging) {
@@ -244,7 +261,7 @@ class MainWindow(val guiContext: GuiContext) : JFrame() {
                     horizontalSplit.dividerLocation = newLocation
                 }
             }
-            
+
             override fun mouseMoved(e: java.awt.event.MouseEvent) {
                 val mouseX = e.x
                 if (mouseX >= 0 && mouseX <= 5 && horizontalSplit.dividerLocation > 0) {
@@ -270,34 +287,6 @@ class MainWindow(val guiContext: GuiContext) : JFrame() {
         }
     }
 
-    /**
-     * 设置双击 Shift 快捷键（打开全局搜索）
-     */
-    private fun setupDoubleShiftShortcut() {
-        // 使用 KeyboardFocusManager 来全局捕获键盘事件
-        val focusManager = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager()
-        focusManager.addKeyEventDispatcher { e ->
-            // 只处理 Shift 键按下事件
-            if (e.id == KeyEvent.KEY_PRESSED && e.keyCode == KeyEvent.VK_SHIFT && !e.isConsumed) {
-                val currentTime = System.currentTimeMillis()
-                val timeSinceLastPress = currentTime - lastShiftPressTime
-
-                // 如果两次按下间隔在指定时间内，视为双击
-                if (timeSinceLastPress > 0 && timeSinceLastPress < doubleShiftInterval) {
-                    // 触发全局搜索
-                    SwingUtilities.invokeLater { showGlobalSearch() }
-                    lastShiftPressTime = 0 // 重置，避免连续触发
-                    true // 消费事件
-                } else {
-                    // 记录本次按下时间
-                    lastShiftPressTime = currentTime
-                    false // 不消费事件，让其他组件正常处理
-                }
-            } else {
-                false // 不消费事件
-            }
-        }
-    }
 
     /**
      * 显示全局搜索对话框
@@ -305,48 +294,6 @@ class MainWindow(val guiContext: GuiContext) : JFrame() {
     fun showGlobalSearch() {
         val dialog = SearchDialog(this, this)
         dialog.showDialog()
-    }
-    
-    /**
-     * 设置 Command+N 快捷键（新建文件）
-     */
-    private fun setupCommandNShortcut() {
-        val focusManager = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager()
-        val shortcutMask = java.awt.Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx
-        focusManager.addKeyEventDispatcher { e ->
-            if (e.id == KeyEvent.KEY_PRESSED && 
-                e.keyCode == KeyEvent.VK_N && 
-                (e.modifiersEx and shortcutMask) == shortcutMask &&
-                !e.isConsumed) {
-                SwingUtilities.invokeLater {
-                    editor.newUntitledFile()
-                }
-                true // 消费事件
-            } else {
-                false // 不消费事件
-            }
-        }
-    }
-
-    /**
-     * 设置 Command+, 快捷键（打开设置）
-     */
-    private fun setupCommandCommaShortcut() {
-        val focusManager = java.awt.KeyboardFocusManager.getCurrentKeyboardFocusManager()
-        val shortcutMask = java.awt.Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx
-        focusManager.addKeyEventDispatcher { e ->
-            if (e.id == KeyEvent.KEY_PRESSED && 
-                e.keyCode == KeyEvent.VK_COMMA && 
-                (e.modifiersEx and shortcutMask) == shortcutMask &&
-                !e.isConsumed) {
-                SwingUtilities.invokeLater {
-                    showSettings()
-                }
-                true // 消费事件
-            } else {
-                false // 不消费事件
-            }
-        }
     }
 
     /**
@@ -362,6 +309,7 @@ class MainWindow(val guiContext: GuiContext) : JFrame() {
             )
             return
         }
-        SettingsDialog(this, guiContext, pm, SettingsDialog.Section.APPEARANCE).isVisible = true
+
+        SettingsDialog.showOrBringToFront(this, guiContext, pm, SettingsDialog.Section.APPEARANCE)
     }
 }

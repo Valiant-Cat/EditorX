@@ -4,7 +4,7 @@ import editorx.core.i18n.I18n
 import editorx.core.i18n.I18nKeys
 import editorx.core.util.IconLoader
 import editorx.core.util.IconRef
-import editorx.gui.core.ThemeManager
+import editorx.gui.ThemeManager
 import editorx.gui.main.MainWindow
 import java.awt.BorderLayout
 import java.awt.Color

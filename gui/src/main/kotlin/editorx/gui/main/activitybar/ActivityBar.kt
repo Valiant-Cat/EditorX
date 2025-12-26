@@ -2,8 +2,8 @@ package editorx.gui.main.activitybar
 
 import editorx.core.util.IconRef
 import editorx.core.gui.GuiViewProvider
-import editorx.gui.core.Constants
-import editorx.gui.core.ThemeManager
+import editorx.gui.Constants
+import editorx.gui.ThemeManager
 import editorx.gui.main.MainWindow
 import editorx.core.util.IconLoader
 import java.awt.*

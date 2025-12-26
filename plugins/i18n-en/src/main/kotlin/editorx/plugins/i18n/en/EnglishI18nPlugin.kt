@@ -268,6 +268,15 @@ Developed by: XiaMao Tools""")
     put(I18nKeys.Dialog.RESTART_REQUIRED_MESSAGE, "Restart EditorX to make changes take effect")
     put(I18nKeys.Dialog.RESTART, "Restart")
     put(I18nKeys.Dialog.LATER, "Later")
+
+    // 快捷键描述
+    put(I18nKeys.Shortcut.GLOBAL_SEARCH, "Open global search dialog")
+    put(I18nKeys.Shortcut.OPEN_SETTINGS, "Open settings dialog")
+    put(I18nKeys.Shortcut.FIND, "Focus search bar")
+    put(I18nKeys.Shortcut.REPLACE, "Expand replace row")
+    put(I18nKeys.Shortcut.SAVE, "Save current content")
+    put(I18nKeys.Shortcut.CLOSE_TAB, "Close active tab")
+    put(I18nKeys.Shortcut.FORMAT_FILE, "Format current file")
     
     // 语言名称使用动态生成的 key
     put(I18nKeys.Lang.forLocale(Locale.forLanguageTag("zh")), "Chinese")

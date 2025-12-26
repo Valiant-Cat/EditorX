@@ -4,7 +4,7 @@ import editorx.core.filetype.FileTypeRegistry
 import editorx.core.filetype.FormatterRegistry
 import editorx.core.external.Jadx
 import editorx.core.external.Smali
-import editorx.gui.core.ThemeManager
+import editorx.gui.ThemeManager
 import editorx.gui.main.MainWindow
 import editorx.gui.main.explorer.ExplorerIcons
 import editorx.core.util.IconUtils

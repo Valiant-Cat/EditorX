@@ -1,6 +1,6 @@
 package editorx.gui.search
 
-import editorx.gui.core.ThemeManager
+import editorx.gui.ThemeManager
 import editorx.gui.main.MainWindow
 import java.awt.BorderLayout
 import java.awt.Color

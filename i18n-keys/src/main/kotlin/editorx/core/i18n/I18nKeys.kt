@@ -329,6 +329,19 @@ object I18nKeys {
     }
 
     /**
+     * 快捷键描述相关的翻译 key
+     */
+    object Shortcut {
+        const val GLOBAL_SEARCH = "shortcut.globalSearch"
+        const val OPEN_SETTINGS = "shortcut.openSettings"
+        const val FIND = "shortcut.find"
+        const val REPLACE = "shortcut.replace"
+        const val SAVE = "shortcut.save"
+        const val CLOSE_TAB = "shortcut.closeTab"
+        const val FORMAT_FILE = "shortcut.formatFile"
+    }
+
+    /**
      * 工具栏相关的消息翻译 key
      */
     object ToolbarMessage {

@@ -6,8 +6,8 @@ import editorx.core.plugin.PluginManager
 import editorx.core.plugin.loader.PluginLoaderImpl
 import editorx.core.store.Store
 import editorx.core.util.StartupTimer
-import editorx.gui.core.ThemeManager
 import editorx.gui.main.MainWindow
+import editorx.gui.plugin.PluginGuiClientImpl
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.util.*

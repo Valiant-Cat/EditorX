@@ -5,7 +5,7 @@ import editorx.core.i18n.I18nKeys
 import editorx.core.external.ApkTool
 import editorx.core.util.IconLoader
 import editorx.core.util.IconRef
-import editorx.gui.core.ThemeManager
+import editorx.gui.ThemeManager
 import editorx.gui.main.MainWindow
 import editorx.gui.main.explorer.Explorer
 import editorx.gui.search.SearchDialog
@@ -225,7 +225,7 @@ class ToolBar(private val mainWindow: MainWindow) : JToolBar() {
             JOptionPane.showMessageDialog(this, I18n.translate(I18nKeys.Dialog.PLUGIN_SYSTEM_NOT_INIT), I18n.translate(I18nKeys.Dialog.TIP), JOptionPane.INFORMATION_MESSAGE)
             return
         }
-        SettingsDialog(mainWindow, mainWindow.guiContext, pm, SettingsDialog.Section.APPEARANCE).isVisible = true
+        SettingsDialog.showOrBringToFront(mainWindow, mainWindow.guiContext, pm, SettingsDialog.Section.APPEARANCE)
     }
 
     private fun showGlobalSearch() {

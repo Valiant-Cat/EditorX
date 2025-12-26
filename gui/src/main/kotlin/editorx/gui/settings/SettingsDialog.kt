@@ -5,6 +5,7 @@ import editorx.core.i18n.I18nKeys
 import editorx.core.plugin.PluginManager
 import editorx.core.gui.GuiContext
 import editorx.gui.main.MainWindow
+import editorx.gui.core.RestartHelper
 import java.awt.BorderLayout
 import java.awt.CardLayout
 import java.awt.Color
@@ -12,6 +13,7 @@ import java.awt.Container
 import java.awt.Dimension
 import java.awt.FlowLayout
 import java.awt.Font
+import java.awt.MouseInfo
 import java.util.Locale
 import javax.swing.BorderFactory
 import javax.swing.DefaultListCellRenderer
@@ -41,6 +43,40 @@ class SettingsDialog(
 
     enum class Section { APPEARANCE, KEYMAP, PLUGINS, CACHE }
 
+    companion object {
+        @Volatile
+        private var currentInstance: SettingsDialog? = null
+
+        /**
+         * 显示设置对话框，如果已存在则将其带到前台
+         */
+        fun showOrBringToFront(
+            owner: MainWindow,
+            environment: GuiContext,
+            pluginManager: PluginManager,
+            defaultSection: Section = Section.APPEARANCE
+        ) {
+            val existing = currentInstance
+            if (existing != null && existing.isVisible) {
+                existing.toFront()
+                existing.requestFocus()
+                return
+            }
+
+            val dialog = SettingsDialog(owner, environment, pluginManager, defaultSection)
+            currentInstance = dialog
+
+            // 监听对话框关闭事件，清除引用
+            dialog.addWindowListener(object : java.awt.event.WindowAdapter() {
+                override fun windowClosed(e: java.awt.event.WindowEvent?) {
+                    currentInstance = null
+                }
+            })
+
+            dialog.isVisible = true
+        }
+    }
+
     private data class SectionItem(
         val section: Section,
         val key: String,
@@ -55,6 +91,10 @@ class SettingsDialog(
     private val keymapPanel = KeymapPanel()
     private val pluginsPanel = PluginsPanel(pluginManager, environment.settings)
     private val cachePanel = CachePanel(environment)
+    
+    // 用于限制 SettingsDialog 的 JSplitPane 最大 dividerLocation
+    private var mainSplitPane: JSplitPane? = null
+    private val minContentWidthForPlugins = 600 // 插件面板需要的最小宽度
 
     private val listModel = DefaultListModel<SectionItem>().apply {
         addElement(SectionItem(Section.APPEARANCE, I18nKeys.Settings.APPEARANCE))
@@ -219,26 +259,54 @@ class SettingsDialog(
             border = BorderFactory.createEmptyBorder()
         }
         
+        // 保存 mainSplitPane 的引用，以便在其他方法中使用
+        this.mainSplitPane = mainSplitPane
+        
         // 在 SettingsDialog 的 JSplitPane divider 上添加鼠标监听器
-        // 检查鼠标是否在 PluginsPanel 区域内，如果是则阻止拖拽
+        // 当显示 PluginsPanel 时，如果鼠标在 PluginsPanel 的 JSplitPane divider 区域内，
+        // 则完全禁用 SettingsDialog 的拖拽，避免嵌套拖拽冲突
         val mainDivider = (mainSplitPane.ui as? javax.swing.plaf.basic.BasicSplitPaneUI)?.divider
+        var isDraggingPluginsDivider = false
+        
         mainDivider?.addMouseListener(object : java.awt.event.MouseAdapter() {
             override fun mousePressed(e: java.awt.event.MouseEvent) {
-                // 检查鼠标是否在 PluginsPanel 的 JSplitPane divider 区域内
-                if (isMouseOverPluginsPanelDivider(e)) {
+                val currentComponent = contentPanel.components.firstOrNull { it.isVisible }
+                if (currentComponent == pluginsPanel) {
+                    // 检查鼠标是否在 PluginsPanel 的 JSplitPane divider 区域内
+                    if (isMouseOverPluginsPanelDivider(e)) {
+                        // 完全阻止 SettingsDialog 的拖拽
+                        e.consume()
+                        isDraggingPluginsDivider = true
+                        return
+                    }
+                }
+                isDraggingPluginsDivider = false
+            }
+            
+            override fun mouseReleased(e: java.awt.event.MouseEvent) {
+                if (isDraggingPluginsDivider) {
                     e.consume()
                 }
+                isDraggingPluginsDivider = false
             }
         })
         
         mainDivider?.addMouseMotionListener(object : java.awt.event.MouseMotionAdapter() {
             override fun mouseDragged(e: java.awt.event.MouseEvent) {
-                // 如果正在拖拽 PluginsPanel 的 JSplitPane，则阻止 SettingsDialog 的 JSplitPane 拖拽
-                if (isMouseOverPluginsPanelDivider(e)) {
-                    e.consume()
+                val currentComponent = contentPanel.components.firstOrNull { it.isVisible }
+                if (currentComponent == pluginsPanel) {
+                    // 如果正在拖拽 PluginsPanel 的 divider，或者鼠标在 PluginsPanel 的 divider 上
+                    if (isDraggingPluginsDivider || isMouseOverPluginsPanelDivider(e)) {
+                        e.consume()
+                        isDraggingPluginsDivider = true
+                        return
+                    }
                 }
             }
         })
+        
+        // 移除之前的 PropertyChangeListener，因为现在通过事件 consume 来阻止嵌套拖拽
+        // 不再需要监听 dividerLocation 变化来恢复位置
         
         return mainSplitPane
     }
@@ -274,8 +342,9 @@ class SettingsDialog(
                     
                     // 如果语言改变需要重启，显示提示对话框
                     if (needRestart && appearancePanel.showRestartDialog()) {
-                        // 用户选择重启，退出应用
-                        System.exit(0)
+                        // 用户选择重启，执行重启
+                        dispose()
+                        editorx.gui.core.RestartHelper.restart()
                     } else {
                         dispose()
                     }
@@ -298,7 +367,18 @@ class SettingsDialog(
         when (section) {
             Section.APPEARANCE -> appearancePanel.refresh()
             Section.KEYMAP -> keymapPanel.refresh()
-            Section.PLUGINS -> pluginsPanel.refreshView()
+            Section.PLUGINS -> {
+                pluginsPanel.refreshView()
+                // 当显示 PluginsPanel 时，限制 SettingsDialog 的 JSplitPane 最大 dividerLocation
+                mainSplitPane?.let { splitPane ->
+                    SwingUtilities.invokeLater {
+                        val maxLocation = splitPane.width - minContentWidthForPlugins
+                        if (splitPane.dividerLocation > maxLocation) {
+                            splitPane.dividerLocation = maxLocation.coerceAtLeast(240)
+                        }
+                    }
+                }
+            }
             Section.CACHE -> cachePanel.refresh()
         }
     }
@@ -309,6 +389,19 @@ class SettingsDialog(
         navigation.repaint()
         contentPanel.revalidate()
         contentPanel.repaint()
+    }
+    
+    /**
+     * 判断是否应该阻止 SettingsDialog 的 JSplitPane divider 拖拽
+     * 当显示 PluginsPanel 且鼠标在 PluginsPanel 的 JSplitPane divider 区域内时返回 true
+     */
+    private fun shouldBlockMainDividerDrag(e: java.awt.event.MouseEvent): Boolean {
+        val currentComponent = contentPanel.components.firstOrNull { it.isVisible }
+        // 只有当显示 PluginsPanel 时才检查
+        if (currentComponent != pluginsPanel) return false
+        
+        // 检查鼠标是否在 PluginsPanel 的 JSplitPane divider 区域内
+        return isMouseOverPluginsPanelDivider(e)
     }
     
     /**

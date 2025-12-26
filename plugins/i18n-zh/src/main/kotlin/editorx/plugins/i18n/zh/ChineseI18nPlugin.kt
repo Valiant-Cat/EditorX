@@ -23,7 +23,7 @@ private val dictionary = buildMap {
     put(I18nKeys.Action.REDO, "重做")
     put(I18nKeys.Action.FIND, "查找…")
     put(I18nKeys.Action.REPLACE, "替换…")
-    put(I18nKeys.Action.GLOBAL_SEARCH, "在文件中搜索…")
+    put(I18nKeys.Action.GLOBAL_SEARCH, "全局搜索")
     put(I18nKeys.Action.PLUGIN_MANAGER, "插件管理")
     put(I18nKeys.Action.ABOUT, "关于")
     put(I18nKeys.Action.HELP, "帮助文档")
@@ -268,6 +268,15 @@ private val dictionary = buildMap {
     put(I18nKeys.Dialog.RESTART_REQUIRED_MESSAGE, "重启 EditorX 以使更改生效")
     put(I18nKeys.Dialog.RESTART, "重启")
     put(I18nKeys.Dialog.LATER, "以后再说")
+
+    // 快捷键描述
+    put(I18nKeys.Shortcut.GLOBAL_SEARCH, "打开全局搜索对话框")
+    put(I18nKeys.Shortcut.OPEN_SETTINGS, "打开设置对话框")
+    put(I18nKeys.Shortcut.FIND, "聚焦顶部搜索栏")
+    put(I18nKeys.Shortcut.REPLACE, "展开替换行")
+    put(I18nKeys.Shortcut.SAVE, "保存当前编辑内容")
+    put(I18nKeys.Shortcut.CLOSE_TAB, "关闭当前标签页")
+    put(I18nKeys.Shortcut.FORMAT_FILE, "格式化当前文件")
 
     // 语言名称使用动态生成的 key
     put(I18nKeys.Lang.forLocale(Locale.forLanguageTag("zh")), "中文")
