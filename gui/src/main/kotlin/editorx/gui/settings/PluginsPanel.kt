@@ -15,21 +15,8 @@ import java.awt.FlowLayout
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
-import java.util.Locale
-import javax.swing.BorderFactory
-import javax.swing.DefaultListCellRenderer
-import javax.swing.DefaultListModel
-import javax.swing.JButton
-import javax.swing.JFileChooser
-import javax.swing.JLabel
-import javax.swing.JList
-import javax.swing.JOptionPane
-import javax.swing.JPanel
-import javax.swing.JScrollPane
-import javax.swing.JTextArea
-import javax.swing.JSplitPane
-import javax.swing.ListSelectionModel
-import javax.swing.SwingUtilities
+import java.util.*
+import javax.swing.*
 
 /**
  * 插件管理面板：左侧插件列表，右侧详情信息。
@@ -40,7 +27,7 @@ class PluginsPanel(
 ) : JPanel(BorderLayout()) {
 
     private val pluginSplitPane: JSplitPane
-    
+
     private val disabledSet: MutableSet<String> = settings.get(DISABLED_KEY, "")
         ?.split(',')
         ?.map { it.trim() }
@@ -96,18 +83,11 @@ class PluginsPanel(
     private val disableBtn = JButton().apply { addActionListener { disableSelected() } }
     private val uninstallBtn = JButton().apply { addActionListener { uninstallSelected() } }
 
-    private val listener = object : PluginManager.Listener {
-        override fun onPluginChanged(pluginId: String) {
+    private val pluginStateListener = object : PluginManager.PluginStateListener {
+        override fun onPluginStateChanged(pluginId: String) {
             SwingUtilities.invokeLater {
                 reloadList()
                 ensureSelection(pluginId)
-            }
-        }
-
-        override fun onPluginUnloaded(pluginId: String) {
-            SwingUtilities.invokeLater {
-                reloadList()
-                ensureSelection()
             }
         }
     }
@@ -115,7 +95,7 @@ class PluginsPanel(
     init {
         applyTexts()
         border = BorderFactory.createEmptyBorder(12, 12, 12, 12)
-        
+
         // 在插件列表区域禁用对话框的拖拽功能，避免与插件面板内部的拖拽操作冲突
         // 注意：这不会影响对话框标题栏的拖拽功能
         pluginList.addMouseListener(object : java.awt.event.MouseAdapter() {
@@ -205,7 +185,7 @@ class PluginsPanel(
             setContinuousLayout(true)
             border = BorderFactory.createEmptyBorder()
         }
-        
+
         // 监听父容器大小变化，确保 JSplitPane 可以正常调整 dividerLocation
         addComponentListener(object : java.awt.event.ComponentAdapter() {
             override fun componentResized(e: java.awt.event.ComponentEvent?) {
@@ -214,7 +194,7 @@ class PluginsPanel(
                     val currentLocation = pluginSplitPane.dividerLocation
                     val minLocation = pluginSplitPane.minimumDividerLocation
                     val maxLocation = pluginSplitPane.maximumDividerLocation
-                    
+
                     // 如果当前位置超出范围，调整到合理位置
                     if (currentLocation < minLocation || currentLocation > maxLocation) {
                         val targetLocation = currentLocation.coerceIn(minLocation, maxLocation)
@@ -225,20 +205,20 @@ class PluginsPanel(
                 }
             }
         })
-        
+
         // 完全移除所有事件 consume，让 JSplitPane 完全正常工作
         // 嵌套拖拽冲突的解决完全在 SettingsDialog 层面处理
-        
+
         add(actionRow, BorderLayout.NORTH)
         add(pluginSplitPane, BorderLayout.CENTER)
         add(statusLabel, BorderLayout.SOUTH)
 
-        pluginManager.addListener(listener)
+        pluginManager.addPluginStateListener(pluginStateListener)
         refreshView()
     }
 
     fun disposePanel() {
-        pluginManager.removeListener(listener)
+        pluginManager.removePluginStateListener(pluginStateListener)
     }
 
     fun refreshView() {
@@ -246,7 +226,7 @@ class PluginsPanel(
         reloadList()
         ensureSelection()
     }
-    
+
     /**
      * 恢复 PluginsPanel 的 JSplitPane 到合理的位置
      */
@@ -371,7 +351,7 @@ class PluginsPanel(
 
     private fun uninstallSelected() {
         val record = selectedRecord() ?: return
-        
+
         // 内置插件不可卸载
         if (record.origin == PluginOrigin.CLASSPATH) {
             val parent = SwingUtilities.getWindowAncestor(this)
@@ -386,7 +366,7 @@ class PluginsPanel(
             )
             return
         }
-        
+
         val parent = SwingUtilities.getWindowAncestor(this)
         val confirm =
             JOptionPane.showConfirmDialog(
@@ -399,7 +379,7 @@ class PluginsPanel(
                 JOptionPane.YES_NO_OPTION
             )
         if (confirm != JOptionPane.YES_OPTION) return
-        
+
         val success = pluginManager.unloadPlugin(record.id)
         if (success) {
             disabledSet.remove(record.id)

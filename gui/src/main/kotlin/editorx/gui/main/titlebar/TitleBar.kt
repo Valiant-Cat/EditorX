@@ -32,7 +32,7 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
     private var compileTask: Thread? = null
 
     // VCS Widget
-    val vcsWidget = VcsWidget(mainWindow.guiContext.workspace)
+    val vcsWidget = VcsWidget(mainWindow.guiContext.getWorkspace())
 
     init {
         isFloatable = false
@@ -181,8 +181,8 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
         }
         if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
             val selected = chooser.selectedFile
-            mainWindow.guiContext.workspace.openWorkspace(selected)
-            mainWindow.guiContext.workspace.addRecentWorkspace(selected)
+            mainWindow.guiContext.getWorkspace().openWorkspace(selected)
+            mainWindow.guiContext.getWorkspace().addRecentWorkspace(selected)
             (mainWindow.sideBar.getView("explorer") as? Explorer)?.refreshRoot()
             mainWindow.titleBar.updateVcsDisplay()
             mainWindow.editor.showEditorContent()
@@ -217,15 +217,7 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
     }
 
     private fun showSettings() {
-        val pm = mainWindow.pluginManager ?: run {
-            JOptionPane.showMessageDialog(
-                mainWindow,
-                I18n.translate(I18nKeys.Dialog.PLUGIN_SYSTEM_NOT_INIT),
-                I18n.translate(I18nKeys.Dialog.TIP),
-                JOptionPane.INFORMATION_MESSAGE
-            )
-            return
-        }
+        val pm = mainWindow.guiContext.getPluginManager()
         SettingsDialog.showOrBringToFront(mainWindow, mainWindow.guiContext, pm, SettingsDialog.Section.APPEARANCE)
     }
 
@@ -257,7 +249,7 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
             return
         }
 
-        val workspaceRoot = mainWindow.guiContext.workspace.getWorkspaceRoot()
+        val workspaceRoot = mainWindow.guiContext.getWorkspace().getWorkspaceRoot()
         if (workspaceRoot == null) {
             JOptionPane.showMessageDialog(
                 mainWindow,

@@ -5,11 +5,8 @@ import editorx.core.filetype.SyntaxHighlighterRegistry
 import editorx.core.plugin.loader.DiscoveredPlugin
 import editorx.core.plugin.loader.PluginLoader
 import editorx.core.service.MutableServiceRegistry
-import editorx.core.service.ServiceRegistry
 import org.slf4j.LoggerFactory
-import java.util.IdentityHashMap
-import java.util.SortedMap
-import java.util.TreeMap
+import java.util.*
 
 /**
  * 插件管理器
@@ -20,9 +17,8 @@ class PluginManager {
         private val logger = LoggerFactory.getLogger(PluginManager::class.java)
     }
 
-    interface Listener {
-        fun onPluginChanged(pluginId: String) {}
-        fun onPluginUnloaded(pluginId: String) {}
+    interface PluginStateListener {
+        fun onPluginStateChanged(pluginId: String) {}
     }
 
     private data class PluginRuntime(
@@ -43,29 +39,19 @@ class PluginManager {
     private val pluginsById: SortedMap<String, PluginRuntime> = TreeMap()
     private val activationRoutes: MutableMap<ActivationEvent, MutableSet<String>> = mutableMapOf()
     private val disabledPluginIds: MutableSet<String> = linkedSetOf()
-    private val contextInitializers: MutableList<(PluginContextImpl) -> Unit> = mutableListOf()
-    private val listeners: MutableList<Listener> = mutableListOf()
+    private var guiProviderFactory: ((PluginContextImpl) -> editorx.core.plugin.gui.PluginGuiProvider?)? = null
+    private val pluginStateListeners: MutableList<PluginStateListener> = mutableListOf()
 
     // JAR 插件：ClassLoader 需要引用计数，避免一个 JAR 内多个插件时被提前关闭
     private val classLoaderRefCount: IdentityHashMap<ClassLoader, Int> = IdentityHashMap()
     private val classLoaderCloseables: IdentityHashMap<ClassLoader, AutoCloseable> = IdentityHashMap()
 
-    fun serviceRegistry(): ServiceRegistry = servicesRegistry
-
-    fun <T : Any> registerService(serviceClass: Class<T>, instance: T) {
-        servicesRegistry.register(serviceClass, instance)
+    fun addPluginStateListener(pluginStateListener: PluginStateListener) {
+        pluginStateListeners.add(pluginStateListener)
     }
 
-    fun <T : Any> unregisterService(serviceClass: Class<T>) {
-        servicesRegistry.unregister(serviceClass)
-    }
-
-    fun addListener(listener: Listener) {
-        listeners.add(listener)
-    }
-
-    fun removeListener(listener: Listener) {
-        listeners.remove(listener)
+    fun removePluginStateListener(pluginStateListener: PluginStateListener) {
+        pluginStateListeners.remove(pluginStateListener)
     }
 
     fun setInitialDisabled(ids: Collection<String>) {
@@ -77,14 +63,14 @@ class PluginManager {
         if (disabled) {
             if (disabledPluginIds.add(pluginId)) {
                 stopPlugin(pluginId)
-                notifyChanged(pluginId)
+                firePluginStateChanged(pluginId)
             }
         } else {
             if (disabledPluginIds.remove(pluginId)) {
                 val runtime = pluginsById[pluginId]
                 if (runtime != null) {
                     val shouldAutoStart = runtime.activationEvents.any { it is ActivationEvent.OnStartup } ||
-                        activationRoutes.values.any { it.contains(pluginId) }
+                            activationRoutes.values.any { it.contains(pluginId) }
                     if (shouldAutoStart) {
                         startPlugin(pluginId)
                     }
@@ -94,12 +80,14 @@ class PluginManager {
     }
 
     /**
-     * 注册插件上下文初始化器（例如 GUI 层为插件注入 GuiEnvironment）。
-     * 会对“已加载”的插件立即执行一次。
+     * 设置 GUI Provider 工厂函数。
+     * 会对"已加载"的插件立即执行一次。
      */
-    fun registerContextInitializer(initializer: (PluginContextImpl) -> Unit) {
-        contextInitializers.add(initializer)
-        pluginsById.values.forEach { initializer(it.context) }
+    fun setGuiProviderFactory(factory: (PluginContextImpl) -> editorx.core.plugin.gui.PluginGuiProvider?) {
+        guiProviderFactory = factory
+        pluginsById.values.forEach { ctx ->
+            ctx.context.guiProvider = factory(ctx.context)
+        }
     }
 
     /**
@@ -161,7 +149,7 @@ class PluginManager {
             logger.warn("插件启动失败: {}", pluginId, e)
         }.getOrDefault(false).also {
             if (it) {
-                notifyChanged(pluginId)
+                firePluginStateChanged(pluginId)
                 logger.info("Plugin started: {}", pluginId)
             }
         }
@@ -172,7 +160,7 @@ class PluginManager {
         if (runtime.state != PluginState.STARTED) {
             cleanupOwner(pluginId)
             runtime.state = PluginState.STOPPED
-            notifyChanged(pluginId)
+            firePluginStateChanged(pluginId)
             return
         }
 
@@ -186,7 +174,7 @@ class PluginManager {
             logger.warn("插件停止失败: {}", pluginId, e)
         }
         cleanupOwner(pluginId)
-        notifyChanged(pluginId)
+        firePluginStateChanged(pluginId)
         logger.info("Plugin stopped: {}", pluginId)
     }
 
@@ -196,18 +184,17 @@ class PluginManager {
      */
     fun unloadPlugin(pluginId: String): Boolean {
         val runtime = pluginsById[pluginId] ?: return false
-        
+
         // 内置插件（随源码一起打包的）不可卸载
         if (runtime.origin == PluginOrigin.CLASSPATH) {
             logger.warn("内置插件不可卸载: {}", pluginId)
             return false
         }
-        
+
         stopPlugin(pluginId)
         pluginsById.remove(pluginId)
         activationRoutes.values.forEach { it.remove(pluginId) }
         releaseClassLoader(runtime)
-        listeners.forEach { it.onPluginUnloaded(pluginId) }
         logger.info("Plugin unloaded: {}", pluginId)
         return true
     }
@@ -240,7 +227,7 @@ class PluginManager {
             return false
         }
         val events = plugin.activationEvents().ifEmpty { listOf(ActivationEvent.OnStartup) }
-        val context = PluginContextImpl(plugin, servicesRegistry)
+        val pluginContext = PluginContextImpl(plugin)
         val initialState = if (disabledPluginIds.contains(pluginId)) {
             PluginState.STOPPED
         } else {
@@ -251,7 +238,7 @@ class PluginManager {
             info = info,
             activationEvents = events,
             restartPolicy = plugin.restartPolicy(),
-            context = context,
+            context = pluginContext,
             origin = discovered.origin,
             source = discovered.source,
             classLoader = discovered.classLoader,
@@ -263,8 +250,8 @@ class PluginManager {
         retainClassLoader(runtime)
 
         registerActivation(pluginId, events)
-        contextInitializers.forEach { it(context) }
-        notifyChanged(pluginId)
+        pluginContext.guiProvider = guiProviderFactory?.invoke(pluginContext)
+        firePluginStateChanged(pluginId)
         return true
     }
 
@@ -302,8 +289,8 @@ class PluginManager {
         // I18n 现在由插件在 deactivate 时自己管理清理
     }
 
-    private fun notifyChanged(pluginId: String) {
-        listeners.forEach { it.onPluginChanged(pluginId) }
+    private fun firePluginStateChanged(pluginId: String) {
+        pluginStateListeners.forEach { it.onPluginStateChanged(pluginId) }
     }
 
     private fun PluginRuntime.toRecord(disabled: Boolean): PluginRecord =

@@ -3,10 +3,7 @@ package editorx.gui.main
 import editorx.core.gui.GuiContext
 import editorx.core.i18n.I18n
 import editorx.core.i18n.I18nKeys
-import editorx.core.plugin.PluginManager
-import editorx.core.plugin.PluginState
 import editorx.core.util.SystemUtils
-import editorx.gui.AppFrame
 import editorx.gui.core.ShortcutIds
 import editorx.gui.core.ShortcutRegistry
 import editorx.gui.main.editor.Editor
@@ -28,7 +25,7 @@ import java.awt.event.MouseMotionAdapter
 import java.io.File
 import javax.swing.*
 
-class MainWindow(val guiContext: GuiContext) : AppFrame() {
+class MainWindow(val guiContext: GuiContext) : JFrame() {
 
     // UI 组件
     private val _menuBar by lazy { MenuBar(this) }
@@ -39,31 +36,6 @@ class MainWindow(val guiContext: GuiContext) : AppFrame() {
     val statusBar by lazy { StatusBar(this) }
     val navigationBar by lazy { NavigationBar(this) }
 
-    private val pluginListener = object : PluginManager.Listener {
-        override fun onPluginChanged(pluginId: String) {
-            val pm = pluginManager ?: return
-            val state = pm.getPlugin(pluginId)?.state
-            if (state != PluginState.STARTED) {
-                // 插件被停用/失败：移除可能残留的入口与视图
-                sideBar.removeView(pluginId)
-            }
-            editor.refreshSyntaxForOpenTabs()
-        }
-
-        override fun onPluginUnloaded(pluginId: String) {
-            // 插件卸载：无条件移除入口与视图
-            sideBar.removeView(pluginId)
-            editor.refreshSyntaxForOpenTabs()
-        }
-    }
-
-    var pluginManager: PluginManager? = null
-        set(value) {
-            field?.removeListener(pluginListener)
-            field = value
-            value?.addListener(pluginListener)
-        }
-
     private val horizontalSplit by lazy {
         JSplitPane(JSplitPane.HORIZONTAL_SPLIT, sideBar, editor).apply {
             dividerLocation = 0  // 初始时隐藏SideBar
@@ -71,9 +43,6 @@ class MainWindow(val guiContext: GuiContext) : AppFrame() {
             dividerSize = 0  // 初始时 SideBar 关闭，隐藏拖拽条
         }
     }
-
-    // 快捷键注册表（单例，直接使用 ShortcutRegistry）
-
 
     init {
         setupWindow()
@@ -159,9 +128,6 @@ class MainWindow(val guiContext: GuiContext) : AppFrame() {
         setLocationRelativeTo(null)
         minimumSize = Dimension(800, 600)
 
-        // 设置窗口图标
-        setApplicationIcon()
-
         if (SystemUtils.isMacOS()) {
             // 启用 macOS 外观
             System.setProperty("apple.laf.useScreenMenuBar", "true")
@@ -171,27 +137,6 @@ class MainWindow(val guiContext: GuiContext) : AppFrame() {
             rootPane.putClientProperty("apple.awt.fullWindowContent", true)
             rootPane.putClientProperty("apple.awt.transparentTitleBar", true)
             rootPane.putClientProperty("apple.awt.windowTitleVisible", false)
-        }
-    }
-
-    private fun setApplicationIcon() {
-        val classLoader = javaClass.classLoader
-        val iconUrl = classLoader.getResource("icon.png")
-        if (iconUrl != null) {
-            val image = java.awt.Toolkit.getDefaultToolkit().getImage(iconUrl)
-            // 确保图像加载完成
-            val tracker = java.awt.MediaTracker(this)
-            tracker.addImage(image, 0)
-            try {
-                tracker.waitForID(0)
-            } catch (e: InterruptedException) {
-                Thread.currentThread().interrupt()
-            }
-            iconImage = image
-        } else {
-            // 调试：检查资源路径
-            val logger = org.slf4j.LoggerFactory.getLogger("MainWindow")
-            logger.warn("无法找到图标资源: icon.png")
         }
     }
 
@@ -344,7 +289,7 @@ class MainWindow(val guiContext: GuiContext) : AppFrame() {
         if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
             val file: File = chooser.selectedFile
             editor.openFile(file)
-            guiContext.workspace.addRecentFile(file)
+            guiContext.getWorkspace().addRecentFile(file)
         }
     }
 
@@ -361,17 +306,7 @@ class MainWindow(val guiContext: GuiContext) : AppFrame() {
      * 显示设置对话框
      */
     fun showSettings() {
-        val pm = pluginManager ?: run {
-            JOptionPane.showMessageDialog(
-                this,
-                I18n.translate(I18nKeys.Dialog.PLUGIN_SYSTEM_NOT_INIT),
-                I18n.translate(I18nKeys.Dialog.TIP),
-                JOptionPane.INFORMATION_MESSAGE
-            )
-            return
-        }
-
-        SettingsDialog.showOrBringToFront(this, guiContext, pm, SettingsDialog.Section.APPEARANCE)
+        SettingsDialog.showOrBringToFront(this, guiContext, guiContext.getPluginManager(), SettingsDialog.Section.APPEARANCE)
     }
 
     /**

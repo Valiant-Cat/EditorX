@@ -51,7 +51,7 @@ class NavigationBar(private val mainWindow: MainWindow) : JPanel() {
 
     fun update(currentFile: File?) {
         crumbs.clear()
-        crumbs += buildCrumbs(mainWindow.guiContext.workspace.getWorkspaceRoot(), currentFile)
+        crumbs += buildCrumbs(mainWindow.guiContext.getWorkspace().getWorkspaceRoot(), currentFile)
 
         removeAll()
         if (crumbs.isEmpty()) {

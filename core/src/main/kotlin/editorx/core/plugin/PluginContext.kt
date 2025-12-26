@@ -1,7 +1,6 @@
 package editorx.core.plugin
 
-import editorx.core.plugin.gui.PluginGuiClient
-import editorx.core.service.ServiceRegistry
+import editorx.core.plugin.gui.PluginGuiProvider
 
 interface PluginContext {
 
@@ -9,11 +8,11 @@ interface PluginContext {
 
     fun pluginInfo(): PluginInfo
 
-    fun gui(): PluginGuiClient?
+    fun gui(): PluginGuiProvider?
 
-    fun services(): ServiceRegistry
+    fun active()
 
-    fun <T : Any> registerService(serviceClass: Class<T>, instance: T)
+    fun deactivate()
 
-    fun <T : Any> unregisterService(serviceClass: Class<T>)
+    fun isActive(): Boolean
 }

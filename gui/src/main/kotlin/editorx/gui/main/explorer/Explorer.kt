@@ -2,7 +2,6 @@ package editorx.gui.main.explorer
 
 import editorx.core.external.ApkTool
 import editorx.core.filetype.FileTypeRegistry
-import editorx.core.service.DecompilerService
 import editorx.core.util.IconLoader
 import editorx.core.util.IconRef
 import editorx.core.util.IconUtils
@@ -164,7 +163,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         }
 
         // 检查文件是否在工作区根目录下
-        val workspaceRoot = mainWindow.guiContext.workspace.getWorkspaceRoot()
+        val workspaceRoot = mainWindow.guiContext.getWorkspace().getWorkspaceRoot()
         if (workspaceRoot == null) {
             JOptionPane.showMessageDialog(this, "请先打开工作区", "提示", JOptionPane.INFORMATION_MESSAGE)
             return
@@ -181,7 +180,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
 
     private fun updateLocateButtonState() {
         val currentFile = mainWindow.editor.getCurrentFile()
-        val workspaceRoot = mainWindow.guiContext.workspace.getWorkspaceRoot()
+        val workspaceRoot = mainWindow.guiContext.getWorkspace().getWorkspaceRoot()
 
         val isEnabled = currentFile != null &&
                 workspaceRoot != null &&
@@ -306,7 +305,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
             }
         }
         // 如果没有选中任何节点，使用工作区根目录
-        return mainWindow.guiContext.workspace.getWorkspaceRoot()
+        return mainWindow.guiContext.getWorkspace().getWorkspaceRoot()
     }
 
     private fun selectFileInTree(file: File) {
@@ -428,7 +427,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
 
         currentTask = Thread {
             try {
-                val rootDir = mainWindow.guiContext.workspace.getWorkspaceRoot()
+                val rootDir = mainWindow.guiContext.getWorkspace().getWorkspaceRoot()
                 if (rootDir == null || !rootDir.exists()) {
                     SwingUtilities.invokeLater { showEmptyRoot() }
                     return@Thread
@@ -487,7 +486,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
 
         currentTask = Thread {
             try {
-                val rootDir = mainWindow.guiContext.workspace.getWorkspaceRoot()
+                val rootDir = mainWindow.guiContext.getWorkspace().getWorkspaceRoot()
                 if (rootDir == null || !rootDir.exists()) {
                     SwingUtilities.invokeLater { showEmptyRoot() }
                     return@Thread
@@ -648,7 +647,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
     private fun openFile(file: File) {
         try {
             mainWindow.editor.openFile(file)
-            mainWindow.guiContext.workspace.addRecentFile(file)
+            mainWindow.guiContext.getWorkspace().addRecentFile(file)
             // 文件打开后更新定位按钮状态
             updateLocateButtonState()
         } catch (e: Exception) {
@@ -691,7 +690,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
     private fun showContextMenuForEmptyArea(x: Int, y: Int) {
         val menu = JPopupMenu()
         // 获取工作区根目录作为目标目录
-        val workspaceRoot = mainWindow.guiContext.workspace.getWorkspaceRoot()
+        val workspaceRoot = mainWindow.guiContext.getWorkspace().getWorkspaceRoot()
         if (workspaceRoot != null) {
             menu.add(JMenuItem("新建文件").apply {
                 addActionListener { createNewFileInDirectory(workspaceRoot) }
@@ -1142,12 +1141,12 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                     options,
                     options[0] // 默认选择"打开已存在的项目"
                 )
-                
+
                 when (choice) {
                     JOptionPane.YES_OPTION -> {
                         // 直接打开已存在的项目
                         SwingUtilities.invokeLater {
-                            mainWindow.guiContext.workspace.openWorkspace(outputDir)
+                            mainWindow.guiContext.getWorkspace().openWorkspace(outputDir)
                             mainWindow.editor.updateNavigation(null)
                             refreshRoot()
                             mainWindow.titleBar.updateVcsDisplay()
@@ -1155,9 +1154,11 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                         }
                         return
                     }
+
                     JOptionPane.NO_OPTION -> {
                         // 重新反编译，继续执行后续逻辑
                     }
+
                     else -> {
                         // 用户取消或关闭对话框
                         return
@@ -1183,7 +1184,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
 
                     if (!isTaskCancelled && !Thread.currentThread().isInterrupted) {
                         SwingUtilities.invokeLater {
-                            mainWindow.guiContext.workspace.openWorkspace(outputDir)
+                            mainWindow.guiContext.getWorkspace().openWorkspace(outputDir)
                             mainWindow.editor.updateNavigation(null)
                             refreshRoot()
                             mainWindow.titleBar.updateVcsDisplay()
@@ -1248,12 +1249,6 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
             logger.error("提取 DEX 文件失败: ${e.message}", e)
             // 不抛出异常，因为反编译本身已经成功
         }
-    }
-
-    private fun ensureDecompilerService(): DecompilerService? {
-        val manager = mainWindow.pluginManager ?: return null
-        manager.triggerCommand("decompiler")
-        return manager.serviceRegistry().get(DecompilerService::class.java)
     }
 
     // Node representing a File with lazy children loading
@@ -1377,7 +1372,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         private fun getIconForFile(file: File): Icon? {
             if (file.isDirectory) {
                 // 检查是否是根目录（assets、res、smali）
-                val workspaceRoot = mainWindow.guiContext.workspace.getWorkspaceRoot()
+                val workspaceRoot = mainWindow.guiContext.getWorkspace().getWorkspaceRoot()
                 if (workspaceRoot != null && file.parentFile?.absolutePath == workspaceRoot.absolutePath) {
                     val dirName = file.name.lowercase()
                     when {
@@ -1490,7 +1485,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                             // 如果没有找到APK文件，检查是否有文件夹可以打开为工作区
                             val dir = files.firstOrNull { it.isDirectory }
                             if (dir != null) {
-                                mainWindow.guiContext.workspace.openWorkspace(dir)
+                                mainWindow.guiContext.getWorkspace().openWorkspace(dir)
                                 mainWindow.editor.updateNavigation(null)
                                 refreshRoot()
                                 mainWindow.titleBar.updateVcsDisplay()

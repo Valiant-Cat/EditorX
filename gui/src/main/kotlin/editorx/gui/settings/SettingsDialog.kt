@@ -87,9 +87,9 @@ class SettingsDialog(
     private val cardLayout = CardLayout()
     private val contentPanel = JPanel(cardLayout).apply { isOpaque = false }
 
-    private val appearancePanel = AppearancePanel(environment.settings)
+    private val appearancePanel = AppearancePanel(environment.getSettings())
     private val keymapPanel = KeymapPanel()
-    private val pluginsPanel = PluginsPanel(pluginManager, environment.settings)
+    private val pluginsPanel = PluginsPanel(pluginManager, environment.getSettings())
     private val cachePanel = CachePanel(environment)
     
     // 用于限制 SettingsDialog 的 JSplitPane 最大 dividerLocation
@@ -338,7 +338,7 @@ class SettingsDialog(
                     (cachePanel as? SettingsPanel)?.apply { needRestart = applyChanges() || needRestart }
                     
                     // 同步所有设置
-                    environment.settings.sync()
+                    environment.getSettings().sync()
                     
                     // 如果语言改变需要重启，显示提示对话框
                     if (needRestart && appearancePanel.showRestartDialog()) {

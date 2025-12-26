@@ -1,7 +1,7 @@
 package editorx.core.service
 
 /**
- * 核心服务注册表，插件通过 [editorx.core.plugin.PluginContext.services] 访问。
+ * 核心服务注册表
  */
 interface ServiceRegistry {
     fun <T : Any> get(serviceClass: Class<T>): T?

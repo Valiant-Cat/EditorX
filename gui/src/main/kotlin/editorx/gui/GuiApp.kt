@@ -1,17 +1,22 @@
 package editorx.gui
 
 import com.formdev.flatlaf.FlatLightLaf
-import editorx.core.gui.GuiContext
 import editorx.core.plugin.PluginManager
+import editorx.core.plugin.PluginState
 import editorx.core.plugin.loader.PluginLoaderImpl
+import editorx.core.store.FileStore
 import editorx.core.store.Store
 import editorx.core.util.StartupTimer
 import editorx.core.util.SystemUtils
+import editorx.core.workspace.DefaultWorkspace
 import editorx.gui.main.MainWindow
-import editorx.gui.plugin.PluginGuiClientImpl
 import org.slf4j.LoggerFactory
+import java.awt.Image
+import java.awt.Taskbar
 import java.io.File
+import java.io.IOException
 import java.util.*
+import javax.imageio.ImageIO
 import javax.swing.SwingUtilities
 
 /**
@@ -57,6 +62,10 @@ private fun setupLogging() {
 }
 
 private fun initializeApplication(timer: StartupTimer) {
+    // 设置应用图标
+    setAppIcon("icon_round_128.png")
+    timer.mark("icon.set")
+
     // 设置 Look and Feel
     runCatching {
         FlatLightLaf.setup()
@@ -78,13 +87,51 @@ private fun initializeApplication(timer: StartupTimer) {
     LoggerFactory.getLogger("GuiApp").info("EditorX 初始化完成")
 }
 
+
+private fun setAppIcon(icon: String) {
+    val classLoader = Thread.currentThread().contextClassLoader ?: ClassLoader.getSystemClassLoader()
+    val iconUrl = classLoader.getResource(icon) ?: run {
+        return
+    }
+
+    val image = try {
+        ImageIO.read(iconUrl)
+    } catch (e: IOException) {
+        return
+    }
+
+    if (image == null) {
+        return
+    }
+
+    // 优先尝试现代 Taskbar API（Windows / 新版本的 macOS）
+    if (Taskbar.isTaskbarSupported()) {
+        val taskbar = Taskbar.getTaskbar()
+        if (taskbar.isSupported(Taskbar.Feature.ICON_IMAGE)) {
+            taskbar.iconImage = image
+            return
+        }
+    }
+
+    // macOS 专属回退（目前仍是主要方式）
+    if (SystemUtils.isMacOS()) {
+        runCatching {
+            val appClass = Class.forName("com.apple.eawt.Application")
+            val application = appClass.getMethod("getApplication").invoke(null)
+            appClass.getMethod("setDockIconImage", Image::class.java).invoke(application, image)
+        }
+    }
+}
+
 private fun initializeMainWindow(startupTimer: StartupTimer) {
     val appDir = File(System.getProperty("user.home"), ".editorx")
-    val guiContext = GuiContext(appDir)
-    startupTimer.mark("environment.ready")
+
+    // 创建 settings 和 workspace
+    val settings = FileStore(File(appDir, "settings.properties"))
+    val workspace = DefaultWorkspace(settings)
 
     // 恢复保存的语言
-    guiContext.settings.get("ui.locale", null)?.let { tag ->
+    settings.get("ui.locale", null)?.let { tag ->
         runCatching { Locale.forLanguageTag(tag) }
             .getOrNull()
             ?.takeIf { it.language.isNotBlank() }
@@ -93,32 +140,47 @@ private fun initializeMainWindow(startupTimer: StartupTimer) {
     }
 
     // 恢复保存的主题
-    guiContext.settings.get("ui.theme", null)?.let { name ->
+    settings.get("ui.theme", null)?.let { name ->
         ThemeManager.loadTheme(name).let { theme ->
             ThemeManager.currentTheme = theme
         }
     }
 
-    // 初始化插件化框架
-    val disabledPlugins = loadDisabledSet(guiContext.settings)
+    // 初始化插件框架
+    val disabledPlugins = loadDisabledSet(settings)
     val pluginManager = PluginManager().apply {
         setInitialDisabled(disabledPlugins)
-        registerContextInitializer { ctx ->
-            ctx.setGuiClient(PluginGuiClientImpl(ctx.pluginId(), guiContext))
-        }
+        scanPlugins(PluginLoaderImpl())
     }
 
     SwingUtilities.invokeLater {
-        // 扫描并启动需在应用初始化时激活的插件（如语言包）
-        pluginManager.scanPlugins(PluginLoaderImpl())
-        pluginManager.triggerStartup()
-        startupTimer.mark("plugins.started")
+        // 创建 GUI 上下文 与 主窗口
+        val guiContext = GuiContextImpl(appDir, settings, workspace, pluginManager)
+        val mainWindow = MainWindow(guiContext).apply {
+            pluginManager.setGuiProviderFactory { pluginCtx ->
+                PluginGuiProviderImpl(pluginCtx.pluginId(), guiContext, this)
+            }
+            pluginManager.addPluginStateListener(object : PluginManager.PluginStateListener {
+                override fun onPluginStateChanged(pluginId: String) {
+                    val state = guiContext.getPluginManager().getPlugin(pluginId)?.state
+                    if (state != PluginState.STARTED) {
+                        // 插件被停用/失败：移除可能残留的入口与视图
+                        sideBar.removeView(pluginId)
+                        // 移除 ToolBar items
+                        toolBar.removeItems(pluginId)
+                    }
+                    editor.refreshSyntaxForOpenTabs()
+                }
+            })
+        }
 
-        // 创建并显示主窗口
-        val mainWindow = MainWindow(guiContext)
-        mainWindow.pluginManager = pluginManager
+        // 显示主窗口
         mainWindow.isVisible = true
-        startupTimer.mark("window.visible")
+        startupTimer.mark("gui.ready")
+
+        // 触发插件启动
+        pluginManager.triggerStartup()
+        startupTimer.mark("plugin.triggerStartup")
 
         // 打印启动计时日志
         val startupLogger = LoggerFactory.getLogger("StartupTimer")

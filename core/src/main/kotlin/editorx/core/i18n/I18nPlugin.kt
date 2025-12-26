@@ -2,7 +2,7 @@ package editorx.core.i18n
 
 import editorx.core.plugin.Plugin
 import editorx.core.plugin.PluginContext
-import java.util.Locale
+import java.util.*
 
 /**
  * 语言包插件基类。
@@ -14,8 +14,20 @@ abstract class I18nPlugin(
     private val locale: Locale
 ) : Plugin {
 
-    private var registered = false
-    private lateinit var provider: TranslationProvider
+    private val provider: TranslationProvider
+
+    init {
+        provider = TranslationProvider { key -> translate(key) }
+        I18n.register(locale, provider)
+    }
+
+    override fun activate(pluginContext: PluginContext) {
+        // nop
+    }
+
+    override fun deactivate() {
+        I18n.unregister(provider)
+    }
 
     /**
      * 翻译指定的 key。
@@ -25,18 +37,5 @@ abstract class I18nPlugin(
      * @return 翻译文案，如果不存在则返回 null
      */
     abstract fun translate(key: String): String?
-
-    override fun activate(pluginContext: PluginContext) {
-        provider = TranslationProvider { key -> translate(key) }
-        I18n.register(locale, provider)
-        registered = true
-    }
-
-    override fun deactivate() {
-        if (registered) {
-            I18n.unregister(provider)
-            registered = false
-        }
-    }
 }
 

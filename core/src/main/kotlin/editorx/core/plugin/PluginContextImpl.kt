@@ -1,15 +1,13 @@
 package editorx.core.plugin
 
-import editorx.core.plugin.gui.PluginGuiClient
-import editorx.core.service.MutableServiceRegistry
+import editorx.core.plugin.gui.PluginGuiProvider
 
 class PluginContextImpl(
     private val plugin: Plugin,
-    private val serviceRegistry: MutableServiceRegistry,
 ) : PluginContext, Comparable<PluginContextImpl> {
-    private var guiClient: PluginGuiClient? = null
     private var hasActive = false
-    private val ownedServices: MutableSet<Class<*>> = linkedSetOf()
+
+    var guiProvider: PluginGuiProvider? = null
 
     override fun pluginId(): String {
         return plugin.getInfo().id
@@ -19,42 +17,26 @@ class PluginContextImpl(
         return plugin.getInfo()
     }
 
-    override fun gui(): PluginGuiClient? {
-        return guiClient
+    override fun gui(): PluginGuiProvider? {
+        return guiProvider
     }
 
-    override fun services(): MutableServiceRegistry = serviceRegistry
 
-    override fun <T : Any> registerService(serviceClass: Class<T>, instance: T) {
-        serviceRegistry.register(serviceClass, instance)
-        ownedServices.add(serviceClass)
-    }
-
-    override fun <T : Any> unregisterService(serviceClass: Class<T>) {
-        serviceRegistry.unregister(serviceClass)
-        ownedServices.remove(serviceClass)
-    }
-
-    fun setGuiClient(guiClient: PluginGuiClient) {
-        this.guiClient = guiClient
-    }
-
-    fun active() {
+    override fun active() {
         if (hasActive) return
         plugin.activate(this)
         hasActive = true
     }
 
-    fun deactivate() {
+    override fun deactivate() {
         if (hasActive) {
             plugin.deactivate()
-            ownedServices.forEach { cls ->
-                @Suppress("UNCHECKED_CAST")
-                serviceRegistry.unregister(cls as Class<Any>)
-            }
-            ownedServices.clear()
             hasActive = false
         }
+    }
+
+    override fun isActive(): Boolean {
+        return hasActive
     }
 
     override fun compareTo(other: PluginContextImpl): Int {

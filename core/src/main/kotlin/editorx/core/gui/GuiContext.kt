@@ -1,16 +1,33 @@
 package editorx.core.gui
 
+import editorx.core.plugin.PluginManager
 import editorx.core.store.Store
-import editorx.core.store.FileStore
-import editorx.core.workspace.DefaultWorkspace
 import editorx.core.workspace.Workspace
 import java.io.File
 
-class GuiContext(val appDir: File) {
+/**
+ * GUI 上下文接口
+ * 提供 GUI 应用所需的基础设施
+ */
+interface GuiContext {
 
-    val settings: Store by lazy {
-        FileStore(File(appDir, "settings.properties"))
-    }
+    /**
+     * 获取应用目录
+     */
+    fun getAppDir(): File
 
-    val workspace: Workspace = DefaultWorkspace(settings)
+    /**
+     * 获取设置存储
+     */
+    fun getSettings(): Store
+
+    /**
+     * 获取工作区
+     */
+    fun getWorkspace(): Workspace
+    
+    /**
+     * 获取插件管理器
+     */
+    fun getPluginManager(): PluginManager
 }

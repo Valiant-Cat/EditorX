@@ -1,16 +1,9 @@
 package editorx.gui.main.toolbar
 
-import editorx.core.i18n.I18n
-import editorx.core.i18n.I18nKeys
-import editorx.core.util.IconLoader
-import editorx.core.util.IconRef
 import editorx.gui.main.MainWindow
 import org.slf4j.LoggerFactory
 import java.awt.Color
 import java.awt.Insets
-import java.awt.event.ActionListener
-import java.io.File
-import java.nio.file.Files
 import javax.swing.*
 
 /**
@@ -22,6 +15,10 @@ class ToolBar(private val mainWindow: MainWindow) : JPanel() {
         private const val ICON_SIZE = 14
     }
 
+    // 按插件 ID 分组存储按钮
+    private val itemsByPlugin = mutableMapOf<String, MutableMap<String, JButton>>()
+    private val itemOrder = mutableListOf<String>() // 保持添加顺序
+
     init {
         val separator = Color(0xDE, 0xDE, 0xDE)
         border = BorderFactory.createCompoundBorder(
@@ -29,46 +26,88 @@ class ToolBar(private val mainWindow: MainWindow) : JPanel() {
             BorderFactory.createEmptyBorder(4, 8, 4, 8),
         )
         layout = BoxLayout(this, BoxLayout.X_AXIS)
-        buildActions()
+        // 初始时添加一个空的分隔符以保持布局
+        add(Box.createHorizontalStrut(12))
     }
 
-    private fun buildActions() {
-        // Android 项目快速跳转按钮
-        add(
-            createIconLabelButton(
-                IconLoader.getIcon(IconRef("icons/gui/android-manifest.svg"), ICON_SIZE),
-                I18n.translate(I18nKeys.Toolbar.GOTO_MANIFEST)
-            ) {
-                navigateToAndroidManifest()
-            })
+    /**
+     * 添加 ToolBar 按钮
+     * @param pluginId 插件 ID
+     * @param id 按钮的唯一标识符
+     * @param icon 按钮图标
+     * @param text 按钮文本
+     * @param action 按钮点击时的动作
+     */
+    fun addItem(pluginId: String, id: String, icon: Icon?, text: String, action: () -> Unit) {
+        // 如果已存在相同 ID 的按钮，先移除
+        if (itemOrder.contains(id)) {
+            removeItem(pluginId, id)
+        }
 
-        add(Box.createHorizontalStrut(6))
+        val button = buildToolBarItem(icon, text, action)
+        itemsByPlugin.getOrPut(pluginId) { mutableMapOf() }[id] = button
+        itemOrder.add(id)
 
-        add(
-            createIconLabelButton(
-                IconLoader.getIcon(IconRef("icons/gui/main-activity.svg"), ICON_SIZE),
-                I18n.translate(I18nKeys.Toolbar.GOTO_MAIN_ACTIVITY)
-            ) {
-                navigateToMainActivity()
-            })
+        // 重新构建 UI
+        rebuildUI()
+    }
 
-        add(Box.createHorizontalStrut(6))
+    /**
+     * 移除指定插件的所有按钮
+     * @param pluginId 插件 ID
+     */
+    fun removeItems(pluginId: String) {
+        val items = itemsByPlugin.remove(pluginId) ?: return
+        itemOrder.removeAll(items.keys)
+        rebuildUI()
+    }
 
-        add(
-            createIconLabelButton(
-                IconLoader.getIcon(IconRef("icons/gui/application.svg"), ICON_SIZE),
-                I18n.translate(I18nKeys.Toolbar.GOTO_APPLICATION)
-            ) {
-                navigateToApplication()
-            })
+    /**
+     * 移除指定按钮
+     * @param pluginId 插件 ID
+     * @param id 按钮 ID
+     */
+    private fun removeItem(pluginId: String, id: String) {
+        val pluginItems = itemsByPlugin[pluginId] ?: return
+        pluginItems.remove(id)?.let {
+            itemOrder.remove(id)
+        }
+        if (pluginItems.isEmpty()) {
+            itemsByPlugin.remove(pluginId)
+        }
+    }
 
+    /**
+     * 重新构建 UI
+     */
+    private fun rebuildUI() {
+        // 移除所有组件
+        removeAll()
+
+        // 按顺序添加所有按钮
+        val allItems = itemOrder.mapNotNull { itemId ->
+            itemsByPlugin.values.firstOrNull { it.containsKey(itemId) }?.get(itemId)
+        }
+
+        allItems.forEachIndexed { index, button ->
+            add(button)
+            // 在按钮之间添加分隔符
+            if (index < allItems.size - 1) {
+                add(Box.createHorizontalStrut(6))
+            }
+        }
+
+        // 添加尾部分隔符
         add(Box.createHorizontalStrut(12))
+
+        revalidate()
+        repaint()
     }
 
     /**
      * 创建带图标和标签的按钮（icon + label 格式）
      */
-    private fun createIconLabelButton(icon: Icon?, text: String, action: () -> Unit): JButton {
+    private fun buildToolBarItem(icon: Icon?, text: String, action: () -> Unit): JButton {
         return JButton(text, icon).apply {
             toolTipText = text
             isFocusable = false
@@ -83,448 +122,6 @@ class ToolBar(private val mainWindow: MainWindow) : JPanel() {
             margin = Insets(4, 8, 4, 8)
             addActionListener { action() }
         }
-    }
-
-    private fun JButton.compact(textLabel: String, l: ActionListener): JButton = apply {
-        toolTipText = textLabel
-        isFocusable = false
-        margin = Insets(4, 4, 4, 4)
-        addActionListener(l)
-    }
-
-    /**
-     * 创建带快捷键提示的紧凑按钮
-     */
-    private fun JButton.compactWithShortcut(textLabel: String, shortcut: String, l: ActionListener): JButton = apply {
-        toolTipText = "$textLabel ($shortcut)"
-        isFocusable = false
-        margin = Insets(4, 4, 4, 4)
-        addActionListener(l)
-    }
-
-    // Android 项目快速跳转方法
-
-    /**
-     * 跳转到 AndroidManifest.xml
-     */
-    private fun navigateToAndroidManifest() {
-        val workspaceRoot = mainWindow.guiContext.workspace.getWorkspaceRoot()
-        if (workspaceRoot == null) {
-            JOptionPane.showMessageDialog(
-                mainWindow,
-                I18n.translate(I18nKeys.ToolbarMessage.WORKSPACE_NOT_OPENED),
-                I18n.translate(I18nKeys.Dialog.TIP),
-                JOptionPane.INFORMATION_MESSAGE
-            )
-            return
-        }
-
-        val manifestFile = File(workspaceRoot, "AndroidManifest.xml")
-        if (!manifestFile.exists()) {
-            JOptionPane.showMessageDialog(
-                mainWindow,
-                I18n.translate(I18nKeys.ToolbarMessage.MANIFEST_NOT_FOUND).format(manifestFile.absolutePath),
-                I18n.translate(I18nKeys.Dialog.FILE_NOT_EXISTS),
-                JOptionPane.WARNING_MESSAGE
-            )
-            return
-        }
-
-        mainWindow.editor.openFile(manifestFile)
-    }
-
-    /**
-     * 跳转到 MainActivity
-     */
-    private fun navigateToMainActivity() {
-        val workspaceRoot = mainWindow.guiContext.workspace.getWorkspaceRoot()
-        if (workspaceRoot == null) {
-            JOptionPane.showMessageDialog(
-                mainWindow,
-                I18n.translate(I18nKeys.ToolbarMessage.WORKSPACE_NOT_OPENED),
-                I18n.translate(I18nKeys.Dialog.TIP),
-                JOptionPane.INFORMATION_MESSAGE
-            )
-            return
-        }
-
-        val manifestFile = File(workspaceRoot, "AndroidManifest.xml")
-        if (!manifestFile.exists()) {
-            JOptionPane.showMessageDialog(
-                mainWindow,
-                I18n.translate(I18nKeys.ToolbarMessage.MAINACTIVITY_NOT_FOUND),
-                I18n.translate(I18nKeys.Dialog.FILE_NOT_EXISTS),
-                JOptionPane.WARNING_MESSAGE
-            )
-            return
-        }
-
-        try {
-            val manifestContent = Files.readString(manifestFile.toPath())
-            val mainActivityClass = findMainActivityClass(manifestContent)
-
-            if (mainActivityClass == null) {
-                JOptionPane.showMessageDialog(
-                    mainWindow,
-                    I18n.translate(I18nKeys.ToolbarMessage.MAINACTIVITY_NOT_FOUND_DETAIL),
-                    I18n.translate(I18nKeys.Dialog.NOT_FOUND),
-                    JOptionPane.INFORMATION_MESSAGE
-                )
-                return
-            }
-
-            val smaliFile = findSmaliFile(workspaceRoot, mainActivityClass)
-            if (smaliFile != null && smaliFile.exists()) {
-                mainWindow.editor.openFile(smaliFile)
-            } else {
-                JOptionPane.showMessageDialog(
-                    mainWindow,
-                    I18n.translate(I18nKeys.ToolbarMessage.MAINACTIVITY_SMALI_NOT_FOUND).format(
-                        mainActivityClass,
-                        smaliFile?.absolutePath ?: I18n.translate(I18nKeys.Dialog.NOT_FOUND)
-                    ),
-                    I18n.translate(I18nKeys.Dialog.FILE_NOT_EXISTS),
-                    JOptionPane.WARNING_MESSAGE
-                )
-            }
-        } catch (e: Exception) {
-            logger.error("跳转到 MainActivity 失败", e)
-            JOptionPane.showMessageDialog(
-                mainWindow,
-                I18n.translate(I18nKeys.ToolbarMessage.PARSE_MANIFEST_FAILED).format(e.message ?: ""),
-                I18n.translate(I18nKeys.Dialog.ERROR),
-                JOptionPane.ERROR_MESSAGE
-            )
-        }
-    }
-
-    /**
-     * 跳转到 Application
-     */
-    private fun navigateToApplication() {
-        val workspaceRoot = mainWindow.guiContext.workspace.getWorkspaceRoot()
-        if (workspaceRoot == null) {
-            JOptionPane.showMessageDialog(
-                mainWindow,
-                I18n.translate(I18nKeys.ToolbarMessage.WORKSPACE_NOT_OPENED),
-                I18n.translate(I18nKeys.Dialog.TIP),
-                JOptionPane.INFORMATION_MESSAGE
-            )
-            return
-        }
-
-        val manifestFile = File(workspaceRoot, "AndroidManifest.xml")
-        if (!manifestFile.exists()) {
-            JOptionPane.showMessageDialog(
-                mainWindow,
-                I18n.translate(I18nKeys.ToolbarMessage.APPLICATION_NOT_FOUND),
-                I18n.translate(I18nKeys.Dialog.FILE_NOT_EXISTS),
-                JOptionPane.WARNING_MESSAGE
-            )
-            return
-        }
-
-        try {
-            val manifestContent = Files.readString(manifestFile.toPath())
-            val applicationClass = findApplicationClass(manifestContent)
-
-            if (applicationClass == null) {
-                JOptionPane.showMessageDialog(
-                    mainWindow,
-                    I18n.translate(I18nKeys.ToolbarMessage.APPLICATION_NOT_FOUND_DETAIL),
-                    I18n.translate(I18nKeys.Dialog.NOT_FOUND),
-                    JOptionPane.INFORMATION_MESSAGE
-                )
-                return
-            }
-
-            val smaliFile = findSmaliFile(workspaceRoot, applicationClass)
-            if (smaliFile != null && smaliFile.exists()) {
-                mainWindow.editor.openFile(smaliFile)
-            } else {
-                JOptionPane.showMessageDialog(
-                    mainWindow,
-                    I18n.translate(I18nKeys.ToolbarMessage.APPLICATION_SMALI_NOT_FOUND)
-                        .format(applicationClass, smaliFile?.absolutePath ?: I18n.translate(I18nKeys.Dialog.NOT_FOUND)),
-                    I18n.translate(I18nKeys.Dialog.FILE_NOT_EXISTS),
-                    JOptionPane.WARNING_MESSAGE
-                )
-            }
-        } catch (e: Exception) {
-            logger.error("跳转到 Application 失败", e)
-            JOptionPane.showMessageDialog(
-                mainWindow,
-                I18n.translate(I18nKeys.ToolbarMessage.PARSE_MANIFEST_FAILED).format(e.message ?: ""),
-                I18n.translate(I18nKeys.Dialog.ERROR),
-                JOptionPane.ERROR_MESSAGE
-            )
-        }
-    }
-
-    /**
-     * 从 AndroidManifest.xml 内容中查找 MainActivity 类名
-     * MainActivity 是指同时包含 MAIN action 和 LAUNCHER category 的 Activity（在同一个 intent-filter 中）
-     */
-    private fun findMainActivityClass(manifestContent: String): String? {
-        try {
-            // 获取包名（用于补全相对类名）
-            val packageName = extractPackageName(manifestContent)
-
-            // 使用更准确的方法查找所有 activity 标签
-            val activities = extractActivities(manifestContent)
-
-            for (activity in activities) {
-                // 首先提取 activity 的 android:name 属性
-                val activityName = extractAttribute(activity, "android:name") ?: continue
-
-                // 检查该 activity 是否包含标准的启动 intent-filter（MAIN + LAUNCHER）
-                if (hasMainLauncherIntentFilter(activity)) {
-                    var className = activityName
-                    // 如果类名以 . 开头，需要补全包名
-                    if (className.startsWith(".") && packageName != null) {
-                        className = packageName + className
-                    }
-                    return className
-                }
-            }
-        } catch (e: Exception) {
-            logger.warn("查找 MainActivity 类名失败", e)
-        }
-        return null
-    }
-
-    /**
-     * 提取 AndroidManifest.xml 中的包名
-     */
-    private fun extractPackageName(manifestContent: String): String? {
-        val pattern = """<manifest[^>]+package\s*=\s*["']([^"']+)["']""".toRegex()
-        val match = pattern.find(manifestContent)
-        return match?.groupValues?.get(1)
-    }
-
-    /**
-     * 从 AndroidManifest.xml 中提取所有 activity 标签的完整 XML（包括嵌套内容）
-     */
-    private fun extractActivities(manifestContent: String): List<String> {
-        val activities = mutableListOf<String>()
-        var pos = 0
-
-        while (pos < manifestContent.length) {
-            // 查找下一个 <activity 标签的开始位置
-            val startTag = manifestContent.indexOf("<activity", pos)
-            if (startTag == -1) break
-
-            // 查找 activity 标签的开始标签结束位置（> 或 />）
-            val tagEnd = findTagEnd(manifestContent, startTag)
-            if (tagEnd == -1) break
-
-            // 检查是否是自闭合标签
-            val tagContent = manifestContent.substring(startTag, tagEnd + 1)
-            if (tagContent.trimEnd().endsWith("/>")) {
-                // 自闭合标签，直接添加
-                activities.add(tagContent)
-                pos = tagEnd + 1
-                continue
-            }
-
-            // 查找对应的 </activity> 结束标签
-            val endTag = findMatchingEndTag(manifestContent, tagEnd + 1, "activity")
-            if (endTag == -1) {
-                pos = tagEnd + 1
-                continue
-            }
-
-            // 提取完整的 activity XML
-            val activityXml = manifestContent.substring(startTag, endTag + "</activity>".length)
-            activities.add(activityXml)
-            pos = endTag + "</activity>".length
-        }
-
-        return activities
-    }
-
-    /**
-     * 查找标签的结束位置（> 或 />）
-     */
-    private fun findTagEnd(content: String, start: Int): Int {
-        var pos = start
-        var inQuotes = false
-        var quoteChar: Char? = null
-
-        while (pos < content.length) {
-            val ch = content[pos]
-            when {
-                !inQuotes && (ch == '"' || ch == '\'') -> {
-                    inQuotes = true
-                    quoteChar = ch
-                }
-
-                inQuotes && ch == quoteChar -> {
-                    inQuotes = false
-                    quoteChar = null
-                }
-
-                !inQuotes && ch == '>' -> {
-                    return pos
-                }
-            }
-            pos++
-        }
-        return -1
-    }
-
-    /**
-     * 查找匹配的结束标签（处理嵌套标签）
-     */
-    private fun findMatchingEndTag(content: String, start: Int, tagName: String): Int {
-        val startTag = "<$tagName"
-        val endTag = "</$tagName>"
-        var pos = start
-        var depth = 1
-
-        while (pos < content.length && depth > 0) {
-            val nextStart = content.indexOf(startTag, pos)
-            val nextEnd = content.indexOf(endTag, pos)
-
-            when {
-                nextEnd == -1 -> return -1 // 没找到结束标签
-                nextStart != -1 && nextStart < nextEnd -> {
-                    // 找到嵌套的开始标签
-                    depth++
-                    pos = nextStart + startTag.length
-                }
-
-                else -> {
-                    // 找到结束标签
-                    depth--
-                    if (depth == 0) {
-                        return nextEnd
-                    }
-                    pos = nextEnd + endTag.length
-                }
-            }
-        }
-        return -1
-    }
-
-    /**
-     * 从 XML 片段中提取指定属性的值
-     */
-    private fun extractAttribute(xml: String, attrName: String): String? {
-        // 匹配属性，支持单引号和双引号，处理空格
-        val pattern = """$attrName\s*=\s*["']([^"']+)["']""".toRegex()
-        val match = pattern.find(xml)
-        return match?.groupValues?.get(1)
-    }
-
-    /**
-     * 检查 activity 是否包含标准的启动 intent-filter（MAIN action + LAUNCHER category）
-     * 需要在同一个 intent-filter 中同时包含这两个
-     */
-    private fun hasMainLauncherIntentFilter(activityXml: String): Boolean {
-        // 提取所有 intent-filter 标签
-        val intentFilters = extractIntentFilters(activityXml)
-
-        for (intentFilter in intentFilters) {
-            // 检查是否同时包含 MAIN action 和 LAUNCHER category
-            val hasMainAction = """android\.intent\.action\.MAIN""".toRegex().containsMatchIn(intentFilter)
-            val hasLauncherCategory = """android\.intent\.category\.LAUNCHER""".toRegex().containsMatchIn(intentFilter)
-
-            if (hasMainAction && hasLauncherCategory) {
-                return true
-            }
-        }
-        return false
-    }
-
-    /**
-     * 从 activity XML 中提取所有 intent-filter 标签
-     */
-    private fun extractIntentFilters(activityXml: String): List<String> {
-        val intentFilters = mutableListOf<String>()
-        var pos = 0
-
-        while (pos < activityXml.length) {
-            val startTag = activityXml.indexOf("<intent-filter", pos)
-            if (startTag == -1) break
-
-            val tagEnd = findTagEnd(activityXml, startTag)
-            if (tagEnd == -1) break
-
-            // 检查是否是自闭合标签（intent-filter 通常不是自闭合的，但为了安全起见还是检查）
-            val tagContent = activityXml.substring(startTag, tagEnd + 1)
-            if (tagContent.trimEnd().endsWith("/>")) {
-                intentFilters.add(tagContent)
-                pos = tagEnd + 1
-                continue
-            }
-
-            // 查找对应的 </intent-filter> 结束标签
-            val endTag = findMatchingEndTag(activityXml, tagEnd + 1, "intent-filter")
-            if (endTag == -1) {
-                pos = tagEnd + 1
-                continue
-            }
-
-            val intentFilterXml = activityXml.substring(startTag, endTag + "</intent-filter>".length)
-            intentFilters.add(intentFilterXml)
-            pos = endTag + "</intent-filter>".length
-        }
-
-        return intentFilters
-    }
-
-    /**
-     * 从 AndroidManifest.xml 内容中查找 Application 类名
-     */
-    private fun findApplicationClass(manifestContent: String): String? {
-        try {
-            // 查找 <application android:name="..."> 中的 android:name 属性
-            val applicationPattern = """<application[^>]+android:name\s*=\s*["']([^"']+)["']""".toRegex()
-            val match = applicationPattern.find(manifestContent)
-            if (match != null) {
-                var className = match.groupValues[1]
-                // 如果类名以 . 开头，需要补全包名
-                if (className.startsWith(".")) {
-                    val packagePattern = """<manifest[^>]+package\s*=\s*["']([^"']+)["']""".toRegex()
-                    val packageMatch = packagePattern.find(manifestContent)
-                    if (packageMatch != null) {
-                        className = packageMatch.groupValues[1] + className
-                    }
-                }
-                return className
-            }
-        } catch (e: Exception) {
-            logger.warn("查找 Application 类名失败", e)
-        }
-        return null
-    }
-
-    /**
-     * 根据 Java 类名查找对应的 smali 文件
-     * 将 com.example.MainActivity 转换为 smali/com/example/MainActivity.smali
-     */
-    private fun findSmaliFile(workspaceRoot: File, className: String): File? {
-        // 将类名转换为路径（com.example.MainActivity -> com/example/MainActivity.smali）
-        val path = className.replace(".", "/") + ".smali"
-
-        // 在 smali 目录下查找（apktool 反编译后的常见结构）
-        // 可能有多个 smali 目录（smali, smali_classes2, smali_classes3, ...）
-        val smaliDirs = workspaceRoot.listFiles()?.filter {
-            it.isDirectory && it.name.matches("""^smali(_classes\d+)?$""".toRegex())
-        } ?: emptyList()
-
-        // 先尝试 smali 目录
-        for (smaliDir in smaliDirs.sorted()) {
-            val smaliFile = File(smaliDir, path)
-            if (smaliFile.exists()) {
-                return smaliFile
-            }
-        }
-
-        // 如果没找到，返回预期的路径（用于错误提示）
-        val defaultSmaliDir = File(workspaceRoot, "smali")
-        return File(defaultSmaliDir, path)
     }
 }
 

@@ -130,8 +130,8 @@ class MenuBar(private val mainWindow: MainWindow) : JMenuBar() {
         if (fileChooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
             val selectedFolder = fileChooser.selectedFile
             // 更新工作区并刷新 Explorer
-            mainWindow.guiContext.workspace.openWorkspace(selectedFolder)
-            mainWindow.guiContext.workspace.addRecentWorkspace(selectedFolder)
+            mainWindow.guiContext.getWorkspace().openWorkspace(selectedFolder)
+            mainWindow.guiContext.getWorkspace().addRecentWorkspace(selectedFolder)
 //            mainWindow.statusBar.setMessage("已打开文件夹: ${selectedFolder.name}")
             (mainWindow.sideBar.getView("explorer") as? Explorer)?.refreshRoot()
             mainWindow.titleBar.updateVcsDisplay()
@@ -185,7 +185,7 @@ private class RecentFilesMenuListener(
 ) : javax.swing.event.MenuListener {
     override fun menuSelected(e: javax.swing.event.MenuEvent) {
         menu.removeAll()
-        val recents = mainWindow.guiContext.workspace.recentFiles()
+        val recents = mainWindow.guiContext.getWorkspace().recentFiles()
         if (recents.isEmpty()) {
             menu.add(JMenuItem(I18n.translate(I18nKeys.Dialog.NO_RECENT_FILES)))
         } else {
