@@ -1,5 +1,6 @@
 package editorx.plugins.android
 
+import editorx.core.gui.GuiExtension
 import editorx.core.i18n.I18n
 import editorx.core.i18n.I18nKeys
 import editorx.core.plugin.*
@@ -120,7 +121,7 @@ class AndroidPlugin : Plugin {
     /**
      * 启动工作区状态检查器
      */
-    private fun startWorkspaceStateChecker(gui: PluginGuiProvider) {
+    private fun startWorkspaceStateChecker(gui: GuiExtension) {
         workspaceCheckTimer = Timer(500) { // 每 500ms 检查一次
             val hasWorkspace = gui.getWorkspaceRoot() != null
             if (hasWorkspace != lastWorkspaceState) {
@@ -135,7 +136,7 @@ class AndroidPlugin : Plugin {
     /**
      * 更新 ToolBar 按钮的启用/禁用状态
      */
-    private fun updateToolBarButtonsState(gui: PluginGuiProvider, enabled: Boolean) {
+    private fun updateToolBarButtonsState(gui: GuiExtension, enabled: Boolean) {
         gui.setToolBarItemEnabled("android.manifest", enabled)
         gui.setToolBarItemEnabled("android.mainactivity", enabled)
         gui.setToolBarItemEnabled("android.application", enabled)
@@ -144,7 +145,7 @@ class AndroidPlugin : Plugin {
     /**
      * 跳转到 AndroidManifest.xml
      */
-    private fun navigateToAndroidManifest(gui: PluginGuiProvider) {
+    private fun navigateToAndroidManifest(gui: GuiExtension) {
         val workspaceRoot = gui.getWorkspaceRoot()
         if (workspaceRoot == null) {
             showMessage(
@@ -171,7 +172,7 @@ class AndroidPlugin : Plugin {
     /**
      * 跳转到 MainActivity
      */
-    private fun navigateToMainActivity(gui: PluginGuiProvider) {
+    private fun navigateToMainActivity(gui: GuiExtension) {
         val workspaceRoot = gui.getWorkspaceRoot()
         if (workspaceRoot == null) {
             showMessage(
@@ -231,7 +232,7 @@ class AndroidPlugin : Plugin {
     /**
      * 跳转到 Application
      */
-    private fun navigateToApplication(gui: PluginGuiProvider) {
+    private fun navigateToApplication(gui: GuiExtension) {
         val workspaceRoot = gui.getWorkspaceRoot()
         if (workspaceRoot == null) {
             showMessage(

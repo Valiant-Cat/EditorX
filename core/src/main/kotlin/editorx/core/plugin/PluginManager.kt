@@ -1,5 +1,6 @@
 package editorx.core.plugin
 
+import editorx.core.gui.GuiExtension
 import editorx.core.plugin.loader.PluginLoader
 import editorx.core.service.BuildService
 import editorx.core.service.MutableServiceRegistry
@@ -23,7 +24,6 @@ class PluginManager {
         val plugin: Plugin,
         val info: PluginInfo,
         val activationEvents: List<ActivationEvent>,
-        val restartPolicy: PluginRestartPolicy,
         val context: PluginContext,
         val origin: PluginOrigin,
         val source: java.nio.file.Path?,
@@ -37,7 +37,7 @@ class PluginManager {
     private val pluginsById: SortedMap<String, PluginRuntime> = TreeMap()
     private val activationRoutes: MutableMap<ActivationEvent, MutableSet<String>> = mutableMapOf()
     private val disabledPluginIds: MutableSet<String> = linkedSetOf()
-    private var guiProviderFactory: ((PluginContext) -> PluginGuiProvider?)? = null
+    private var guiExtensionFactory: ((PluginContext) -> GuiExtension?)? = null
     private val pluginStateListeners: MutableList<PluginStateListener> = mutableListOf()
 
     // JAR 插件：ClassLoader 需要引用计数，避免一个 JAR 内多个插件时被提前关闭
@@ -78,13 +78,13 @@ class PluginManager {
     }
 
     /**
-     * 设置 GUI Provider 工厂函数。
+     * 设置 GUI Extension 工厂函数。
      * 会对"已加载"的插件立即执行一次。
      */
-    fun setGuiProviderFactory(factory: (PluginContext) -> PluginGuiProvider?) {
-        guiProviderFactory = factory
+    fun setGuiExtensionFactory(factory: (PluginContext) -> GuiExtension?) {
+        guiExtensionFactory = factory
         pluginsById.values.forEach { ctx ->
-            ctx.context.guiProvider = factory(ctx.context)
+            ctx.context.guiExtension = factory(ctx.context)
         }
     }
 
@@ -122,12 +122,12 @@ class PluginManager {
             .forEach { unloadPlugin(it) }
     }
 
-    fun listPlugins(): List<PluginRecord> {
-        return pluginsById.values.map { it.toRecord(disabledPluginIds.contains(it.info.id)) }
+    fun listPlugins(): List<PluginSnapshot> {
+        return pluginsById.values.map { it.toSnapshot(disabledPluginIds.contains(it.info.id)) }
     }
 
-    fun getPlugin(pluginId: String): PluginRecord? =
-        pluginsById[pluginId]?.toRecord(disabledPluginIds.contains(pluginId))
+    fun getPlugin(pluginId: String): PluginSnapshot? =
+        pluginsById[pluginId]?.toSnapshot(disabledPluginIds.contains(pluginId))
 
     /**
      * 查找可以为指定工作区提供构建能力的插件
@@ -188,13 +188,13 @@ class PluginManager {
 
     /**
      * 卸载插件。
-     * @return 是否成功卸载。内置插件（CLASSPATH）不可卸载，将返回 false。
+     * @return 是否成功卸载。内置插件（SOURCE）不可卸载，将返回 false。
      */
     fun unloadPlugin(pluginId: String): Boolean {
         val runtime = pluginsById[pluginId] ?: return false
 
         // 内置插件（随源码一起打包的）不可卸载
-        if (runtime.origin == PluginOrigin.CLASSPATH) {
+        if (runtime.origin == PluginOrigin.SOURCE) {
             logger.warn("内置插件不可卸载: {}", pluginId)
             return false
         }
@@ -225,7 +225,7 @@ class PluginManager {
         }
     }
 
-    private fun loadDiscovered(discovered: DiscoveredPlugin): Boolean {
+    private fun loadDiscovered(discovered: LoadedPlugin): Boolean {
         val plugin = discovered.plugin
         val info = plugin.getInfo()
         val pluginId = info.id
@@ -245,10 +245,9 @@ class PluginManager {
             plugin = plugin,
             info = info,
             activationEvents = events,
-            restartPolicy = plugin.restartPolicy(),
             context = pluginContext,
             origin = discovered.origin,
-            source = discovered.source,
+            source = discovered.path,
             classLoader = discovered.classLoader,
             closeable = discovered.closeable,
             state = initialState,
@@ -258,7 +257,7 @@ class PluginManager {
         retainClassLoader(runtime)
 
         registerActivation(pluginId, events)
-        pluginContext.guiProvider = guiProviderFactory?.invoke(pluginContext)
+        pluginContext.guiExtension = guiExtensionFactory?.invoke(pluginContext)
         firePluginStateChanged(pluginId)
         return true
     }
@@ -299,15 +298,12 @@ class PluginManager {
         pluginStateListeners.forEach { it.onPluginStateChanged(pluginId) }
     }
 
-    private fun PluginRuntime.toRecord(disabled: Boolean): PluginRecord =
-        PluginRecord(
-            id = info.id,
-            name = info.name,
-            version = info.version,
+    private fun PluginRuntime.toSnapshot(disabled: Boolean): PluginSnapshot =
+        PluginSnapshot(
+            info = info,
             origin = origin,
             state = state,
-            source = source,
-            lastError = lastError,
+            path = source,
             disabled = disabled,
         )
 }

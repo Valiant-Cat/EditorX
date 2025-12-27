@@ -6,17 +6,17 @@ import editorx.core.filetype.Language
 import editorx.core.filetype.SyntaxHighlighter
 import editorx.core.gui.GuiContext
 import editorx.core.plugin.FileHandler
-import editorx.core.plugin.PluginGuiProvider
+import editorx.core.gui.GuiExtension
 import editorx.gui.MainWindow
 import editorx.gui.theme.ThemeManager
 import java.io.File
 import javax.swing.Icon
 
-class PluginGuiProviderImpl(
+class GuiExtensionImpl(
     private val pluginId: String,
     private val guiContext: GuiContext,
     private val mainWindow: MainWindow?
-) : PluginGuiProvider {
+) : GuiExtension {
 
     override fun getWorkspaceRoot(): File? {
         return guiContext.getWorkspace().getWorkspaceRoot()

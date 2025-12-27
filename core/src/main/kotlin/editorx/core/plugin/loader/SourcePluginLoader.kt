@@ -1,6 +1,6 @@
 package editorx.core.plugin.loader
 
-import editorx.core.plugin.DiscoveredPlugin
+import editorx.core.plugin.LoadedPlugin
 import editorx.core.plugin.Plugin
 import editorx.core.plugin.PluginOrigin
 import org.slf4j.LoggerFactory
@@ -17,15 +17,15 @@ class SourcePluginLoader : PluginLoader {
         private val logger = LoggerFactory.getLogger(SourcePluginLoader::class.java)
     }
 
-    override fun load(): List<DiscoveredPlugin> {
-        val map = mutableMapOf<Class<out Plugin>, DiscoveredPlugin>()
+    override fun load(): List<LoadedPlugin> {
+        val map = mutableMapOf<Class<out Plugin>, LoadedPlugin>()
         val classLoader = this::class.java.classLoader
-        loadFromClsLoader(map, classLoader, origin = PluginOrigin.CLASSPATH, source = null, closeable = null)
+        loadFromClsLoader(map, classLoader, origin = PluginOrigin.SOURCE, source = null, closeable = null)
         return map.values.toList().sortedBy { it.plugin.javaClass.simpleName }
     }
 
     private fun loadFromClsLoader(
-        map: MutableMap<Class<out Plugin>, DiscoveredPlugin>,
+        map: MutableMap<Class<out Plugin>, LoadedPlugin>,
         classLoader: ClassLoader,
         origin: PluginOrigin,
         source: Path?,
@@ -40,10 +40,10 @@ class SourcePluginLoader : PluginLoader {
                     logger.warn("插件实例化失败：{} ({})", p.type().name, origin, e)
                     return@forEach
                 }
-                map[p.type()] = DiscoveredPlugin(
+                map[p.type()] = LoadedPlugin(
                     plugin = plugin,
                     origin = origin,
-                    source = source,
+                    path = source,
                     classLoader = classLoader,
                     closeable = closeable,
                 )

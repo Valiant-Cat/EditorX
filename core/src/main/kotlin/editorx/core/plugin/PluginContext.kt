@@ -1,5 +1,6 @@
 package editorx.core.plugin
 
+import editorx.core.gui.GuiExtension
 import editorx.core.service.MutableServiceRegistry
 
 class PluginContext(
@@ -8,7 +9,7 @@ class PluginContext(
 ) : Comparable<PluginContext> {
     private var hasActive = false
 
-    var guiProvider: PluginGuiProvider? = null
+    var guiExtension: GuiExtension? = null
 
     fun pluginId(): String {
         return plugin.getInfo().id
@@ -18,8 +19,8 @@ class PluginContext(
         return plugin.getInfo()
     }
 
-    fun gui(): PluginGuiProvider? {
-        return guiProvider
+    fun gui(): GuiExtension? {
+        return guiExtension
     }
 
     fun active() {

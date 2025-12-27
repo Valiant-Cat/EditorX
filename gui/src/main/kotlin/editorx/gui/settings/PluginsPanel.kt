@@ -4,7 +4,7 @@ import editorx.core.i18n.I18n
 import editorx.core.i18n.I18nKeys
 import editorx.core.plugin.PluginManager
 import editorx.core.plugin.PluginOrigin
-import editorx.core.plugin.PluginRecord
+import editorx.core.plugin.PluginSnapshot
 import editorx.core.plugin.PluginState
 import editorx.core.plugin.loader.DuplexPluginLoader
 import editorx.core.util.Store
@@ -35,7 +35,7 @@ class PluginsPanel(
         ?.toMutableSet()
         ?: mutableSetOf()
 
-    private val listModel = DefaultListModel<PluginRecord>()
+    private val listModel = DefaultListModel<PluginSnapshot>()
     private val pluginList = JList(listModel).apply {
         selectionMode = ListSelectionModel.SINGLE_SELECTION
         visibleRowCount = 12
@@ -49,8 +49,8 @@ class PluginsPanel(
                 cellHasFocus: Boolean,
             ): java.awt.Component {
                 val comp = super.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus) as JLabel
-                val record = value as? PluginRecord
-                comp.text = record?.let { "${it.name}  (${displayState(it)})" } ?: ""
+                val snapshot = value as? PluginSnapshot
+                comp.text = snapshot?.let { "${it.info.name}  (${displayState(it)})" } ?: ""
                 comp.border = BorderFactory.createEmptyBorder(2, 8, 2, 8)
                 
                 // 应用主题颜色
@@ -67,7 +67,7 @@ class PluginsPanel(
                 return comp
             }
         }
-        addListSelectionListener { updateDetails(selectedRecord()) }
+        addListSelectionListener { updateDetails(selectedSnapshot()) }
     }
     private var pluginListScrollPane: JScrollPane? = null
     private var centerPane: JPanel? = null
@@ -343,12 +343,12 @@ class PluginsPanel(
     }
 
     private fun reloadList() {
-        val selectedId = selectedRecord()?.id
+        val selectedId = selectedSnapshot()?.info?.id
         listModel.clear()
-        val records = pluginManager.listPlugins()
+        val snapshots = pluginManager.listPlugins()
         disabledSet.clear()
-        disabledSet.addAll(records.filter { it.disabled }.map { it.id })
-        records.forEach { listModel.addElement(it) }
+        disabledSet.addAll(snapshots.filter { it.disabled }.map { it.info.id })
+        snapshots.forEach { listModel.addElement(it) }
         ensureSelection(selectedId)
         statusLabel.text = if (isEnglish()) {
             "${listModel.size()} plugins"
@@ -366,19 +366,19 @@ class PluginsPanel(
             return
         }
         val index = when {
-            preferredId != null -> (0 until listModel.size()).firstOrNull { listModel.get(it).id == preferredId } ?: 0
+            preferredId != null -> (0 until listModel.size()).firstOrNull { listModel.get(it).info.id == preferredId } ?: 0
             pluginList.selectedIndex >= 0 -> pluginList.selectedIndex
             else -> 0
         }
         pluginList.selectedIndex = index.coerceIn(0, listModel.size() - 1)
-        updateDetails(selectedRecord())
+        updateDetails(selectedSnapshot())
         updateActionButtons()
     }
 
-    private fun selectedRecord(): PluginRecord? = pluginList.selectedValue
+    private fun selectedSnapshot(): PluginSnapshot? = pluginList.selectedValue
 
-    private fun updateDetails(record: PluginRecord?) {
-        if (record == null) {
+    private fun updateDetails(snapshot: PluginSnapshot?) {
+        if (snapshot == null) {
             detailName.text = if (isEnglish()) "No plugin selected" else "未选择插件"
             detailId.text = ""
             detailVersion.text = ""
@@ -389,34 +389,30 @@ class PluginsPanel(
             detailErrorLabel.isVisible = false
             return
         }
-        detailName.text = "${record.name} (${record.id})"
-        detailId.text = "ID: ${record.id}"
-        detailVersion.text = "版本 / Version: ${record.version}"
-        detailOrigin.text = "来源 / Origin: ${formatOrigin(record.origin)}"
-        detailState.text = "状态 / State: ${displayState(record)}"
-        detailPath.text = record.source?.toString() ?: "-"
-        val errorText = record.lastError?.takeIf { it.isNotBlank() }?.let {
-            val prefix = if (isEnglish()) "Error: " else "错误："
-            prefix + it
-        } ?: ""
-        detailErrorLabel.text = errorText
-        detailErrorLabel.isVisible = errorText.isNotBlank()
+        detailName.text = "${snapshot.info.name} (${snapshot.info.id})"
+        detailId.text = "ID: ${snapshot.info.id}"
+        detailVersion.text = "版本 / Version: ${snapshot.info.version}"
+        detailOrigin.text = "来源 / Origin: ${formatOrigin(snapshot.origin)}"
+        detailState.text = "状态 / State: ${displayState(snapshot)}"
+        detailPath.text = snapshot.path?.toString() ?: "-"
+        detailErrorLabel.text = ""
+        detailErrorLabel.isVisible = false
         updateActionButtons()
     }
 
     private fun updateActionButtons() {
-        val record = selectedRecord()
-        enableBtn.isEnabled = record != null && (record.state != PluginState.STARTED || record.disabled)
-        disableBtn.isEnabled = record != null && !record.disabled
-        // 内置插件（CLASSPATH）不可卸载
-        uninstallBtn.isEnabled = record != null && record.origin != PluginOrigin.CLASSPATH
+        val snapshot = selectedSnapshot()
+        enableBtn.isEnabled = snapshot != null && (snapshot.state != PluginState.STARTED || snapshot.disabled)
+        disableBtn.isEnabled = snapshot != null && !snapshot.disabled
+        // 内置插件（SOURCE）不可卸载
+        uninstallBtn.isEnabled = snapshot != null && snapshot.origin != PluginOrigin.SOURCE
     }
 
     private fun scanPlugins() {
-        val before = pluginManager.listPlugins().map { it.id }.toSet()
+        val before = pluginManager.listPlugins().map { it.info.id }.toSet()
         pluginManager.scanPlugins(DuplexPluginLoader())
         reloadList()
-        val after = pluginManager.listPlugins().map { it.id }
+        val after = pluginManager.listPlugins().map { it.info.id }
         val newlyLoaded = after.filterNot { before.contains(it) }
         statusLabel.text = if (newlyLoaded.isNotEmpty()) {
             if (isEnglish()) "Found new plugins: ${newlyLoaded.joinToString(", ")} (not started)" else "发现新插件：${
@@ -430,36 +426,36 @@ class PluginsPanel(
     }
 
     private fun enableSelected() {
-        val record = selectedRecord() ?: return
-        pluginManager.markDisabled(record.id, false)
-        disabledSet.remove(record.id)
-        pluginManager.startPlugin(record.id)
-        statusLabel.text = if (isEnglish()) "Enabled: ${record.id}" else "已启用：${record.id}"
+        val snapshot = selectedSnapshot() ?: return
+        pluginManager.markDisabled(snapshot.info.id, false)
+        disabledSet.remove(snapshot.info.id)
+        pluginManager.startPlugin(snapshot.info.id)
+        statusLabel.text = if (isEnglish()) "Enabled: ${snapshot.info.id}" else "已启用：${snapshot.info.id}"
         saveDisabledSet()
         reloadList()
     }
 
     private fun disableSelected() {
-        val record = selectedRecord() ?: return
-        pluginManager.markDisabled(record.id, true)
-        disabledSet.add(record.id)
-        statusLabel.text = if (isEnglish()) "Disabled: ${record.id}" else "已禁用：${record.id}"
+        val snapshot = selectedSnapshot() ?: return
+        pluginManager.markDisabled(snapshot.info.id, true)
+        disabledSet.add(snapshot.info.id)
+        statusLabel.text = if (isEnglish()) "Disabled: ${snapshot.info.id}" else "已禁用：${snapshot.info.id}"
         saveDisabledSet()
         reloadList()
     }
 
     private fun uninstallSelected() {
-        val record = selectedRecord() ?: return
+        val snapshot = selectedSnapshot() ?: return
 
         // 内置插件不可卸载
-        if (record.origin == PluginOrigin.CLASSPATH) {
+        if (snapshot.origin == PluginOrigin.SOURCE) {
             val parent = SwingUtilities.getWindowAncestor(this)
             JOptionPane.showMessageDialog(
                 parent,
                 if (isEnglish())
-                    "Built-in plugins cannot be uninstalled.\nPlugin: ${record.name} (${record.id})"
+                    "Built-in plugins cannot be uninstalled.\nPlugin: ${snapshot.info.name} (${snapshot.info.id})"
                 else
-                    "内置插件不可卸载。\n插件：${record.name}（${record.id}）",
+                    "内置插件不可卸载。\n插件：${snapshot.info.name}（${snapshot.info.id}）",
                 if (isEnglish()) "Cannot Uninstall" else "无法卸载",
                 JOptionPane.WARNING_MESSAGE
             )
@@ -471,27 +467,27 @@ class PluginsPanel(
             JOptionPane.showConfirmDialog(
                 parent,
                 if (isEnglish())
-                    "Remove plugin ${record.name} (${record.id})?\nIf it is a JAR plugin, also remove the file from plugins/ directory."
+                    "Remove plugin ${snapshot.info.name} (${snapshot.info.id})?\nIf it is a JAR plugin, also remove the file from plugins/ directory."
                 else
-                    "确定要卸载插件：${record.name}（${record.id}）？\n若是 JAR 插件，建议从 plugins/ 目录删除对应文件。",
+                    "确定要卸载插件：${snapshot.info.name}（${snapshot.info.id}）？\n若是 JAR 插件，建议从 plugins/ 目录删除对应文件。",
                 if (isEnglish()) "Confirm Removal" else "确认卸载",
                 JOptionPane.YES_NO_OPTION
             )
         if (confirm != JOptionPane.YES_OPTION) return
 
-        val success = pluginManager.unloadPlugin(record.id)
+        val success = pluginManager.unloadPlugin(snapshot.info.id)
         if (success) {
-            disabledSet.remove(record.id)
+            disabledSet.remove(snapshot.info.id)
             saveDisabledSet()
-            statusLabel.text = if (isEnglish()) "Removed: ${record.id}" else "已卸载：${record.id}"
+            statusLabel.text = if (isEnglish()) "Removed: ${snapshot.info.id}" else "已卸载：${snapshot.info.id}"
             reloadList()
         } else {
             JOptionPane.showMessageDialog(
                 parent,
                 if (isEnglish())
-                    "Failed to uninstall plugin: ${record.name} (${record.id})"
+                    "Failed to uninstall plugin: ${snapshot.info.name} (${snapshot.info.id})"
                 else
-                    "卸载插件失败：${record.name}（${record.id}）",
+                    "卸载插件失败：${snapshot.info.name}（${snapshot.info.id}）",
                 if (isEnglish()) "Error" else "错误",
                 JOptionPane.ERROR_MESSAGE
             )
@@ -538,18 +534,18 @@ class PluginsPanel(
             return
         }
 
-        val before = pluginManager.listPlugins().map { it.id }.toSet()
+        val before = pluginManager.listPlugins().map { it.info.id }.toSet()
         pluginManager.scanPlugins(DuplexPluginLoader())
-        val newRecords = pluginManager.listPlugins().filterNot { before.contains(it.id) }
-        newRecords.forEach { pluginManager.startPlugin(it.id) }
+        val newSnapshots = pluginManager.listPlugins().filterNot { before.contains(it.info.id) }
+        newSnapshots.forEach { pluginManager.startPlugin(it.info.id) }
         reloadList()
-        statusLabel.text = if (newRecords.isEmpty()) {
+        statusLabel.text = if (newSnapshots.isEmpty()) {
             if (isEnglish()) "Copied to plugins/, but no new plugin entry detected (check META-INF/services)." else "已复制到 plugins/，但未发现新的插件入口（请检查 META-INF/services 配置）"
         } else {
-            if (isEnglish()) "Installed and started: ${newRecords.joinToString(", ") { it.id }}" else "安装成功并已启动：${
-                newRecords.joinToString(
+            if (isEnglish()) "Installed and started: ${newSnapshots.joinToString(", ") { it.info.id }}" else "安装成功并已启动：${
+                newSnapshots.joinToString(
                     ", "
-                ) { it.id }
+                ) { it.info.id }
             }"
         }
     }
@@ -571,16 +567,16 @@ class PluginsPanel(
     }
 
     private fun formatOrigin(origin: PluginOrigin): String = when (origin) {
-        PluginOrigin.CLASSPATH -> "内置 / Bundled"
+        PluginOrigin.SOURCE -> "内置 / Bundled"
         PluginOrigin.JAR -> "JAR"
     }
 
-    private fun displayState(record: PluginRecord): String {
+    private fun displayState(snapshot: PluginSnapshot): String {
         return when {
-            record.disabled -> I18n.translate(I18nKeys.Settings.PLUGIN_STATE_DISABLED)
-            record.state == PluginState.STARTED -> I18n.translate(I18nKeys.Settings.PLUGIN_STATE_ENABLED)
-            record.state == PluginState.FAILED -> I18n.translate(I18nKeys.Settings.PLUGIN_STATE_FAILED)
-            else -> record.state.name
+            snapshot.disabled -> I18n.translate(I18nKeys.Settings.PLUGIN_STATE_DISABLED)
+            snapshot.state == PluginState.STARTED -> I18n.translate(I18nKeys.Settings.PLUGIN_STATE_ENABLED)
+            snapshot.state == PluginState.FAILED -> I18n.translate(I18nKeys.Settings.PLUGIN_STATE_FAILED)
+            else -> snapshot.state.name
         }
     }
 

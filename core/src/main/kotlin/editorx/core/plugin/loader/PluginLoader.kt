@@ -1,8 +1,8 @@
 package editorx.core.plugin.loader
 
-import editorx.core.plugin.DiscoveredPlugin
+import editorx.core.plugin.LoadedPlugin
 
 interface PluginLoader {
 
-    fun load(): List<DiscoveredPlugin>
+    fun load(): List<LoadedPlugin>
 }

@@ -5,7 +5,7 @@ package editorx.core.plugin
  */
 enum class PluginOrigin {
     /** 来自应用 classpath（随应用编译/发布）。 */
-    CLASSPATH,
+    SOURCE,
 
     /** 来自运行时 plugins/ 目录的 JAR。 */
     JAR,

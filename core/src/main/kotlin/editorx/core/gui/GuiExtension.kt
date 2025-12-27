@@ -1,14 +1,15 @@
-package editorx.core.plugin
+package editorx.core.gui
 
 import editorx.core.filetype.FileType
 import editorx.core.filetype.Formatter
 import editorx.core.filetype.Language
 import editorx.core.filetype.SyntaxHighlighter
+import editorx.core.plugin.FileHandler
 import java.awt.Color
 import java.io.File
 import javax.swing.Icon
 
-interface PluginGuiProvider {
+interface GuiExtension {
 
     /**
      * 获取工作区根目录

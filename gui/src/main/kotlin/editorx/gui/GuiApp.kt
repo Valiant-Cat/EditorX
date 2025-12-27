@@ -11,7 +11,7 @@ import editorx.core.util.StartupTimer
 import editorx.core.util.SystemUtils
 import editorx.core.workspace.DefaultWorkspace
 import editorx.gui.core.GuiContextImpl
-import editorx.gui.core.PluginGuiProviderImpl
+import editorx.gui.core.GuiExtensionImpl
 import editorx.gui.search.SearchDialog
 import editorx.gui.settings.SettingsDialog
 import editorx.gui.shortcut.ShortcutIds
@@ -166,8 +166,8 @@ private fun initializeMainWindow(startupTimer: StartupTimer) {
         // 创建 GUI 上下文 与 主窗口
         val guiContext = GuiContextImpl(appDir, settings, workspace, pluginManager)
         val mainWindow = MainWindow(guiContext).apply {
-            pluginManager.setGuiProviderFactory { pluginCtx ->
-                PluginGuiProviderImpl(pluginCtx.pluginId(), guiContext, this)
+            pluginManager.setGuiExtensionFactory { pluginCtx ->
+                GuiExtensionImpl(pluginCtx.pluginId(), guiContext, this)
             }
             pluginManager.addPluginStateListener(object : PluginManager.PluginStateListener {
                 override fun onPluginStateChanged(pluginId: String) {

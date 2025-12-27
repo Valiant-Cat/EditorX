@@ -1,6 +1,6 @@
 package editorx.plugins.git
 
-import editorx.core.plugin.PluginGuiProvider
+import editorx.core.gui.GuiExtension
 import java.awt.*
 import java.io.File
 import javax.swing.*
@@ -10,7 +10,7 @@ import javax.swing.border.EmptyBorder
  * Git 工具窗口视图
  * 参考 IntelliJ IDEA/VSCode 的 Git 工具窗口设计
  */
-class GitView(private val guiContext: PluginGuiProvider) : JPanel(BorderLayout()) {
+class GitView(private val guiContext: GuiExtension) : JPanel(BorderLayout()) {
     
     // 变更内容相关组件
     private val commitMessageField = JTextField()

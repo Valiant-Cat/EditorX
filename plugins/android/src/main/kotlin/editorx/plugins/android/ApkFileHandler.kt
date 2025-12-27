@@ -4,7 +4,7 @@ import editorx.core.external.ApkTool
 import editorx.core.i18n.I18n
 import editorx.core.i18n.I18nKeys
 import editorx.core.plugin.FileHandler
-import editorx.core.plugin.PluginGuiProvider
+import editorx.core.gui.GuiExtension
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.FileOutputStream
@@ -16,7 +16,7 @@ import javax.swing.SwingUtilities
  * APK 文件处理器
  * 负责处理 APK 文件的打开、反编译等功能
  */
-class ApkFileHandler(private val gui: PluginGuiProvider) : FileHandler {
+class ApkFileHandler(private val gui: GuiExtension) : FileHandler {
     companion object {
         private val logger = LoggerFactory.getLogger(ApkFileHandler::class.java)
     }

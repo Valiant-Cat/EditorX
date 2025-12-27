@@ -1,6 +1,6 @@
 package editorx.core.plugin.loader
 
-import editorx.core.plugin.DiscoveredPlugin
+import editorx.core.plugin.LoadedPlugin
 import editorx.core.plugin.Plugin
 import editorx.core.plugin.PluginOrigin
 import org.slf4j.LoggerFactory
@@ -19,20 +19,20 @@ class JarPluginLoader : PluginLoader {
         private val logger = LoggerFactory.getLogger(JarPluginLoader::class.java)
     }
 
-    override fun load(): List<DiscoveredPlugin> {
-        val map = mutableMapOf<Class<out Plugin>, DiscoveredPlugin>()
+    override fun load(): List<LoadedPlugin> {
+        val map = mutableMapOf<Class<out Plugin>, LoadedPlugin>()
         loadInstalledPlugins(map)
         return map.values.toList().sortedBy { it.plugin.javaClass.simpleName }
     }
 
-    private fun loadInstalledPlugins(map: MutableMap<Class<out Plugin>, DiscoveredPlugin>) {
+    private fun loadInstalledPlugins(map: MutableMap<Class<out Plugin>, LoadedPlugin>) {
         val pluginDir = Path.of("plugins")
         pluginDir.toFile().listFiles()
             ?.filter { it.isFile && it.extension.lowercase() == "jar" }
             ?.forEach { jar -> loadFromJar(map, jar.toPath()) }
     }
 
-    private fun loadFromJar(map: MutableMap<Class<out Plugin>, DiscoveredPlugin>, jar: Path) {
+    private fun loadFromJar(map: MutableMap<Class<out Plugin>, LoadedPlugin>, jar: Path) {
         val jarFile = jar.toFile()
         val clsLoaderName = "editorx-plugin:" + jarFile.name
         val urls: Array<URL> = arrayOf(jarFile.toURI().toURL())
@@ -57,7 +57,7 @@ class JarPluginLoader : PluginLoader {
     }
 
     private fun loadFromClsLoader(
-        map: MutableMap<Class<out Plugin>, DiscoveredPlugin>,
+        map: MutableMap<Class<out Plugin>, LoadedPlugin>,
         classLoader: ClassLoader,
         origin: PluginOrigin,
         source: Path?,
@@ -72,10 +72,10 @@ class JarPluginLoader : PluginLoader {
                     logger.warn("插件实例化失败：{} ({})", p.type().name, origin, e)
                     return@forEach
                 }
-                map[p.type()] = DiscoveredPlugin(
+                map[p.type()] = LoadedPlugin(
                     plugin = plugin,
                     origin = origin,
-                    source = source,
+                    path = source,
                     classLoader = classLoader,
                     closeable = closeable,
                 )

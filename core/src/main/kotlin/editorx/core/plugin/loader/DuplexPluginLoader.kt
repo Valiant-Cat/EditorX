@@ -1,7 +1,6 @@
 package editorx.core.plugin.loader
 
-import editorx.core.plugin.DiscoveredPlugin
-import java.util.*
+import editorx.core.plugin.LoadedPlugin
 
 /**
  * 双重插件加载器
@@ -12,8 +11,8 @@ class DuplexPluginLoader : PluginLoader {
     private val sourceLoader = SourcePluginLoader()
     private val jarLoader = JarPluginLoader()
 
-    override fun load(): List<DiscoveredPlugin> {
-        val allPlugins = mutableListOf<DiscoveredPlugin>()
+    override fun load(): List<LoadedPlugin> {
+        val allPlugins = mutableListOf<LoadedPlugin>()
         allPlugins.addAll(sourceLoader.load())
         allPlugins.addAll(jarLoader.load())
         return allPlugins.sortedBy { it.plugin.javaClass.simpleName }
