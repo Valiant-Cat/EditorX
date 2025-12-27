@@ -49,6 +49,9 @@ cd editorx
 # 通用 zip 分发包（bin/ lib/ plugins/）
 ./package.sh
 
+# zip 分发包内置 Java 运行时（生成 gui-bundled-java.zip，下载即用）
+./package.sh --bundle-java
+
 # macOS: 额外生成 .app（以及可分发的 .app.zip）
 ./package.sh --mac-app
 ```

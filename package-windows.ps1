@@ -24,7 +24,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$Root = Split-Path -Parent $PSScriptRoot
+$Root = $PSScriptRoot
 Set-Location $Root
 
 function Info([string]$msg) { Write-Host "[INFO] $msg" -ForegroundColor Green }

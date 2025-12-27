@@ -131,8 +131,17 @@ create_distribution() {
         error "部分插件 JAR 移动失败，请检查"
     fi
     
+    # 若需要：在分发包中内置 Java 运行时（jbr/），实现下载即用
+    if [ "$BUNDLE_JAVA" = true ]; then
+        bundle_java_runtime "$install_dir"
+        patch_start_scripts "$install_dir"
+    fi
+
     # 删除旧的 zip 和 tar 文件（如果存在）
     local zip_file="gui/build/distributions/gui.zip"
+    if [ "$BUNDLE_JAVA" = true ]; then
+        zip_file="gui/build/distributions/gui-bundled-java.zip"
+    fi
     local tar_file="gui/build/distributions/gui.tar"
     if [ -f "$zip_file" ]; then
         rm -f "$zip_file"
@@ -180,6 +189,171 @@ create_distribution() {
     
     info "分发包创建成功："
     info "  - $zip_file"
+}
+
+java_major_version() {
+    local java_bin="$1"
+    # 兼容输出：openjdk version "21.0.6" / java version "1.8.0_..."
+    local version_line
+    version_line=$("$java_bin" -version 2>&1 | head -n 1)
+    local ver
+    ver=$(echo "$version_line" | sed -n 's/.*\"\([0-9][0-9]*\)\..*\".*/\1/p')
+    if [ -z "$ver" ]; then
+        ver=$(echo "$version_line" | sed -n 's/.*\"\([0-9][0-9]*\)\".*/\1/p')
+    fi
+    if [ -z "$ver" ]; then
+        echo ""
+        return 0
+    fi
+    # 处理 1.8 这种情况
+    if [ "$ver" = "1" ]; then
+        ver=$(echo "$version_line" | sed -n 's/.*\"1\.\([0-9][0-9]*\)\..*\".*/\1/p')
+    fi
+    echo "$ver"
+}
+
+assert_java_at_least_21() {
+    local java_home="$1"
+    local java_bin="$java_home/bin/java"
+    local major
+    major="$(java_major_version "$java_bin")"
+    if [ -z "$major" ]; then
+        warn "无法解析 Java 版本：$java_bin（将继续尝试，但运行时可能失败）"
+        return 0
+    fi
+    if [ "$major" -lt 21 ]; then
+        error "内置 Java 版本过低（需要 >= 21，当前=$major）：$java_home"
+    fi
+}
+
+detect_java_home() {
+    normalize_dir() {
+        local p="$1"
+        if [ -z "$p" ]; then
+            echo ""
+            return 0
+        fi
+        if command -v realpath &> /dev/null; then
+            realpath "$p" 2>/dev/null || echo "$p"
+            return 0
+        fi
+        (cd -P "$p" > /dev/null 2>&1 && pwd) || echo "$p"
+    }
+
+    if [ -n "$JAVA_HOME_OVERRIDE" ]; then
+        normalize_dir "$JAVA_HOME_OVERRIDE"
+        return 0
+    fi
+    if [ -n "$JAVA_HOME" ]; then
+        normalize_dir "$JAVA_HOME"
+        return 0
+    fi
+    local detected
+    detected=$(java -XshowSettings:properties -version 2>&1 | awk -F' = ' '/java.home =/ {print $2; exit}' | tr -d '\r')
+    normalize_dir "$detected"
+}
+
+bundle_java_runtime() {
+    local install_dir="$1"
+    local runtime_dir="$install_dir/jbr"
+
+    local java_home
+    java_home="$(detect_java_home)"
+    if [ -z "$java_home" ]; then
+        error "无法检测 Java Home，请使用 --java-home 指定"
+    fi
+    if [ ! -x "$java_home/bin/java" ]; then
+        error "Java Home 无效（未找到 bin/java）：$java_home"
+    fi
+
+    assert_java_at_least_21 "$java_home"
+
+    info "内置 Java 运行时：$java_home -> $runtime_dir"
+    rm -rf "$runtime_dir"
+    mkdir -p "$runtime_dir"
+
+    if command -v rsync &> /dev/null; then
+        rsync -a "$java_home/" "$runtime_dir/"
+    else
+        cp -R "$java_home/"* "$runtime_dir/"
+    fi
+
+    if [ ! -x "$runtime_dir/bin/java" ]; then
+        error "内置 Java 运行时复制失败（未找到 jbr/bin/java）"
+    fi
+}
+
+patch_start_scripts() {
+    local install_dir="$1"
+    local unix_script="$install_dir/bin/gui"
+    local win_script="$install_dir/bin/gui.bat"
+
+    if [ -f "$unix_script" ]; then
+        python3 - "$unix_script" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+data = path.read_bytes()
+text = data.decode("utf-8", errors="replace")
+
+marker = "EDITORX_BUNDLED_RUNTIME"
+if marker in text:
+    sys.exit(0)
+
+newline = "\r\n" if b"\r\n" in data else "\n"
+needle = "# Determine the Java command to use to start the JVM."
+idx = text.find(needle)
+if idx < 0:
+    raise SystemExit(f"无法补丁启动脚本（未找到锚点）：{path}")
+
+insertion_lines = [
+    "",
+    "# EditorX: bundled runtime support (EDITORX_BUNDLED_RUNTIME)",
+    'if [ -z "${JAVA_HOME}" ] && [ -x "$APP_HOME/jbr/bin/java" ]; then',
+    '    JAVA_HOME="$APP_HOME/jbr"',
+    "fi",
+    "",
+]
+insertion = newline.join(insertion_lines)
+text = text.replace(needle, insertion + needle, 1)
+path.write_bytes(text.encode("utf-8"))
+PY
+        chmod +x "$unix_script"
+    fi
+
+    if [ -f "$win_script" ]; then
+        python3 - "$win_script" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+data = path.read_bytes()
+text = data.decode("utf-8", errors="replace")
+
+marker = "EDITORX_BUNDLED_RUNTIME"
+if marker in text:
+    sys.exit(0)
+
+newline = "\r\n" if b"\r\n" in data else "\n"
+needle = "@rem Find java.exe"
+idx = text.find(needle)
+if idx < 0:
+    raise SystemExit(f"无法补丁 Windows 启动脚本（未找到锚点）：{path}")
+
+insertion_lines = [
+    "",
+    "@rem EditorX: bundled runtime support (EDITORX_BUNDLED_RUNTIME)",
+    "if not defined JAVA_HOME (",
+    '  if exist "%APP_HOME%\\\\jbr\\\\bin\\\\java.exe" set "JAVA_HOME=%APP_HOME%\\\\jbr"',
+    ")",
+    "",
+]
+insertion = newline.join(insertion_lines)
+text = text.replace(needle, insertion + needle, 1)
+path.write_bytes(text.encode("utf-8"))
+PY
+    fi
 }
 
 # 生成 macOS .app（可选）
@@ -249,12 +423,13 @@ create_macos_app() {
         fi
     fi
 
-    # 使用当前 java.home 作为 runtime-image（确保能运行当前编译产物）
+    # 使用当前或指定的 Java Home 作为 runtime-image（确保能运行当前编译产物）
     local runtime_home
-    runtime_home=$(java -XshowSettings:properties -version 2>&1 | awk -F' = ' '/java.home =/ {print $2; exit}' | tr -d '\r')
+    runtime_home="$(detect_java_home)"
     if [ -z "$runtime_home" ] || [ ! -x "$runtime_home/bin/java" ]; then
         error "无法解析 java.home 或找到 $runtime_home/bin/java；请确保 PATH 中的 java 可用"
     fi
+    assert_java_at_least_21 "$runtime_home"
 
     # 清理旧的 .app
     rm -rf "$out_dir/EditorX.app"
@@ -282,6 +457,64 @@ create_macos_app() {
         error ".app 生成失败：$out_dir/EditorX.app"
     fi
 
+    # 调整目录结构（按你的要求）：
+    # - 保留 `runtime/`（内置 JDK）
+    # - 移除 `jbr`（不创建/不保留）
+    # - 移除 `app/`，使用 `lib/` 作为 jar 目录
+    # - 插件放在外层 `plugins/`（不放在 lib/plugins）
+    local contents_dir="$out_dir/EditorX.app/Contents"
+    rm -f "$contents_dir/jbr" 2>/dev/null || true
+
+    if [ -d "$contents_dir/app" ]; then
+        rm -rf "$contents_dir/lib"
+        mv "$contents_dir/app" "$contents_dir/lib"
+    fi
+
+    if [ -d "$contents_dir/lib/plugins" ]; then
+        rm -rf "$contents_dir/plugins"
+        mv "$contents_dir/lib/plugins" "$contents_dir/plugins"
+    fi
+
+    # 替换可执行入口：让 Finder 启动时使用 runtime + lib 布局
+    local mac_exec="$contents_dir/MacOS/EditorX"
+    if [ -f "$mac_exec" ] && [ ! -f "$mac_exec.bin" ]; then
+        mv "$mac_exec" "$mac_exec.bin"
+    fi
+    cat > "$mac_exec" <<'EOF'
+#!/bin/sh
+set -e
+
+DIR="$(cd "$(dirname "$0")" && pwd)"
+CONTENTS_DIR="$(cd "$DIR/.." && pwd)"
+
+JAVA_BIN="$CONTENTS_DIR/runtime/Contents/Home/bin/java"
+if [ -x "$JAVA_BIN" ]; then
+  :
+elif [ -n "$JAVA_HOME" ] && [ -x "$JAVA_HOME/bin/java" ]; then
+  JAVA_BIN="$JAVA_HOME/bin/java"
+else
+  JAVA_BIN="java"
+fi
+
+CLASSPATH="$CONTENTS_DIR/lib/*"
+exec "$JAVA_BIN" ${JAVA_OPTS} ${EDITORX_OPTS} -Deditorx.home="$CONTENTS_DIR" -classpath "$CLASSPATH" editorx.gui.GuiAppKt "$@"
+EOF
+    chmod +x "$mac_exec"
+
+    mkdir -p "$contents_dir/bin"
+    cat > "$contents_dir/bin/editorx" <<'EOF'
+#!/bin/sh
+DIR="$(cd "$(dirname "$0")" && pwd)"
+APP_HOME="$(cd "$DIR/.." && pwd)"
+exec "$APP_HOME/MacOS/EditorX" "$@"
+EOF
+    chmod +x "$contents_dir/bin/editorx"
+
+    # 修改过 bundle 内容后需要重新签名，否则可能提示“已损坏”
+    if [ -x "/usr/bin/codesign" ]; then
+        /usr/bin/codesign -s - --force --deep "$out_dir/EditorX.app"
+    fi
+
     # 生成可分发的 zip（macOS 推荐用 ditto 保留资源 fork）
     local app_zip="$out_dir/EditorX-macOS.app.zip"
     rm -f "$app_zip"
@@ -306,7 +539,12 @@ create_release_dir() {
     mkdir -p "$release_dir"
     
     # 复制分发包（zip）
-    cp gui/build/distributions/gui.zip "$release_dir/"
+    if [ -f "gui/build/distributions/gui.zip" ]; then
+        cp "gui/build/distributions/gui.zip" "$release_dir/"
+    fi
+    if [ -f "gui/build/distributions/gui-bundled-java.zip" ]; then
+        cp "gui/build/distributions/gui-bundled-java.zip" "$release_dir/"
+    fi
     # 若存在 macOS .app zip，也一并复制（可选）
     if [ -f "gui/build/distributions/EditorX-macOS.app.zip" ]; then
         cp "gui/build/distributions/EditorX-macOS.app.zip" "$release_dir/"
@@ -340,6 +578,8 @@ EditorX 打包脚本
     -v, --version VERSION    指定版本号（用于发布目录命名）
     -c, --clean               清理构建（默认会清理）
     -b, --build-only          仅构建，不创建分发包
+    --bundle-java             在 zip 分发包中内置 Java 运行时（生成 jbr/，用户可下载即用）
+    --java-home PATH          指定要内置的 Java Home（默认自动检测 java.home / JAVA_HOME）
     --mac-app                 额外生成 macOS .app（需要 macOS + jpackage）
     -h, --help                显示此帮助信息
 
@@ -347,6 +587,7 @@ EditorX 打包脚本
     $0                        # 标准打包
     $0 -v 1.0.0              # 指定版本号打包
     $0 -b                    # 仅构建，不创建分发包
+    $0 --bundle-java         # zip 分发包内置 Java 运行时
     $0 --mac-app             # 标准打包 + 生成 macOS .app
     $0 --clean               # 清理并打包
 
@@ -358,6 +599,8 @@ VERSION=""
 CLEAN=true
 BUILD_ONLY=false
 MAC_APP=false
+BUNDLE_JAVA=false
+JAVA_HOME_OVERRIDE=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -372,6 +615,14 @@ while [[ $# -gt 0 ]]; do
         -b|--build-only)
             BUILD_ONLY=true
             shift
+            ;;
+        --bundle-java)
+            BUNDLE_JAVA=true
+            shift
+            ;;
+        --java-home)
+            JAVA_HOME_OVERRIDE="$2"
+            shift 2
             ;;
         --mac-app)
             MAC_APP=true
