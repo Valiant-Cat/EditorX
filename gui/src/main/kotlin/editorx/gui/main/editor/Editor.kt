@@ -1,10 +1,10 @@
 package editorx.gui.main.editor
 
-import editorx.core.filetype.FileTypeRegistry
-import editorx.core.filetype.FormatterRegistry
+import editorx.gui.core.FileTypeRegistry
+import editorx.gui.core.FormatterRegistry
 import editorx.core.external.Jadx
 import editorx.core.external.Smali
-import editorx.core.plugin.FileHandlerRegistry
+import editorx.gui.core.FileHandlerRegistry
 import editorx.gui.theme.ThemeManager
 import editorx.gui.main.MainWindow
 import editorx.gui.main.explorer.ExplorerIcons

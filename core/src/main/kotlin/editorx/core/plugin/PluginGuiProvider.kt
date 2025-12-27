@@ -67,9 +67,21 @@ interface PluginGuiProvider {
     fun registerFileType(fileType: FileType)
 
     /**
+     * 取消注册所有文件类型（按插件 ID）
+     * 插件应在 deactivate 时调用此方法
+     */
+    fun unregisterAllFileTypes()
+
+    /**
      * 注册语法高亮
      */
     fun registerSyntaxHighlighter(language: Language, syntaxHighlighter: SyntaxHighlighter)
+
+    /**
+     * 取消注册所有语法高亮（按插件 ID）
+     * 插件应在 deactivate 时调用此方法
+     */
+    fun unregisterAllSyntaxHighlighters()
 
     /**
      * 注册格式化器
@@ -77,10 +89,22 @@ interface PluginGuiProvider {
     fun registerFormatter(language: Language, formatter: Formatter)
 
     /**
+     * 取消注册所有格式化器（按插件 ID）
+     * 插件应在 deactivate 时调用此方法
+     */
+    fun unregisterAllFormatters()
+
+    /**
      * 注册文件处理器
      * @param handler 文件处理器
      */
     fun registerFileHandler(handler: FileHandler)
+
+    /**
+     * 取消注册所有文件处理器（按插件 ID）
+     * 插件应在 deactivate 时调用此方法
+     */
+    fun unregisterAllFileHandlers()
 
     /**
      * 获取当前主题的文本颜色（用于图标等）

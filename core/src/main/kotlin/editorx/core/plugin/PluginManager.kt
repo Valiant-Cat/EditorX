@@ -1,7 +1,5 @@
 package editorx.core.plugin
 
-import editorx.core.filetype.FileTypeRegistry
-import editorx.core.filetype.SyntaxHighlighterRegistry
 import editorx.core.service.BuildService
 import editorx.core.service.MutableServiceRegistry
 import org.slf4j.LoggerFactory
@@ -136,7 +134,7 @@ class PluginManager {
      * @return 找到的 BuildProvider，如果没有则返回 null
      */
     fun findBuildProvider(workspaceRoot: java.io.File): BuildService? {
-        return servicesRegistry.getAll(BuildService::class.java)
+        return servicesRegistry.getService(BuildService::class.java)
             .firstOrNull { it.canBuild(workspaceRoot) }
     }
 
@@ -292,10 +290,8 @@ class PluginManager {
         }
     }
 
+    @Deprecated("移步到Plugin.deactivate()")
     private fun cleanupOwner(ownerId: String) {
-        FileTypeRegistry.unregisterByOwner(ownerId)
-        SyntaxHighlighterRegistry.unregisterByOwner(ownerId)
-        // I18n 现在由插件在 deactivate 时自己管理清理
     }
 
     private fun firePluginStateChanged(pluginId: String) {

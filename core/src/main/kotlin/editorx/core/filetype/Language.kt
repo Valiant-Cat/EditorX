@@ -15,10 +15,6 @@ abstract class Language(val id: String) {
 
     fun getDisplayName(): String = id
 
-    fun getAssociatedFileType(): LanguageFileType? {
-        return FileTypeRegistry.findFileTypeByLanguage(this)
-    }
-
     fun findMyFileType(types: Array<FileType>): LanguageFileType? {
         for (fileType in types) {
             if (fileType is LanguageFileType) {

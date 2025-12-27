@@ -11,11 +11,20 @@ class SmaliPlugin : Plugin {
         version = "0.0.1",
     )
 
+    private var pluginContext: PluginContext? = null
+
     override fun activate(pluginContext: PluginContext) {
+        this.pluginContext = pluginContext
         // 注册文件类型
         pluginContext.gui()?.registerFileType(SmaliFileType)
 
         // 注册 Smali 语法高亮
         pluginContext.gui()?.registerSyntaxHighlighter(SmaliLanguage, SmaliHighlighter)
+    }
+
+    override fun deactivate() {
+        pluginContext?.gui()?.unregisterAllFileTypes()
+        pluginContext?.gui()?.unregisterAllSyntaxHighlighters()
+        pluginContext = null
     }
 }

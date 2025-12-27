@@ -1,6 +1,6 @@
 package editorx.gui.main.editor
 
-import editorx.core.filetype.SyntaxHighlighterRegistry
+import editorx.gui.core.SyntaxHighlighterRegistry
 import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea
 import org.fife.ui.rsyntaxtextarea.SyntaxConstants
 import org.slf4j.LoggerFactory

@@ -1,8 +1,8 @@
 package editorx.gui.main.explorer
 
 import editorx.core.external.ApkTool
-import editorx.core.filetype.FileTypeRegistry
-import editorx.core.plugin.FileHandlerRegistry
+import editorx.gui.core.FileTypeRegistry
+import editorx.gui.core.FileHandlerRegistry
 import editorx.core.util.IconLoader
 import editorx.core.util.IconRef
 import editorx.core.util.IconUtils

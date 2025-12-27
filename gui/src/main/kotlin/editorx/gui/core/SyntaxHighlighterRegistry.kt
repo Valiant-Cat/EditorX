@@ -1,5 +1,8 @@
-package editorx.core.filetype
+package editorx.gui.core
 
+import editorx.core.filetype.Language
+import editorx.core.filetype.LanguageFileType
+import editorx.core.filetype.SyntaxHighlighter
 import org.fife.ui.rsyntaxtextarea.AbstractTokenMakerFactory
 import org.fife.ui.rsyntaxtextarea.TokenMakerFactory
 import java.io.File

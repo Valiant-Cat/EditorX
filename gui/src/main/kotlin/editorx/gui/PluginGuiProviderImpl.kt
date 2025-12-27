@@ -1,10 +1,16 @@
 package editorx.gui
 
-import editorx.core.filetype.*
+import editorx.core.filetype.FileType
+import editorx.core.filetype.Formatter
+import editorx.core.filetype.Language
+import editorx.core.filetype.SyntaxHighlighter
 import editorx.core.gui.GuiContext
 import editorx.core.plugin.FileHandler
-import editorx.core.plugin.FileHandlerRegistry
 import editorx.core.plugin.PluginGuiProvider
+import editorx.gui.core.FileHandlerRegistry
+import editorx.gui.core.FileTypeRegistry
+import editorx.gui.core.FormatterRegistry
+import editorx.gui.core.SyntaxHighlighterRegistry
 import editorx.gui.theme.ThemeManager
 import java.io.File
 import javax.swing.Icon
@@ -59,6 +65,10 @@ class PluginGuiProviderImpl(
         FileTypeRegistry.registerFileType(fileType, ownerId = pluginId)
     }
 
+    override fun unregisterAllFileTypes() {
+        FileTypeRegistry.unregisterByOwner(pluginId)
+    }
+
     override fun registerSyntaxHighlighter(language: Language, syntaxHighlighter: SyntaxHighlighter) {
         SyntaxHighlighterRegistry.registerSyntaxHighlighter(
             language,
@@ -67,12 +77,24 @@ class PluginGuiProviderImpl(
         )
     }
 
+    override fun unregisterAllSyntaxHighlighters() {
+        SyntaxHighlighterRegistry.unregisterByOwner(pluginId)
+    }
+
     override fun registerFormatter(language: Language, formatter: Formatter) {
         FormatterRegistry.registerFormatter(language, formatter, ownerId = pluginId)
     }
 
+    override fun unregisterAllFormatters() {
+        FormatterRegistry.unregisterByOwner(pluginId)
+    }
+
     override fun registerFileHandler(handler: FileHandler) {
-        FileHandlerRegistry.register(handler)
+        FileHandlerRegistry.register(handler, ownerId = pluginId)
+    }
+
+    override fun unregisterAllFileHandlers() {
+        FileHandlerRegistry.unregisterByOwner(pluginId)
     }
 
     override fun getThemeTextColor(): java.awt.Color {

@@ -41,11 +41,11 @@ class PluginContextImpl(
     }
 
     override fun <T : Any> registerService(serviceClass: Class<T>, instance: T) {
-        servicesRegistry.registerMulti(serviceClass, instance)
+        servicesRegistry.registerService(serviceClass, instance)
     }
 
     override fun <T : Any> unregisterService(serviceClass: Class<T>, instance: T) {
-        servicesRegistry.unregisterMulti(serviceClass, instance)
+        servicesRegistry.unregisterService(serviceClass, instance)
     }
 
     override fun compareTo(other: PluginContextImpl): Int {

@@ -1,5 +1,8 @@
-package editorx.core.filetype
+package editorx.gui.core
 
+import editorx.core.filetype.Formatter
+import editorx.core.filetype.Language
+import editorx.core.filetype.LanguageFileType
 import java.io.File
 
 object FormatterRegistry {

@@ -106,6 +106,10 @@ class AndroidPlugin : Plugin {
             pluginContext?.unregisterService(BUILD_PROVIDER_CLASS, provider)
         }
         buildProvider = null
+
+        // 取消注册文件处理器
+        pluginContext?.gui()?.unregisterAllFileHandlers()
+
         pluginContext = null
 
         // 停止定时器

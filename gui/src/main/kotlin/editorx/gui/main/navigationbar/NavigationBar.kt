@@ -2,7 +2,7 @@ package editorx.gui.main.navigationbar
 
 import editorx.gui.main.MainWindow
 import editorx.gui.main.explorer.Explorer
-import editorx.core.filetype.FileTypeRegistry
+import editorx.gui.core.FileTypeRegistry
 import editorx.gui.main.explorer.ExplorerIcons
 import editorx.core.util.IconUtils
 import editorx.gui.theme.ThemeManager

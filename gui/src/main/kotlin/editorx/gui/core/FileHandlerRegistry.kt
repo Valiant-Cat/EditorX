@@ -1,5 +1,6 @@
-package editorx.core.plugin
+package editorx.gui.core
 
+import editorx.core.plugin.FileHandler
 import java.io.File
 
 /**
@@ -7,7 +8,15 @@ import java.io.File
  * 用于管理所有注册的文件处理器
  */
 object FileHandlerRegistry {
-    private val fileHandlers = mutableListOf<FileHandler>()
+    private data class Registration(
+        val handler: FileHandler,
+        val ownerId: String?,
+    )
+
+    private val registrations: MutableList<Registration> = mutableListOf()
+    private val fileHandlers: List<FileHandler>
+        get() = registrations.map { it.handler }
+
     // 正在处理的文件集合，用于避免重复处理（循环调用）
     private val processingFiles = mutableSetOf<String>()
 
@@ -16,7 +25,16 @@ object FileHandlerRegistry {
      * @param handler 文件处理器
      */
     fun register(handler: FileHandler) {
-        fileHandlers.add(handler)
+        register(handler, ownerId = null)
+    }
+
+    /**
+     * 注册文件处理器，并记录归属插件（用于卸载时回收）
+     * @param handler 文件处理器
+     * @param ownerId 插件 ID
+     */
+    fun register(handler: FileHandler, ownerId: String?) {
+        registrations.add(Registration(handler = handler, ownerId = ownerId))
     }
 
     /**
@@ -24,7 +42,14 @@ object FileHandlerRegistry {
      * @param handler 文件处理器
      */
     fun unregister(handler: FileHandler) {
-        fileHandlers.remove(handler)
+        registrations.removeIf { it.handler == handler }
+    }
+
+    /**
+     * 按插件 ID 卸载其注册的文件处理器
+     */
+    fun unregisterByOwner(ownerId: String) {
+        registrations.removeIf { it.ownerId == ownerId }
     }
 
     /**
@@ -76,14 +101,14 @@ object FileHandlerRegistry {
      * 获取所有注册的文件处理器
      */
     fun getAllHandlers(): List<FileHandler> {
-        return fileHandlers.toList()
+        return fileHandlers
     }
 
     /**
      * 清空所有注册的文件处理器
      */
     fun clear() {
-        fileHandlers.clear()
+        registrations.clear()
     }
 }
 
