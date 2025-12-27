@@ -2,8 +2,7 @@ package editorx.core.plugin
 
 import editorx.core.filetype.FileTypeRegistry
 import editorx.core.filetype.SyntaxHighlighterRegistry
-import editorx.core.plugin.loader.DiscoveredPlugin
-import editorx.core.plugin.loader.PluginLoader
+import editorx.core.service.BuildService
 import editorx.core.service.MutableServiceRegistry
 import org.slf4j.LoggerFactory
 import java.util.*
@@ -39,7 +38,7 @@ class PluginManager {
     private val pluginsById: SortedMap<String, PluginRuntime> = TreeMap()
     private val activationRoutes: MutableMap<ActivationEvent, MutableSet<String>> = mutableMapOf()
     private val disabledPluginIds: MutableSet<String> = linkedSetOf()
-    private var guiProviderFactory: ((PluginContextImpl) -> editorx.core.plugin.gui.PluginGuiProvider?)? = null
+    private var guiProviderFactory: ((PluginContextImpl) -> PluginGuiProvider?)? = null
     private val pluginStateListeners: MutableList<PluginStateListener> = mutableListOf()
 
     // JAR 插件：ClassLoader 需要引用计数，避免一个 JAR 内多个插件时被提前关闭
@@ -83,7 +82,7 @@ class PluginManager {
      * 设置 GUI Provider 工厂函数。
      * 会对"已加载"的插件立即执行一次。
      */
-    fun setGuiProviderFactory(factory: (PluginContextImpl) -> editorx.core.plugin.gui.PluginGuiProvider?) {
+    fun setGuiProviderFactory(factory: (PluginContextImpl) -> PluginGuiProvider?) {
         guiProviderFactory = factory
         pluginsById.values.forEach { ctx ->
             ctx.context.guiProvider = factory(ctx.context)
@@ -130,6 +129,16 @@ class PluginManager {
 
     fun getPlugin(pluginId: String): PluginRecord? =
         pluginsById[pluginId]?.toRecord(disabledPluginIds.contains(pluginId))
+
+    /**
+     * 查找可以为指定工作区提供构建能力的插件
+     * @param workspaceRoot 工作区根目录
+     * @return 找到的 BuildProvider，如果没有则返回 null
+     */
+    fun findBuildProvider(workspaceRoot: java.io.File): BuildService? {
+        return servicesRegistry.getAll(BuildService::class.java)
+            .firstOrNull { it.canBuild(workspaceRoot) }
+    }
 
     fun startPlugin(pluginId: String): Boolean {
         val runtime = pluginsById[pluginId] ?: return false
@@ -227,7 +236,7 @@ class PluginManager {
             return false
         }
         val events = plugin.activationEvents().ifEmpty { listOf(ActivationEvent.OnStartup) }
-        val pluginContext = PluginContextImpl(plugin)
+        val pluginContext = PluginContextImpl(plugin, servicesRegistry)
         val initialState = if (disabledPluginIds.contains(pluginId)) {
             PluginState.STOPPED
         } else {

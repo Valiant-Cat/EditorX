@@ -2,7 +2,7 @@ package editorx.gui
 
 import editorx.core.gui.GuiContext
 import editorx.core.plugin.PluginManager
-import editorx.core.store.Store
+import editorx.core.util.Store
 import editorx.core.workspace.Workspace
 import java.io.File
 

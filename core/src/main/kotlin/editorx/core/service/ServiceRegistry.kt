@@ -4,26 +4,32 @@ package editorx.core.service
  * 核心服务注册表
  */
 interface ServiceRegistry {
-    fun <T : Any> get(serviceClass: Class<T>): T?
 
-    fun <T : Any> require(serviceClass: Class<T>): T =
-        get(serviceClass)
-            ?: error("Service not found: ${serviceClass.name}")
+    /**
+     * 获取所有注册的服务实例（用于支持多实例的场景）
+     */
+    fun <T : Any> getAll(serviceClass: Class<T>): List<T>
 }
 
 class MutableServiceRegistry : ServiceRegistry {
-    private val services: MutableMap<Class<*>, Any> = linkedMapOf()
+    private val multiServices: MutableMap<Class<*>, MutableList<Any>> = mutableMapOf()
 
-    fun <T : Any> register(serviceClass: Class<T>, instance: T) {
-        services[serviceClass] = instance
+    /**
+     * 注册服务（多实例支持）
+     */
+    fun <T : Any> registerMulti(serviceClass: Class<T>, instance: T) {
+        multiServices.getOrPut(serviceClass) { mutableListOf() }.add(instance)
     }
 
-    fun <T : Any> unregister(serviceClass: Class<T>) {
-        services.remove(serviceClass)
+    /**
+     * 取消注册服务（多实例）
+     */
+    fun <T : Any> unregisterMulti(serviceClass: Class<T>, instance: T) {
+        multiServices[serviceClass]?.remove(instance)
     }
 
-    override fun <T : Any> get(serviceClass: Class<T>): T? {
+    override fun <T : Any> getAll(serviceClass: Class<T>): List<T> {
         @Suppress("UNCHECKED_CAST")
-        return services[serviceClass] as? T
+        return multiServices[serviceClass]?.map { it as T } ?: emptyList()
     }
 }

@@ -2,7 +2,7 @@ package editorx.gui.main.statusbar
 
 import editorx.core.i18n.I18n
 import editorx.core.i18n.I18nKeys
-import editorx.gui.ThemeManager
+import editorx.gui.theme.ThemeManager
 import editorx.gui.main.MainWindow
 import java.awt.Color
 import java.awt.Dimension

@@ -6,11 +6,10 @@ import editorx.core.plugin.PluginManager
 import editorx.core.plugin.PluginOrigin
 import editorx.core.plugin.PluginRecord
 import editorx.core.plugin.PluginState
-import editorx.core.plugin.loader.PluginLoaderImpl
-import editorx.core.store.Store
-import editorx.gui.ThemeManager
+import editorx.core.plugin.PluginLoaderImpl
+import editorx.core.util.Store
+import editorx.gui.theme.ThemeManager
 import java.awt.BorderLayout
-import java.awt.Color
 import java.awt.Dimension
 import java.awt.FlowLayout
 import java.nio.file.Files

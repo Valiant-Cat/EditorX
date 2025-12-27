@@ -1,4 +1,4 @@
-package editorx.core.store
+package editorx.core.util
 
 import java.io.File
 import java.io.FileInputStream

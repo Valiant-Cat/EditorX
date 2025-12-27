@@ -1,9 +1,10 @@
 package editorx.core.plugin
 
-import editorx.core.plugin.gui.PluginGuiProvider
+import editorx.core.service.MutableServiceRegistry
 
 class PluginContextImpl(
     private val plugin: Plugin,
+    private val servicesRegistry: MutableServiceRegistry,
 ) : PluginContext, Comparable<PluginContextImpl> {
     private var hasActive = false
 
@@ -37,6 +38,14 @@ class PluginContextImpl(
 
     override fun isActive(): Boolean {
         return hasActive
+    }
+
+    override fun <T : Any> registerService(serviceClass: Class<T>, instance: T) {
+        servicesRegistry.registerMulti(serviceClass, instance)
+    }
+
+    override fun <T : Any> unregisterService(serviceClass: Class<T>, instance: T) {
+        servicesRegistry.unregisterMulti(serviceClass, instance)
     }
 
     override fun compareTo(other: PluginContextImpl): Int {

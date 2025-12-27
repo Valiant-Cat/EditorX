@@ -374,6 +374,10 @@ object I18nKeys {
         const val APPLICATION_NOT_FOUND = "toolbarMessage.applicationNotFound"
         const val APPLICATION_NOT_FOUND_DETAIL = "toolbarMessage.applicationNotFoundDetail"
         const val APPLICATION_SMALI_NOT_FOUND = "toolbarMessage.applicationSmaliNotFound"
+        const val NO_BUILD_PROVIDER = "toolbarMessage.noBuildProvider"
+        const val BUILD_TOOL_NOT_FOUND = "toolbarMessage.buildToolNotFound"
+        const val COMPILE_SUCCESS = "toolbarMessage.compileSuccess"
+        const val BUILD_GENERATED = "toolbarMessage.buildGenerated"
     }
 
     /**

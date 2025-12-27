@@ -2,9 +2,8 @@ package editorx.plugins.android
 
 import editorx.core.i18n.I18n
 import editorx.core.i18n.I18nKeys
-import editorx.core.plugin.Plugin
-import editorx.core.plugin.PluginContext
-import editorx.core.plugin.PluginInfo
+import editorx.core.plugin.*
+import editorx.core.service.BuildService
 import editorx.core.util.IconLoader
 import editorx.core.util.IconRef
 import org.slf4j.LoggerFactory
@@ -14,12 +13,13 @@ import javax.swing.JOptionPane
 import javax.swing.Timer
 
 /**
- * Android 插件：提供 Android 项目快速跳转功能
+ * Android 插件：提供 Android 项目快速跳转功能和构建能力
  */
 class AndroidPlugin : Plugin {
     companion object {
         private val logger = LoggerFactory.getLogger(AndroidPlugin::class.java)
         private const val ICON_SIZE = 14
+        private val BUILD_PROVIDER_CLASS: Class<BuildService> = BuildService::class.java
     }
 
     override fun getInfo() = PluginInfo(
@@ -30,8 +30,16 @@ class AndroidPlugin : Plugin {
 
     private var workspaceCheckTimer: Timer? = null
     private var lastWorkspaceState: Boolean = false
+    private var pluginContext: PluginContext? = null
+    private var buildProvider: ApkBuildService? = null
 
     override fun activate(pluginContext: PluginContext) {
+        this.pluginContext = pluginContext
+
+        // 创建并注册 BuildProvider 服务
+        buildProvider = ApkBuildService()
+        pluginContext.registerService(BUILD_PROVIDER_CLASS, buildProvider!!)
+
         val gui = pluginContext.gui() ?: return
 
         // 注册 AndroidManifest.xml 跳转按钮
@@ -89,10 +97,17 @@ class AndroidPlugin : Plugin {
         startWorkspaceStateChecker(gui)
 
         // 注册 APK 文件处理器
-        gui.registerFileHandler(ApkFileHandler(gui))
+        pluginContext.gui()?.registerFileHandler(ApkFileHandler(gui))
     }
 
     override fun deactivate() {
+        // 取消注册 BuildProvider 服务
+        buildProvider?.let { provider ->
+            pluginContext?.unregisterService(BUILD_PROVIDER_CLASS, provider)
+        }
+        buildProvider = null
+        pluginContext = null
+
         // 停止定时器
         workspaceCheckTimer?.stop()
         workspaceCheckTimer = null
@@ -101,7 +116,7 @@ class AndroidPlugin : Plugin {
     /**
      * 启动工作区状态检查器
      */
-    private fun startWorkspaceStateChecker(gui: editorx.core.plugin.gui.PluginGuiProvider) {
+    private fun startWorkspaceStateChecker(gui: PluginGuiProvider) {
         workspaceCheckTimer = Timer(500) { // 每 500ms 检查一次
             val hasWorkspace = gui.getWorkspaceRoot() != null
             if (hasWorkspace != lastWorkspaceState) {
@@ -116,7 +131,7 @@ class AndroidPlugin : Plugin {
     /**
      * 更新 ToolBar 按钮的启用/禁用状态
      */
-    private fun updateToolBarButtonsState(gui: editorx.core.plugin.gui.PluginGuiProvider, enabled: Boolean) {
+    private fun updateToolBarButtonsState(gui: PluginGuiProvider, enabled: Boolean) {
         gui.setToolBarItemEnabled("android.manifest", enabled)
         gui.setToolBarItemEnabled("android.mainactivity", enabled)
         gui.setToolBarItemEnabled("android.application", enabled)
@@ -125,7 +140,7 @@ class AndroidPlugin : Plugin {
     /**
      * 跳转到 AndroidManifest.xml
      */
-    private fun navigateToAndroidManifest(gui: editorx.core.plugin.gui.PluginGuiProvider) {
+    private fun navigateToAndroidManifest(gui: PluginGuiProvider) {
         val workspaceRoot = gui.getWorkspaceRoot()
         if (workspaceRoot == null) {
             showMessage(
@@ -152,7 +167,7 @@ class AndroidPlugin : Plugin {
     /**
      * 跳转到 MainActivity
      */
-    private fun navigateToMainActivity(gui: editorx.core.plugin.gui.PluginGuiProvider) {
+    private fun navigateToMainActivity(gui: PluginGuiProvider) {
         val workspaceRoot = gui.getWorkspaceRoot()
         if (workspaceRoot == null) {
             showMessage(
@@ -212,7 +227,7 @@ class AndroidPlugin : Plugin {
     /**
      * 跳转到 Application
      */
-    private fun navigateToApplication(gui: editorx.core.plugin.gui.PluginGuiProvider) {
+    private fun navigateToApplication(gui: PluginGuiProvider) {
         val workspaceRoot = gui.getWorkspaceRoot()
         if (workspaceRoot == null) {
             showMessage(
@@ -541,6 +556,7 @@ class AndroidPlugin : Plugin {
         val defaultSmaliDir = File(workspaceRoot, "smali")
         return File(defaultSmaliDir, path)
     }
+
 }
 
 

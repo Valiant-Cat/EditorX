@@ -1,7 +1,5 @@
-package editorx.core.plugin.loader
+package editorx.core.plugin
 
-import editorx.core.plugin.Plugin
-import editorx.core.plugin.PluginOrigin
 import org.slf4j.LoggerFactory
 import java.net.URL
 import java.net.URLClassLoader

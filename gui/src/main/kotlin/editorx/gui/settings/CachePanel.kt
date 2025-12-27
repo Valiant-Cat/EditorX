@@ -3,7 +3,7 @@ package editorx.gui.settings
 import editorx.core.i18n.I18n
 import editorx.core.i18n.I18nKeys
 import editorx.core.gui.GuiContext
-import editorx.gui.ThemeManager
+import editorx.gui.theme.ThemeManager
 import java.awt.BorderLayout
 import java.awt.FlowLayout
 import java.io.File

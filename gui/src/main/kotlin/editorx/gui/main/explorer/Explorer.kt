@@ -2,11 +2,11 @@ package editorx.gui.main.explorer
 
 import editorx.core.external.ApkTool
 import editorx.core.filetype.FileTypeRegistry
-import editorx.core.plugin.gui.FileHandlerRegistry
+import editorx.core.plugin.FileHandlerRegistry
 import editorx.core.util.IconLoader
 import editorx.core.util.IconRef
 import editorx.core.util.IconUtils
-import editorx.gui.ThemeManager
+import editorx.gui.theme.ThemeManager
 import editorx.gui.main.MainWindow
 import java.awt.*
 import java.awt.datatransfer.DataFlavor

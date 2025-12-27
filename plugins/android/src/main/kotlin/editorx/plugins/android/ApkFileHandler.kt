@@ -3,8 +3,8 @@ package editorx.plugins.android
 import editorx.core.external.ApkTool
 import editorx.core.i18n.I18n
 import editorx.core.i18n.I18nKeys
-import editorx.core.plugin.gui.FileHandler
-import editorx.core.plugin.gui.PluginGuiProvider
+import editorx.core.plugin.FileHandler
+import editorx.core.plugin.PluginGuiProvider
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.FileOutputStream

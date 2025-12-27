@@ -1,4 +1,4 @@
-package editorx.core.plugin.gui
+package editorx.core.plugin
 
 import editorx.core.filetype.FileType
 import editorx.core.filetype.Formatter

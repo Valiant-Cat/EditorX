@@ -4,9 +4,9 @@ import com.formdev.flatlaf.FlatLightLaf
 import editorx.core.i18n.I18nKeys
 import editorx.core.plugin.PluginManager
 import editorx.core.plugin.PluginState
-import editorx.core.plugin.loader.PluginLoaderImpl
-import editorx.core.store.FileStore
-import editorx.core.store.Store
+import editorx.core.plugin.PluginLoaderImpl
+import editorx.core.util.FileStore
+import editorx.core.util.Store
 import editorx.core.util.StartupTimer
 import editorx.core.util.SystemUtils
 import editorx.core.workspace.DefaultWorkspace
@@ -15,6 +15,7 @@ import editorx.gui.core.ShortcutRegistry
 import editorx.gui.main.MainWindow
 import editorx.gui.search.SearchDialog
 import editorx.gui.settings.SettingsDialog
+import editorx.gui.theme.ThemeManager
 import org.slf4j.LoggerFactory
 import java.awt.Image
 import java.awt.Taskbar

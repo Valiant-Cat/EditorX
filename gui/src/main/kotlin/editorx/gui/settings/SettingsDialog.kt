@@ -5,17 +5,13 @@ import editorx.core.i18n.I18nKeys
 import editorx.core.plugin.PluginManager
 import editorx.core.gui.GuiContext
 import editorx.gui.main.MainWindow
-import editorx.gui.core.RestartHelper
-import editorx.gui.ThemeManager
+import editorx.gui.theme.ThemeManager
 import java.awt.BorderLayout
 import java.awt.CardLayout
-import java.awt.Color
 import java.awt.Container
 import java.awt.Dimension
 import java.awt.FlowLayout
 import java.awt.Font
-import java.awt.MouseInfo
-import java.util.Locale
 import javax.swing.BorderFactory
 import javax.swing.DefaultListCellRenderer
 import javax.swing.DefaultListModel
@@ -27,7 +23,6 @@ import javax.swing.JList
 import javax.swing.JPanel
 import javax.swing.JScrollPane
 import javax.swing.JSplitPane
-import javax.swing.InputMap
 import javax.swing.KeyStroke
 import javax.swing.ListSelectionModel
 import javax.swing.SwingUtilities

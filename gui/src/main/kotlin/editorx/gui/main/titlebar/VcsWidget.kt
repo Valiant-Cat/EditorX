@@ -5,7 +5,7 @@ import editorx.core.i18n.I18nKeys
 import editorx.core.util.IconLoader
 import editorx.core.util.IconRef
 import editorx.core.workspace.Workspace
-import editorx.gui.ThemeManager
+import editorx.gui.theme.ThemeManager
 import org.slf4j.LoggerFactory
 import java.awt.Component
 import java.awt.Dimension

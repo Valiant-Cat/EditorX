@@ -211,7 +211,6 @@ private val dictionary = buildMap {
 
     put(I18nKeys.ToolbarMessage.COMPILING, "正在编译，请稍候…")
     put(I18nKeys.ToolbarMessage.COMPILING_TITLE, "编译进行中")
-    put(I18nKeys.ToolbarMessage.WORKSPACE_NOT_OPENED, "尚未打开工作区")
     put(I18nKeys.ToolbarMessage.NOT_APKTOOL_DIR, "当前工作区不是 apktool 反编译目录（缺少 apktool.yml）")
     put(I18nKeys.ToolbarMessage.CANNOT_COMPILE, "无法编译")
     put(I18nKeys.ToolbarMessage.COMPILING_APK, "正在编译APK...")
@@ -238,6 +237,10 @@ private val dictionary = buildMap {
     put(I18nKeys.ToolbarMessage.APPLICATION_NOT_FOUND, "未找到 AndroidManifest.xml 文件，无法定位 Application")
     put(I18nKeys.ToolbarMessage.APPLICATION_NOT_FOUND_DETAIL, "在 AndroidManifest.xml 中未找到自定义 Application")
     put(I18nKeys.ToolbarMessage.APPLICATION_SMALI_NOT_FOUND, "未找到 Application 对应的 smali 文件\n类名: %s\n预期路径: %s")
+    put(I18nKeys.ToolbarMessage.NO_BUILD_PROVIDER, "当前工作区没有可用的构建提供者")
+    put(I18nKeys.ToolbarMessage.BUILD_TOOL_NOT_FOUND, "未找到构建工具")
+    put(I18nKeys.ToolbarMessage.COMPILE_SUCCESS, "构建成功: %s")
+    put(I18nKeys.ToolbarMessage.BUILD_GENERATED, "构建产物已生成:\n%s")
 
     put(I18nKeys.Cache.CACHE_CONTENT, "缓存内容")
     put(I18nKeys.Cache.LOGS, "日志文件")
@@ -253,6 +256,7 @@ private val dictionary = buildMap {
     put(I18nKeys.Dialog.COPY_PATH_FAILED, "复制路径失败: %s")
     put(I18nKeys.Dialog.PATH_COPIED, "已复制路径: %s")
     put(I18nKeys.Dialog.PLUGIN_SYSTEM_NOT_INIT, "插件系统尚未初始化")
+    put(I18nKeys.Dialog.WORKSPACE_NOT_OPENED, "尚未打开工作区")
     put(I18nKeys.Dialog.SELECT_JAR_FILE, "请选择 .jar 文件")
     put(I18nKeys.Dialog.CONFIRM_OVERWRITE, "插件目录已存在同名文件：%s\n是否覆盖？")
     put(I18nKeys.Dialog.CANNOT_UNINSTALL, "无法卸载")

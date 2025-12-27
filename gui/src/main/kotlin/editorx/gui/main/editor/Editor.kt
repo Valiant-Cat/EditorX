@@ -4,8 +4,8 @@ import editorx.core.filetype.FileTypeRegistry
 import editorx.core.filetype.FormatterRegistry
 import editorx.core.external.Jadx
 import editorx.core.external.Smali
-import editorx.core.plugin.gui.FileHandlerRegistry
-import editorx.gui.ThemeManager
+import editorx.core.plugin.FileHandlerRegistry
+import editorx.gui.theme.ThemeManager
 import editorx.gui.main.MainWindow
 import editorx.gui.main.explorer.ExplorerIcons
 import editorx.core.util.IconUtils
@@ -141,6 +141,27 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                 override fun paintContentBorder(g: java.awt.Graphics?, placement: Int, selectedIndex: Int) {
                     // 不绘制内容区边框，避免底部与右侧出现黑线
                 }
+                
+                override fun paintTabBackground(
+                    g: java.awt.Graphics,
+                    tabPlacement: Int,
+                    tabIndex: Int,
+                    x: Int,
+                    y: Int,
+                    w: Int,
+                    h: Int,
+                    isSelected: Boolean
+                ) {
+                    // 使用主题背景色绘制 tab 背景
+                    val theme = ThemeManager.currentTheme
+                    val g2d = g.create() as java.awt.Graphics2D
+                    try {
+                        g2d.color = theme.surface
+                        g2d.fillRect(x, y, w, h)
+                    } finally {
+                        g2d.dispose()
+                    }
+                }
             })
         }
 
@@ -258,8 +279,61 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             textArea.foreground = theme.onSurface
         }
         
+        // 更新 tabbedPane 的背景色和前景色
+        tabbedPane.background = theme.surface
+        tabbedPane.foreground = theme.onSurfaceVariant
+        // 更新所有 tab 的背景色和前景色
+        for (i in 0 until tabbedPane.tabCount) {
+            try {
+                tabbedPane.setBackgroundAt(i, theme.surface)
+                tabbedPane.setForegroundAt(i, theme.onSurfaceVariant)
+            } catch (e: Exception) {
+                // 某些 tab 可能不支持设置颜色，忽略
+            }
+        }
+        
         // 更新所有 tab header 的样式
         updateTabHeaderStyles()
+        
+        // 更新底部 manifest 视图标签
+        manifestViewTabs?.let { tabs ->
+            tabs.border = BorderFactory.createMatteBorder(1, 0, 0, 0, theme.outline)
+            tabs.background = theme.surface
+            tabs.foreground = theme.onSurfaceVariant
+            // 更新所有 tab 的背景色和前景色
+            for (i in 0 until tabs.tabCount) {
+                try {
+                    tabs.setBackgroundAt(i, theme.surface)
+                    val isSelected = (i == tabs.selectedIndex)
+                    tabs.setForegroundAt(i, if (isSelected) theme.onSurface else theme.onSurfaceVariant)
+                } catch (e: Exception) {
+                    // 某些 tab 可能不支持设置颜色，忽略
+                }
+            }
+            // 触发 UI 更新以重新渲染 tab 背景
+            tabs.updateUI()
+            tabs.repaint()
+        }
+        
+        // 更新底部 smali 视图标签
+        smaliViewTabs?.let { tabs ->
+            tabs.border = BorderFactory.createMatteBorder(1, 0, 0, 0, theme.outline)
+            tabs.background = theme.surface
+            tabs.foreground = theme.onSurfaceVariant
+            // 更新所有 tab 的背景色和前景色
+            for (i in 0 until tabs.tabCount) {
+                try {
+                    tabs.setBackgroundAt(i, theme.surface)
+                    val isSelected = (i == tabs.selectedIndex)
+                    tabs.setForegroundAt(i, if (isSelected) theme.onSurface else theme.onSurfaceVariant)
+                } catch (e: Exception) {
+                    // 某些 tab 可能不支持设置颜色，忽略
+                }
+            }
+            // 触发 UI 更新以重新渲染 tab 背景
+            tabs.updateUI()
+            tabs.repaint()
+        }
         
         // 触发 tabbedPane 的重绘，更新 tab 背景
         tabbedPane.repaint()
@@ -604,6 +678,13 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         fileToTab[file] = index
         tabToFile[index] = file
         tabTextAreas[index] = textArea
+        // 应用主题颜色到新创建的 tab
+        try {
+            tabbedPane.setBackgroundAt(index, theme.surface)
+            tabbedPane.setForegroundAt(index, theme.onSurfaceVariant)
+        } catch (e: Exception) {
+            // 某些情况下可能不支持设置颜色，忽略
+        }
         val closeButton = createVSCodeTabHeader(file)
         tabbedPane.setTabComponentAt(index, closeButton)
         attachPopupToHeader(closeButton)
@@ -621,7 +702,10 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         originalTextByIndex[index] = textArea.text
         dirtyTabs.remove(index)
         textArea.putClientProperty("suppressDirty", false)
+        // 更新 tab header 样式以确保应用当前主题（在设置 selectedIndex 之后调用）
         updateTabHeaderStyles()
+        // 触发 tabbedPane 重绘以确保 tab 背景色正确
+        tabbedPane.repaint()
         updateNavigation(file)
 
         // 检测是否为 AndroidManifest.xml，显示/隐藏底部视图标签
@@ -723,10 +807,21 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         fileToTab[untitledFile] = index
         tabToFile[index] = untitledFile
         tabTextAreas[index] = textArea
+        // 应用主题颜色到新创建的 tab
+        try {
+            tabbedPane.setBackgroundAt(index, theme.surface)
+            tabbedPane.setForegroundAt(index, theme.onSurfaceVariant)
+        } catch (e: Exception) {
+            // 某些情况下可能不支持设置颜色，忽略
+        }
         val closeButton = createVSCodeTabHeader(untitledFile)
         tabbedPane.setTabComponentAt(index, closeButton)
         attachPopupToHeader(closeButton)
         tabbedPane.selectedIndex = index
+        // 更新 tab header 样式以确保应用当前主题
+        updateTabHeaderStyles()
+        // 触发 tabbedPane 重绘以确保 tab 背景色正确
+        tabbedPane.repaint()
 
         SwingUtilities.invokeLater {
             runCatching {
@@ -740,7 +835,6 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         originalTextByIndex[index] = ""
         dirtyTabs.remove(index)
         textArea.putClientProperty("suppressDirty", false)
-        updateTabHeaderStyles()
         mainWindow.statusBar.setFileInfo(title, "0 B")
         mainWindow.statusBar.setLineColumn(1, 1)
 
@@ -1614,11 +1708,13 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             val manifestData = parseAndroidManifest(content)
 
             // 创建底部标签面板（简洁样式）
+            val theme = ThemeManager.currentTheme
             manifestViewTabs = JTabbedPane().apply {
                 tabPlacement = JTabbedPane.TOP
                 tabLayoutPolicy = JTabbedPane.SCROLL_TAB_LAYOUT
-                border = BorderFactory.createMatteBorder(1, 0, 0, 0, Color(220, 220, 220))
-                background = Color(250, 250, 250)
+                border = BorderFactory.createMatteBorder(1, 0, 0, 0, theme.outline)
+                background = theme.surface
+                foreground = theme.onSurfaceVariant
                 preferredSize = Dimension(0, 36)
                 maximumSize = Dimension(Int.MAX_VALUE, 36)
 
@@ -1644,9 +1740,9 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                     ) {
                         val g2d = g.create() as Graphics2D
                         try {
+                            val theme = ThemeManager.currentTheme
                             if (isSelected) {
                                 // 选中状态：使用主题背景色
-                                val theme = ThemeManager.currentTheme
                                 g2d.color = theme.surface
                                 g2d.fillRect(x, y, w, h)
 
@@ -1654,8 +1750,8 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                                 g2d.color = theme.primary
                                 g2d.fillRect(x, y + h - 2, w, 2)
                             } else {
-                                // 未选中状态：透明背景
-                                g2d.color = Color(0, 0, 0, 0)
+                                // 未选中状态：使用主题背景色
+                                g2d.color = theme.surface
                                 g2d.fillRect(x, y, w, h)
                             }
                         } finally {
@@ -2164,11 +2260,13 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             smaliOriginalContent = content
 
             // 创建底部标签面板（简洁样式）
+            val theme = ThemeManager.currentTheme
             smaliViewTabs = JTabbedPane().apply {
                 tabPlacement = JTabbedPane.TOP
                 tabLayoutPolicy = JTabbedPane.SCROLL_TAB_LAYOUT
-                border = BorderFactory.createMatteBorder(1, 0, 0, 0, Color(220, 220, 220))
-                background = Color(250, 250, 250)
+                border = BorderFactory.createMatteBorder(1, 0, 0, 0, theme.outline)
+                background = theme.surface
+                foreground = theme.onSurfaceVariant
                 preferredSize = Dimension(0, 36)
                 maximumSize = Dimension(Int.MAX_VALUE, 36)
 
@@ -2194,9 +2292,9 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                     ) {
                         val g2d = g.create() as Graphics2D
                         try {
+                            val theme = ThemeManager.currentTheme
                             if (isSelected) {
                                 // 选中状态：使用主题背景色
-                                val theme = ThemeManager.currentTheme
                                 g2d.color = theme.surface
                                 g2d.fillRect(x, y, w, h)
 
@@ -2204,8 +2302,8 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                                 g2d.color = theme.primary
                                 g2d.fillRect(x, y + h - 2, w, 2)
                             } else {
-                                // 未选中状态：透明背景
-                                g2d.color = Color(0, 0, 0, 0)
+                                // 未选中状态：使用主题背景色
+                                g2d.color = theme.surface
                                 g2d.fillRect(x, y, w, h)
                             }
                         } finally {

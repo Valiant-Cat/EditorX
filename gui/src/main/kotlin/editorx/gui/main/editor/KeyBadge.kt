@@ -1,6 +1,7 @@
 package editorx.gui.main.editor
 
-import editorx.gui.ThemeManager
+import editorx.gui.theme.Theme
+import editorx.gui.theme.ThemeManager
 import java.awt.*
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
@@ -30,7 +31,7 @@ class KeyBadge(private val keyText: String) : JLabel() {
         val theme = ThemeManager.currentTheme
         // 使用更深的背景色以匹配截图中的样式
         // 在深色主题下使用更浅的背景，在浅色主题下使用更深的背景
-        bgColor = if (theme is editorx.gui.Theme.Dark) {
+        bgColor = if (theme is Theme.Dark) {
             Color(theme.surfaceVariant.rgb)
         } else {
             Color(theme.surfaceVariant.rgb)

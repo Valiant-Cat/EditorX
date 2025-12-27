@@ -1,4 +1,4 @@
-package editorx.core.store
+package editorx.core.util
 
 /**
  * Simple persistent key-value settings store backed by a .properties file.

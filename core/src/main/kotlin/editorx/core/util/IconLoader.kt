@@ -77,7 +77,7 @@ object IconLoader {
         val icon = if (iconRef.isSvg) loadSvg(iconRef, size) else loadRaster(iconRef, size)
         
         if (adaptToTheme && icon != null && getThemeColor != null) {
-            return ThemeAdaptiveIcon(icon, getThemeColor, getDisabledColor)
+            return ThemeIcon(icon, getThemeColor, getDisabledColor)
         }
         
         return icon

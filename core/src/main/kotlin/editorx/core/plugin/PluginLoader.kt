@@ -1,4 +1,4 @@
-package editorx.core.plugin.loader
+package editorx.core.plugin
 
 interface PluginLoader {
 

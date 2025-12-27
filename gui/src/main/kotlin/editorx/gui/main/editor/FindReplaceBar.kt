@@ -4,7 +4,7 @@ import editorx.core.i18n.I18n
 import editorx.core.i18n.I18nKeys
 import editorx.core.util.IconLoader
 import editorx.core.util.IconRef
-import editorx.gui.ThemeManager
+import editorx.gui.theme.ThemeManager
 import org.fife.ui.rtextarea.SearchContext
 import org.fife.ui.rtextarea.SearchEngine
 import org.fife.ui.rtextarea.SearchResult

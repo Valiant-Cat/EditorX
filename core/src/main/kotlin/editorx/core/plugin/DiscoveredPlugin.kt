@@ -1,7 +1,5 @@
-package editorx.core.plugin.loader
+package editorx.core.plugin
 
-import editorx.core.plugin.Plugin
-import editorx.core.plugin.PluginOrigin
 import java.nio.file.Path
 
 data class DiscoveredPlugin(

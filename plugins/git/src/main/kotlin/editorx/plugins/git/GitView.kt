@@ -1,6 +1,6 @@
 package editorx.plugins.git
 
-import editorx.core.plugin.gui.PluginGuiProvider
+import editorx.core.plugin.PluginGuiProvider
 import java.awt.*
 import java.io.File
 import javax.swing.*

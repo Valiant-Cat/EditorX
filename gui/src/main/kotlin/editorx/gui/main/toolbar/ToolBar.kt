@@ -1,9 +1,8 @@
 package editorx.gui.main.toolbar
 
-import editorx.gui.ThemeManager
+import editorx.gui.theme.ThemeManager
 import editorx.gui.main.MainWindow
 import org.slf4j.LoggerFactory
-import java.awt.Color
 import java.awt.Insets
 import javax.swing.*
 

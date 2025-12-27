@@ -9,7 +9,7 @@ import javax.swing.Icon
  * 在绘制时将图标颜色替换为主题的前景色（onSurface）
  * 如果组件被禁用，则使用禁用状态的颜色
  */
-class ThemeAdaptiveIcon(
+class ThemeIcon(
     private val baseIcon: Icon,
     private val getThemeColor: () -> Color,
     private val getDisabledColor: (() -> Color)? = null
@@ -43,7 +43,7 @@ class ThemeAdaptiveIcon(
 
             // 根据禁用状态选择颜色
             val themeColor = if (isDisabled && getDisabledColor != null) {
-                getDisabledColor()
+                getDisabledColor.invoke()
             } else {
                 getThemeColor()
             }

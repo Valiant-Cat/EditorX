@@ -2,9 +2,10 @@ package editorx.gui
 
 import editorx.core.filetype.*
 import editorx.core.gui.GuiContext
-import editorx.core.plugin.gui.FileHandler
-import editorx.core.plugin.gui.FileHandlerRegistry
-import editorx.core.plugin.gui.PluginGuiProvider
+import editorx.core.plugin.FileHandler
+import editorx.core.plugin.FileHandlerRegistry
+import editorx.core.plugin.PluginGuiProvider
+import editorx.gui.theme.ThemeManager
 import java.io.File
 import javax.swing.Icon
 

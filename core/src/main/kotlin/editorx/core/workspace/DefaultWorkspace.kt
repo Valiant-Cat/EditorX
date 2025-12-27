@@ -1,6 +1,6 @@
 package editorx.core.workspace
 
-import editorx.core.store.Store
+import editorx.core.util.Store
 import java.io.File
 
 class DefaultWorkspace(private val settings: Store) : Workspace {

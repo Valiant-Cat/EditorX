@@ -2,11 +2,11 @@ package editorx.gui.main.titlebar
 
 import editorx.core.i18n.I18n
 import editorx.core.i18n.I18nKeys
-import editorx.core.external.ApkTool
+import editorx.core.service.BuildStatus
 import editorx.core.util.IconLoader
 import editorx.core.util.IconRef
 import editorx.core.util.SystemUtils
-import editorx.gui.ThemeManager
+import editorx.gui.theme.ThemeManager
 import editorx.gui.main.MainWindow
 import editorx.gui.main.explorer.Explorer
 import editorx.gui.search.SearchDialog
@@ -14,8 +14,6 @@ import editorx.gui.settings.SettingsDialog
 import org.slf4j.LoggerFactory
 import java.awt.*
 import java.awt.event.ActionListener
-import java.io.File
-import java.util.*
 import javax.swing.*
 
 /**
@@ -172,7 +170,7 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
                 getThemeColor = { ThemeManager.currentTheme.onSurface }
             )
         ).compact(I18n.translate(I18nKeys.Toolbar.BUILD)) {
-            compileWorkspaceApk()
+            buildWorkspace()
         }
         add(buildButton)
 
@@ -285,7 +283,7 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
     }
 
 
-    private fun compileWorkspaceApk() {
+    private fun buildWorkspace() {
         if (compileTask?.isAlive == true) {
             JOptionPane.showMessageDialog(
                 mainWindow,
@@ -300,104 +298,80 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
         if (workspaceRoot == null) {
             JOptionPane.showMessageDialog(
                 mainWindow,
-                I18n.translate(I18nKeys.ToolbarMessage.WORKSPACE_NOT_OPENED),
+                I18n.translate(I18nKeys.Dialog.WORKSPACE_NOT_OPENED),
                 I18n.translate(I18nKeys.Dialog.TIP),
                 JOptionPane.INFORMATION_MESSAGE
             )
             return
         }
 
-        val apktoolConfig = File(workspaceRoot, "apktool.yml")
-        if (!apktoolConfig.exists()) {
+        // 查找可以提供构建能力的插件
+        val buildProvider = mainWindow.guiContext.getPluginManager().findBuildProvider(workspaceRoot)
+        if (buildProvider == null) {
             JOptionPane.showMessageDialog(
                 mainWindow,
-                I18n.translate(I18nKeys.ToolbarMessage.NOT_APKTOOL_DIR),
-                I18n.translate(I18nKeys.ToolbarMessage.CANNOT_COMPILE),
+                I18n.translate(I18nKeys.ToolbarMessage.NO_BUILD_PROVIDER),
+                I18n.translate(I18nKeys.Dialog.TIP),
                 JOptionPane.WARNING_MESSAGE
             )
             return
         }
 
-        val distDir = File(workspaceRoot, "dist").apply { mkdirs() }
-        val baseName = workspaceRoot.name.ifEmpty { "output" }
-        var outputApk = File(distDir, "${baseName}-recompiled.apk")
-        var index = 1
-        while (outputApk.exists()) {
-            outputApk = File(distDir, "${baseName}-recompiled-$index.apk")
-            index++
-        }
-
         mainWindow.statusBar.showProgress(I18n.translate(I18nKeys.ToolbarMessage.COMPILING_APK), indeterminate = true)
         compileTask = Thread {
             try {
-                val buildResult = ApkTool.build(workspaceRoot, outputApk)
-
-                var signResult: SignResult? = null
-                if (buildResult.status == ApkTool.Status.SUCCESS) {
+                val buildResult = buildProvider.build(workspaceRoot) { progressMessage ->
                     SwingUtilities.invokeLater {
-                        mainWindow.statusBar.showProgress(
-                            I18n.translate(I18nKeys.ToolbarMessage.SIGNING_APK),
-                            indeterminate = true
-                        )
+                        mainWindow.statusBar.showProgress(progressMessage, indeterminate = true)
                     }
-                    signResult = signWithDebugKeystore(outputApk)
                 }
 
-                val finalSignResult = signResult
                 SwingUtilities.invokeLater {
                     mainWindow.statusBar.hideProgress()
                     when (buildResult.status) {
-                        ApkTool.Status.SUCCESS -> {
-                            if (finalSignResult?.success == true) {
+                        BuildStatus.SUCCESS -> {
+                            val outputFile = buildResult.outputFile
+                            if (outputFile != null) {
                                 mainWindow.statusBar.showSuccess(
-                                    I18n.translate(I18nKeys.ToolbarMessage.COMPILE_AND_SIGN_SUCCESS)
-                                        .format(outputApk.name)
+                                    I18n.translate(I18nKeys.ToolbarMessage.COMPILE_SUCCESS)
+                                        .format(outputFile.name)
                                 )
                                 JOptionPane.showMessageDialog(
                                     mainWindow,
-                                    I18n.translate(I18nKeys.ToolbarMessage.APK_GENERATED)
-                                        .format(outputApk.absolutePath),
+                                    I18n.translate(I18nKeys.ToolbarMessage.BUILD_GENERATED)
+                                        .format(outputFile.absolutePath),
                                     I18n.translate(I18nKeys.ToolbarMessage.COMPILE_COMPLETE),
                                     JOptionPane.INFORMATION_MESSAGE
                                 )
                             } else {
-                                val msg =
-                                    finalSignResult?.message ?: I18n.translate(I18nKeys.ToolbarMessage.SIGN_EXCEPTION)
-                                mainWindow.statusBar.showError(
-                                    I18n.translate(I18nKeys.ToolbarMessage.SIGN_FAILED).format(msg)
-                                )
-                                JOptionPane.showMessageDialog(
-                                    mainWindow,
-                                    I18n.translate(I18nKeys.ToolbarMessage.SIGN_FAILED_DETAIL).format(msg),
-                                    I18n.translate(I18nKeys.ToolbarMessage.SIGN_FAILED).split(":")[0],
-                                    JOptionPane.ERROR_MESSAGE
+                                mainWindow.statusBar.showSuccess(
+                                    I18n.translate(I18nKeys.ToolbarMessage.COMPILE_SUCCESS).format("")
                                 )
                             }
                         }
 
-                        ApkTool.Status.NOT_FOUND -> {
-                            mainWindow.statusBar.showError(I18n.translate(I18nKeys.ToolbarMessage.APKTOOL_NOT_FOUND))
+                        BuildStatus.NOT_FOUND -> {
+                            val msg = buildResult.errorMessage ?: I18n.translate(I18nKeys.ToolbarMessage.BUILD_TOOL_NOT_FOUND)
+                            mainWindow.statusBar.showError(msg)
                             JOptionPane.showMessageDialog(
                                 mainWindow,
-                                I18n.translate(I18nKeys.ToolbarMessage.APKTOOL_NOT_FOUND_DETAIL),
-                                I18n.translate(I18nKeys.ToolbarMessage.CANNOT_COMPILE),
+                                msg,
+                                I18n.translate(I18nKeys.Dialog.ERROR),
                                 JOptionPane.ERROR_MESSAGE
                             )
                         }
 
-                        ApkTool.Status.CANCELLED -> {
+                        BuildStatus.CANCELLED -> {
                             mainWindow.statusBar.setMessage(I18n.translate(I18nKeys.ToolbarMessage.COMPILE_CANCELLED))
                         }
 
-                        ApkTool.Status.FAILED -> {
-                            mainWindow.statusBar.showError(
-                                I18n.translate(I18nKeys.ToolbarMessage.COMPILE_FAILED).format(buildResult.exitCode)
-                            )
+                        BuildStatus.FAILED -> {
+                            val msg = buildResult.errorMessage ?: I18n.translate(I18nKeys.ToolbarMessage.COMPILE_FAILED).format("")
+                            mainWindow.statusBar.showError(msg)
                             JOptionPane.showMessageDialog(
                                 mainWindow,
-                                I18n.translate(I18nKeys.ToolbarMessage.COMPILE_FAILED_DETAIL)
-                                    .format(buildResult.exitCode, buildResult.output),
-                                I18n.translate(I18nKeys.ToolbarMessage.COMPILE_FAILED).split("(")[0].trim(),
+                                buildResult.output ?: msg,
+                                I18n.translate(I18nKeys.Dialog.ERROR),
                                 JOptionPane.ERROR_MESSAGE
                             )
                         }
@@ -407,14 +381,12 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
                 SwingUtilities.invokeLater {
                     mainWindow.statusBar.hideProgress()
                     mainWindow.statusBar.showError(
-                        "${
-                            I18n.translate(I18nKeys.ToolbarMessage.COMPILE_FAILED).split("(")[0].trim()
-                        }: ${e.message}"
+                        "${I18n.translate(I18nKeys.ToolbarMessage.COMPILE_FAILED).split("(")[0].trim()}: ${e.message}"
                     )
                     JOptionPane.showMessageDialog(
                         mainWindow,
                         I18n.translate(I18nKeys.ToolbarMessage.COMPILE_EXCEPTION).format(e.message ?: ""),
-                        I18n.translate(I18nKeys.ToolbarMessage.COMPILE_FAILED).split("(")[0].trim(),
+                        I18n.translate(I18nKeys.Dialog.ERROR),
                         JOptionPane.ERROR_MESSAGE
                     )
                 }
@@ -426,134 +398,6 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
             start()
         }
     }
-
-    private fun signWithDebugKeystore(apkFile: File): SignResult {
-        val keystore = ensureDebugKeystore()
-            ?: return SignResult(false, I18n.translate(I18nKeys.ToolbarMessage.KEYSTORE_NOT_FOUND))
-        val apksigner = locateApkSigner()
-            ?: return SignResult(
-                false,
-                I18n.translate(I18nKeys.ToolbarMessage.APKSIGNER_NOT_FOUND)
-            )
-
-        val processBuilder =
-            ProcessBuilder(
-                apksigner,
-                "sign",
-                "--ks",
-                keystore.absolutePath,
-                "--ks-pass",
-                "pass:android",
-                "--key-pass",
-                "pass:android",
-                "--ks-key-alias",
-                "androiddebugkey",
-                apkFile.absolutePath
-            )
-        processBuilder.redirectErrorStream(true)
-        return try {
-            val process = processBuilder.start()
-            val output = process.inputStream.bufferedReader().use { it.readText() }
-            val exitCode = process.waitFor()
-            if (exitCode == 0) SignResult(true, null)
-            else SignResult(false, "apksigner exit code $exitCode\n$output")
-        } catch (e: Exception) {
-            SignResult(false, e.message ?: I18n.translate(I18nKeys.ToolbarMessage.SIGN_EXCEPTION))
-        }
-    }
-
-    private fun ensureDebugKeystore(): File? {
-        val keystore = File(System.getProperty("user.home"), ".android/debug.keystore")
-        if (keystore.exists()) return keystore
-
-        keystore.parentFile?.mkdirs()
-        val keytool = locateKeytool() ?: return null
-        val processBuilder =
-            ProcessBuilder(
-                keytool,
-                "-genkeypair",
-                "-alias",
-                "androiddebugkey",
-                "-keypass",
-                "android",
-                "-keystore",
-                keystore.absolutePath,
-                "-storepass",
-                "android",
-                "-dname",
-                "CN=Android Debug,O=Android,C=US",
-                "-validity",
-                "9999",
-                "-keyalg",
-                "RSA",
-                "-keysize",
-                "2048"
-            )
-        processBuilder.redirectErrorStream(true)
-        return try {
-            val process = processBuilder.start()
-            val output = process.inputStream.bufferedReader().use { it.readText() }
-            val exitCode = process.waitFor()
-            if (exitCode == 0 && keystore.exists()) {
-                keystore
-            } else {
-                logger.warn("keytool 生成调试签名失败，输出: {}", output)
-                null
-            }
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    private fun locateKeytool(): String? {
-        try {
-            val process = ProcessBuilder("keytool", "-help").start()
-            process.waitFor()
-            return "keytool"
-        } catch (_: Exception) {
-        }
-
-        val javaHome = System.getProperty("java.home")
-        if (!javaHome.isNullOrEmpty()) {
-            val bin = File(javaHome, "bin/keytool")
-            if (bin.exists()) return bin.absolutePath
-            val binWin = File(javaHome, "bin/keytool.exe")
-            if (binWin.exists()) return binWin.absolutePath
-        }
-        return null
-    }
-
-    private fun locateApkSigner(): String? {
-        val projectRoot = File(System.getProperty("user.dir"))
-        val local = File(projectRoot, "tools/apksigner")
-        if (local.exists() && local.canExecute()) return local.absolutePath
-
-        try {
-            val process = ProcessBuilder("apksigner", "--version").start()
-            if (process.waitFor() == 0) return "apksigner"
-        } catch (_: Exception) {
-        }
-
-        val sdkRoot = System.getenv("ANDROID_HOME") ?: System.getenv("ANDROID_SDK_ROOT")
-        if (!sdkRoot.isNullOrBlank()) {
-            val buildTools = File(sdkRoot, "build-tools")
-            if (buildTools.isDirectory) {
-                val candidates = buildTools.listFiles()?.filter { it.isDirectory }
-                    ?.sortedByDescending { it.name.lowercase(Locale.getDefault()) }
-                if (candidates != null) {
-                    for (dir in candidates) {
-                        val exe = File(dir, "apksigner")
-                        if (exe.exists()) return exe.absolutePath
-                        val exeWin = File(dir, "apksigner.bat")
-                        if (exeWin.exists()) return exeWin.absolutePath
-                    }
-                }
-            }
-        }
-        return null
-    }
-
-    private data class SignResult(val success: Boolean, val message: String?)
 
 }
 

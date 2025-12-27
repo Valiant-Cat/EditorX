@@ -1,6 +1,6 @@
 package editorx.gui.widget
 
-import editorx.gui.ThemeManager
+import editorx.gui.theme.ThemeManager
 import java.awt.*
 import javax.swing.BorderFactory
 import javax.swing.UIManager
