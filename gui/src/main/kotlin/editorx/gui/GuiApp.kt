@@ -15,7 +15,7 @@ import editorx.gui.core.PluginGuiProviderImpl
 import editorx.gui.search.SearchDialog
 import editorx.gui.settings.SettingsDialog
 import editorx.gui.shortcut.ShortcutIds
-import editorx.gui.shortcut.ShortcutRegistry
+import editorx.gui.shortcut.ShortcutManager
 import editorx.gui.theme.ThemeManager
 import org.slf4j.LoggerFactory
 import java.awt.Image
@@ -213,7 +213,7 @@ private fun loadDisabledSet(settings: Store): Set<String> {
  */
 private fun setupShortcuts(mainWindow: MainWindow) {
     // 双击 Shift - 全局搜索
-    ShortcutRegistry.registerDoubleShortcut(
+    ShortcutManager.registerDoubleShortcut(
         id = ShortcutIds.Global.SEARCH,
         keyCode = KeyEvent.VK_SHIFT,
         nameKey = I18nKeys.Action.GLOBAL_SEARCH,
@@ -223,7 +223,7 @@ private fun setupShortcuts(mainWindow: MainWindow) {
 
     // Command+, - 打开设置
     val shortcutMask = java.awt.Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx
-    ShortcutRegistry.registerShortcut(
+    ShortcutManager.registerShortcut(
         id = ShortcutIds.Global.SETTINGS,
         keyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_COMMA, shortcutMask),
         nameKey = I18nKeys.Toolbar.SETTINGS,
@@ -232,7 +232,7 @@ private fun setupShortcuts(mainWindow: MainWindow) {
     )
 
     // Command+N - 新建文件
-    ShortcutRegistry.registerShortcut(
+    ShortcutManager.registerShortcut(
         id = ShortcutIds.Editor.NEW_FILE,
         keyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_N, shortcutMask),
         nameKey = I18nKeys.Action.NEW_FILE,
@@ -241,7 +241,7 @@ private fun setupShortcuts(mainWindow: MainWindow) {
     )
 
     // Command+W - 关闭当前标签页
-    ShortcutRegistry.registerShortcut(
+    ShortcutManager.registerShortcut(
         id = ShortcutIds.Editor.CLOSE_TAB,
         keyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_W, shortcutMask),
         nameKey = I18nKeys.Action.CLOSE,
@@ -260,7 +260,7 @@ private fun setupShortcuts(mainWindow: MainWindow) {
     } else {
         java.awt.event.InputEvent.ALT_DOWN_MASK or java.awt.event.InputEvent.CTRL_DOWN_MASK
     }
-    ShortcutRegistry.registerShortcut(
+    ShortcutManager.registerShortcut(
         id = ShortcutIds.Editor.FORMAT_FILE,
         keyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_L, formatShortcutMask),
         nameKey = I18nKeys.Action.FORMAT_FILE,

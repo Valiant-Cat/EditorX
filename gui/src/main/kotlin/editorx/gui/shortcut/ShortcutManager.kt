@@ -11,7 +11,7 @@ import javax.swing.SwingUtilities
  * 统一的快捷键注册表（单例）
  * 负责管理全局快捷键快捷键的注册与注销
  */
-object ShortcutRegistry {
+object ShortcutManager {
 
     /**
      * 快捷键绑定信息

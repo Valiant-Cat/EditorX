@@ -1,8 +1,8 @@
 package editorx.gui.workbench.explorer
 
 import editorx.core.external.ApkTool
-import editorx.gui.core.FileTypeRegistry
-import editorx.gui.core.FileHandlerRegistry
+import editorx.gui.core.FileTypeManager
+import editorx.gui.core.FileHandlerManager
 import editorx.core.util.IconLoader
 import editorx.core.util.IconRef
 import editorx.core.util.IconUtils
@@ -1450,7 +1450,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
             val key = if (ext.isBlank()) "__noext__" else ext
 
             // Prefer plugin-provided file type icons
-            val ft = FileTypeRegistry.getFileTypeByFileName(file.name)
+            val ft = FileTypeManager.getFileTypeByFileName(file.name)
             if (ft != null) {
                 val icon = ft.getIcon()
                 if (icon != null) return icon
@@ -1521,7 +1521,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                             if (files.size == 1) {
                                 val file = files[0]
                                 if (file.isFile && file.canRead()) {
-                                    if (FileHandlerRegistry.handleOpenFile(file)) {
+                                    if (FileHandlerManager.handleOpenFile(file)) {
                                         dtde.dropComplete(true)
                                         return
                                     }

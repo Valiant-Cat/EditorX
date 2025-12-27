@@ -7,7 +7,7 @@ import java.io.File
  * 文件处理器注册表
  * 用于管理所有注册的文件处理器
  */
-object FileHandlerRegistry {
+object FileHandlerManager {
     private data class Registration(
         val handler: FileHandler,
         val ownerId: String?,

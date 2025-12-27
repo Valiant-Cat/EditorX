@@ -5,7 +5,7 @@ import editorx.core.filetype.Language
 import editorx.core.filetype.LanguageFileType
 import java.io.File
 
-object FormatterRegistry {
+object FormatterManager {
     private data class Registration(
         val language: Language,
         val formatter: Formatter,
@@ -50,7 +50,7 @@ object FormatterRegistry {
      * 获取文件对应的格式化器
      */
     fun getFormatter(file: File): Formatter? {
-        val fileType = FileTypeRegistry.getFileTypeByFileName(file.name)
+        val fileType = FileTypeManager.getFileTypeByFileName(file.name)
         if (fileType is LanguageFileType) {
             return languageToRegistrations[fileType.language]?.lastOrNull()?.formatter
         }

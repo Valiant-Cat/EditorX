@@ -1,6 +1,6 @@
 package editorx.gui.workbench.editor
 
-import editorx.gui.core.SyntaxHighlighterRegistry
+import editorx.gui.core.SyntaxHighlighterManager
 import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea
 import org.fife.ui.rsyntaxtextarea.SyntaxConstants
 import org.slf4j.LoggerFactory
@@ -26,7 +26,7 @@ class TextArea : RSyntaxTextArea() {
      */
     fun detectSyntax(file: File) {
         // 检测是否有自定义语法高亮器
-        val syntaxHighlighter = SyntaxHighlighterRegistry.getSyntaxHighlighter(file)
+        val syntaxHighlighter = SyntaxHighlighterManager.getSyntaxHighlighter(file)
         if (syntaxHighlighter != null) {
             logger.debug("找到自定义语法高亮器: {}", syntaxHighlighter::class.simpleName)
             this.syntaxEditingStyle = syntaxHighlighter.syntaxStyleKey

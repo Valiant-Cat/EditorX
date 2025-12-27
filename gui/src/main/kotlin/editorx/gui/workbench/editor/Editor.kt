@@ -1,16 +1,16 @@
 package editorx.gui.workbench.editor
 
-import editorx.gui.core.FileTypeRegistry
-import editorx.gui.core.FormatterRegistry
+import editorx.gui.core.FileTypeManager
+import editorx.gui.core.FormatterManager
 import editorx.core.external.Jadx
 import editorx.core.external.Smali
-import editorx.gui.core.FileHandlerRegistry
+import editorx.gui.core.FileHandlerManager
 import editorx.gui.theme.ThemeManager
 import editorx.gui.MainWindow
 import editorx.gui.workbench.explorer.ExplorerIcons
 import editorx.core.util.IconUtils
 import editorx.gui.shortcut.ShortcutIds
-import editorx.gui.shortcut.ShortcutRegistry
+import editorx.gui.shortcut.ShortcutManager
 import org.fife.ui.rtextarea.RTextScrollPane
 import org.slf4j.LoggerFactory
 import java.awt.*
@@ -555,12 +555,12 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         }
 
         // 先询问文件处理器是否要处理该文件
-        if (FileHandlerRegistry.handleOpenFile(file)) {
+        if (FileHandlerManager.handleOpenFile(file)) {
             return
         }
 
         // 检测是否为 Android 压缩包文件（xapk、aab、aar）
-        val fileType = FileTypeRegistry.getFileTypeByFileName(file.name)
+        val fileType = FileTypeManager.getFileTypeByFileName(file.name)
         if (fileType?.getName() == "android-archive") {
             openArchiveFile(file)
             return
@@ -1314,7 +1314,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             return ExplorerIcons.Folder?.let { IconUtils.resizeIcon(it, 16, 16) }
         }
         val fileTypeIcon =
-            FileTypeRegistry.getFileTypeByFileName(file.name)?.getIcon()?.let { IconUtils.resizeIcon(it, 16, 16) }
+            FileTypeManager.getFileTypeByFileName(file.name)?.getIcon()?.let { IconUtils.resizeIcon(it, 16, 16) }
         return fileTypeIcon ?: ExplorerIcons.AnyType?.let { IconUtils.resizeIcon(it, 16, 16) }
     }
 
@@ -1588,7 +1588,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         }
 
         // 获取格式化器
-        val formatter = FormatterRegistry.getFormatter(file)
+        val formatter = FormatterManager.getFormatter(file)
         if (formatter == null) {
             JOptionPane.showMessageDialog(
                 this,
@@ -1654,7 +1654,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
 
         // 检查是否有格式化器可用
         val file = getCurrentFile()
-        val hasFormatter = file != null && FormatterRegistry.getFormatter(file) != null
+        val hasFormatter = file != null && FormatterManager.getFormatter(file) != null
 
         menu.add(JMenuItem("查找...").apply {
             accelerator =
@@ -1671,7 +1671,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             menu.addSeparator()
 
             menu.add(JMenuItem("格式化文件").apply {
-                ShortcutRegistry.getShortcut(ShortcutIds.Editor.FORMAT_FILE)?.let { accelerator = it.keyStroke }
+                ShortcutManager.getShortcut(ShortcutIds.Editor.FORMAT_FILE)?.let { accelerator = it.keyStroke }
                 addActionListener { formatCurrentFile() }
             })
         }

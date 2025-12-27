@@ -59,15 +59,15 @@ class PluginGuiProviderImpl(
     }
 
     override fun registerFileType(fileType: FileType) {
-        FileTypeRegistry.registerFileType(fileType, ownerId = pluginId)
+        FileTypeManager.registerFileType(fileType, ownerId = pluginId)
     }
 
     override fun unregisterAllFileTypes() {
-        FileTypeRegistry.unregisterByOwner(pluginId)
+        FileTypeManager.unregisterByOwner(pluginId)
     }
 
     override fun registerSyntaxHighlighter(language: Language, syntaxHighlighter: SyntaxHighlighter) {
-        SyntaxHighlighterRegistry.registerSyntaxHighlighter(
+        SyntaxHighlighterManager.registerSyntaxHighlighter(
             language,
             syntaxHighlighter,
             ownerId = pluginId
@@ -75,23 +75,23 @@ class PluginGuiProviderImpl(
     }
 
     override fun unregisterAllSyntaxHighlighters() {
-        SyntaxHighlighterRegistry.unregisterByOwner(pluginId)
+        SyntaxHighlighterManager.unregisterByOwner(pluginId)
     }
 
     override fun registerFormatter(language: Language, formatter: Formatter) {
-        FormatterRegistry.registerFormatter(language, formatter, ownerId = pluginId)
+        FormatterManager.registerFormatter(language, formatter, ownerId = pluginId)
     }
 
     override fun unregisterAllFormatters() {
-        FormatterRegistry.unregisterByOwner(pluginId)
+        FormatterManager.unregisterByOwner(pluginId)
     }
 
     override fun registerFileHandler(handler: FileHandler) {
-        FileHandlerRegistry.register(handler, ownerId = pluginId)
+        FileHandlerManager.register(handler, ownerId = pluginId)
     }
 
     override fun unregisterAllFileHandlers() {
-        FileHandlerRegistry.unregisterByOwner(pluginId)
+        FileHandlerManager.unregisterByOwner(pluginId)
     }
 
     override fun getThemeTextColor(): java.awt.Color {

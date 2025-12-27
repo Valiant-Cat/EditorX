@@ -7,7 +7,7 @@ import org.fife.ui.rsyntaxtextarea.AbstractTokenMakerFactory
 import org.fife.ui.rsyntaxtextarea.TokenMakerFactory
 import java.io.File
 
-object SyntaxHighlighterRegistry {
+object SyntaxHighlighterManager {
     private data class Registration(
         val language: Language,
         val syntaxHighlighter: SyntaxHighlighter,
@@ -86,7 +86,7 @@ object SyntaxHighlighterRegistry {
      * 获取文件对应的语法适配器
      */
     fun getSyntaxHighlighter(file: File): SyntaxHighlighter? {
-        val fileType = FileTypeRegistry.getFileTypeByFileName(file.name)
+        val fileType = FileTypeManager.getFileTypeByFileName(file.name)
         if (fileType is LanguageFileType) {
             return languageToRegistrations[fileType.language]?.lastOrNull()?.syntaxHighlighter
         }

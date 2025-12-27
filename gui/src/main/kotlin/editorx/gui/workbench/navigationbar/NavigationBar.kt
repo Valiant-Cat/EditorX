@@ -2,7 +2,7 @@ package editorx.gui.workbench.navigationbar
 
 import editorx.gui.MainWindow
 import editorx.gui.workbench.explorer.Explorer
-import editorx.gui.core.FileTypeRegistry
+import editorx.gui.core.FileTypeManager
 import editorx.gui.workbench.explorer.ExplorerIcons
 import editorx.core.util.IconUtils
 import editorx.gui.theme.ThemeManager
@@ -157,7 +157,7 @@ class NavigationBar(private val mainWindow: MainWindow) : JPanel() {
 //            ExplorerIcons.Folder?.let { IconUtil.resizeIcon(it, 16, 16) }
             return null
         } else {
-            val fileTypeIcon = FileTypeRegistry.getFileTypeByFileName(file.name)?.getIcon()
+            val fileTypeIcon = FileTypeManager.getFileTypeByFileName(file.name)?.getIcon()
             val resized = fileTypeIcon?.let { IconUtils.resizeIcon(it, 14, 14) }
             resized ?: ExplorerIcons.AnyType?.let { IconUtils.resizeIcon(it, 14, 14) }
         }

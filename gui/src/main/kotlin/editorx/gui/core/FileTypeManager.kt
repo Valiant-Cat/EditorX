@@ -5,7 +5,7 @@ import editorx.core.filetype.Language
 import editorx.core.filetype.LanguageFileType
 import editorx.core.util.FileUtils
 
-object FileTypeRegistry {
+object FileTypeManager {
     private data class Registration(
         val fileType: FileType,
         val ownerId: String?,

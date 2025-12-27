@@ -4,7 +4,7 @@ import editorx.core.i18n.I18n
 import editorx.core.i18n.I18nKeys
 import editorx.gui.theme.ThemeManager
 import editorx.gui.shortcut.ShortcutIds
-import editorx.gui.shortcut.ShortcutRegistry
+import editorx.gui.shortcut.ShortcutManager
 import editorx.gui.MainWindow
 import java.awt.*
 import java.awt.event.KeyEvent
@@ -159,7 +159,7 @@ class EmptyEditorView(private val mainWindow: MainWindow) : JPanel() {
         val shortcutMask = java.awt.Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx
         
         // 从 ShortcutRegistry 获取已注册的快捷键
-        val registeredShortcuts = ShortcutRegistry.getAllShortcuts()
+        val registeredShortcuts = ShortcutManager.getAllShortcuts()
         
         val isZh = I18n.locale().language == "zh"
         

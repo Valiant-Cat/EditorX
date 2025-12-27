@@ -3,7 +3,7 @@ package editorx.gui.settings
 import editorx.core.i18n.I18n
 import editorx.core.i18n.I18nKeys
 import editorx.gui.theme.ThemeManager
-import editorx.gui.shortcut.ShortcutRegistry
+import editorx.gui.shortcut.ShortcutManager
 import java.awt.BorderLayout
 import java.awt.FlowLayout
 import java.awt.Font
@@ -42,7 +42,7 @@ class KeymapPanel : JPanel(BorderLayout()) {
         val addedIds = mutableSetOf<String>()
 
         // 从 ShortcutRegistry 获取已注册的快捷键
-        ShortcutRegistry.getAllShortcuts().forEach { binding ->
+        ShortcutManager.getAllShortcuts().forEach { binding ->
             shortcuts.add(
                 ShortcutItem(
                     action = binding.displayName,
