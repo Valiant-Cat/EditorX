@@ -1,9 +1,13 @@
 package editorx.gui.workbench.editor
 
 import editorx.gui.core.FileTypeManager
+import editorx.gui.core.EditorContextMenuManager
 import editorx.gui.core.FormatterManager
+import editorx.core.filetype.LanguageFileType
 import editorx.core.external.Jadx
 import editorx.core.external.Smali
+import editorx.core.gui.EditorContextMenuHandler
+import editorx.core.gui.EditorContextMenuView
 import editorx.gui.core.FileHandlerManager
 import editorx.gui.theme.ThemeManager
 import editorx.gui.MainWindow
@@ -635,13 +639,13 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             val textAreaForMenu = this
             addMouseListener(object : MouseAdapter() {
                 override fun mousePressed(e: MouseEvent) {
-                    if (SwingUtilities.isRightMouseButton(e)) {
+                    if (e.isPopupTrigger) {
                         showTextAreaContextMenu(textAreaForMenu, e.x, e.y)
                     }
                 }
 
                 override fun mouseReleased(e: MouseEvent) {
-                    if (SwingUtilities.isRightMouseButton(e)) {
+                    if (e.isPopupTrigger) {
                         showTextAreaContextMenu(textAreaForMenu, e.x, e.y)
                     }
                 }
@@ -779,13 +783,13 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             val textAreaForMenu = this
             addMouseListener(object : MouseAdapter() {
                 override fun mousePressed(e: MouseEvent) {
-                    if (SwingUtilities.isRightMouseButton(e)) {
+                    if (e.isPopupTrigger) {
                         showTextAreaContextMenu(textAreaForMenu, e.x, e.y)
                     }
                 }
 
                 override fun mouseReleased(e: MouseEvent) {
-                    if (SwingUtilities.isRightMouseButton(e)) {
+                    if (e.isPopupTrigger) {
                         showTextAreaContextMenu(textAreaForMenu, e.x, e.y)
                     }
                 }
@@ -1611,34 +1615,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             val formattedContent = formatter.format(currentContent)
 
             // 如果内容有变化，更新文本区域
-            if (formattedContent != currentContent) {
-                val caretPos = textArea.caretPosition
-                val currentIndex = tabbedPane.selectedIndex
-
-                textArea.putClientProperty("suppressDirty", true)
-
-                // 使用 replaceRange 替换整个文本，这样可以保持撤销历史
-                textArea.replaceRange(formattedContent, 0, currentContent.length)
-
-                textArea.putClientProperty("suppressDirty", false)
-
-                // 手动更新脏标记（因为 suppressDirty 阻止了 DocumentListener 的更新）
-                if (currentIndex >= 0) {
-                    val original = originalTextByIndex[currentIndex]
-                    val isDirty = original != formattedContent
-                    if (isDirty) {
-                        dirtyTabs.add(currentIndex)
-                    } else {
-                        dirtyTabs.remove(currentIndex)
-                    }
-                    updateTabTitle(currentIndex)
-                    updateTabHeaderStyles()
-                }
-
-                // 尝试恢复光标位置（如果可能）
-                val newCaretPos = minOf(caretPos, formattedContent.length)
-                textArea.caretPosition = newCaretPos
-            }
+            replaceTextAreaContent(textArea, formattedContent)
         } catch (e: Exception) {
             logger.error("格式化文件失败: ${file.name}", e)
             JOptionPane.showMessageDialog(
@@ -1650,14 +1627,50 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         }
     }
 
+    private fun replaceTextAreaContent(textArea: TextArea, newContent: String) {
+        val currentContent = textArea.text
+        if (newContent == currentContent) return
+
+        val caretPos = textArea.caretPosition
+        val scrollComp = textArea.parent?.parent as? java.awt.Component
+        val tabIndex = scrollComp?.let { getTabIndexForComponent(it) } ?: tabbedPane.selectedIndex
+
+        textArea.putClientProperty("suppressDirty", true)
+
+        // 使用 replaceRange 替换整个文本，这样可以保持撤销历史
+        textArea.replaceRange(newContent, 0, currentContent.length)
+
+        textArea.putClientProperty("suppressDirty", false)
+
+        // 手动更新脏标记（因为 suppressDirty 阻止了 DocumentListener 的更新）
+        if (tabIndex >= 0) {
+            val original = originalTextByIndex[tabIndex]
+            val isDirty = original != newContent
+            if (isDirty) {
+                dirtyTabs.add(tabIndex)
+            } else {
+                dirtyTabs.remove(tabIndex)
+            }
+            updateTabTitle(tabIndex)
+            updateTabHeaderStyles()
+        }
+
+        // 尝试恢复光标位置（如果可能）
+        val newCaretPos = minOf(caretPos, newContent.length)
+        textArea.caretPosition = newCaretPos
+    }
+
     /**
      * 显示文本区域的右键菜单
      */
     private fun showTextAreaContextMenu(textArea: TextArea, x: Int, y: Int) {
         val menu = JPopupMenu()
 
+        val scrollComp = textArea.parent?.parent as? java.awt.Component
+        val tabIndex = scrollComp?.let { getTabIndexForComponent(it) } ?: tabbedPane.selectedIndex
+        val file = if (tabIndex >= 0) tabToFile[tabIndex] else null
+
         // 检查是否有格式化器可用
-        val file = getCurrentFile()
         val hasFormatter = file != null && FormatterManager.getFormatter(file) != null
 
         menu.add(JMenuItem("查找...").apply {
@@ -1678,6 +1691,71 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                 ShortcutManager.getShortcut(ShortcutIds.Editor.FORMAT_FILE)?.let { accelerator = it.keyStroke }
                 addActionListener { formatCurrentFile() }
             })
+        }
+
+        // 插件扩展的编辑器右键菜单项
+        val languageId = file
+            ?.let { FileTypeManager.getFileTypeByFileName(it.name) }
+            ?.let { it as? LanguageFileType }
+            ?.language
+            ?.id
+        val view = EditorContextMenuView(
+            file = file,
+            languageId = languageId,
+            editable = textArea.isEditable,
+            selectionStart = textArea.selectionStart,
+            selectionEnd = textArea.selectionEnd,
+        )
+        val pluginItems = EditorContextMenuManager.getItems(view)
+        if (pluginItems.isNotEmpty()) {
+            val handler = object : EditorContextMenuHandler {
+                override val view: EditorContextMenuView
+                    get() = EditorContextMenuView(
+                        file = file,
+                        languageId = languageId,
+                        editable = textArea.isEditable,
+                        selectionStart = textArea.selectionStart,
+                        selectionEnd = textArea.selectionEnd,
+                    )
+
+                override fun getText(): String = textArea.text
+
+                override fun replaceText(newText: String) {
+                    if (!textArea.isEditable) return
+                    replaceTextAreaContent(textArea, newText)
+                }
+
+                override fun getSelectedText(): String? = textArea.selectedText
+
+                override fun replaceSelectedText(newText: String) {
+                    if (!textArea.isEditable) return
+                    val start = textArea.selectionStart
+                    val end = textArea.selectionEnd
+                    if (start == end) return
+                    textArea.replaceRange(newText, start, end)
+                }
+            }
+
+            menu.addSeparator()
+            for (item in pluginItems) {
+                val enabled = runCatching { item.enabledWhen(handler.view) }.getOrDefault(false)
+                menu.add(JMenuItem(item.text).apply {
+                    isEnabled = enabled
+                    addActionListener {
+                        runCatching {
+                            item.action(handler)
+                        }.onFailure { e ->
+                            logger.error("执行编辑器右键菜单项失败: ${item.id}", e)
+                            JOptionPane.showMessageDialog(
+                                this@Editor,
+                                "执行失败: ${e.message}",
+                                "错误",
+                                JOptionPane.ERROR_MESSAGE
+                            )
+                        }
+                    }
+                })
+            }
         }
 
         menu.show(textArea, x, y)

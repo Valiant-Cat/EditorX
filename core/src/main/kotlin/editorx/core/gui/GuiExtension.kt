@@ -108,6 +108,17 @@ interface GuiExtension {
     fun unregisterAllFileHandlers()
 
     /**
+     * 注册编辑器右键菜单项
+     */
+    fun registerEditorContextMenuItem(item: EditorContextMenuItem)
+
+    /**
+     * 取消注册所有编辑器右键菜单项（按插件 ID）
+     * 插件应在 deactivate 时调用此方法
+     */
+    fun unregisterAllEditorContextMenuItems()
+
+    /**
      * 获取当前主题的文本颜色（用于图标等）
      * @return 当前主题的文本颜色
      */

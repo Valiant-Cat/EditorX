@@ -11,6 +11,7 @@ import editorx.core.util.StartupTimer
 import editorx.core.util.SystemUtils
 import editorx.core.workspace.DefaultWorkspace
 import editorx.gui.core.GuiContextImpl
+import editorx.gui.core.EditorContextMenuManager
 import editorx.gui.core.GuiExtensionImpl
 import editorx.gui.search.SearchDialog
 import editorx.gui.settings.SettingsDialog
@@ -177,6 +178,8 @@ private fun initializeMainWindow(startupTimer: StartupTimer) {
                         sideBar.removeView(pluginId)
                         // 移除 ToolBar items
                         toolBar.removeItems(pluginId)
+                        // 移除编辑器右键菜单项
+                        EditorContextMenuManager.unregisterByOwner(pluginId)
                     }
                     editor.refreshSyntaxForOpenTabs()
                 }
