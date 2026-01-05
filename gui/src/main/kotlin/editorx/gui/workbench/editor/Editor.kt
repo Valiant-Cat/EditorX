@@ -597,9 +597,14 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                     if (index < 0) return
                     val original = originalTextByIndex[index]
                     val isDirty = original != this@apply.text
+                    val wasDirty = dirtyTabs.contains(index)
                     if (isDirty) dirtyTabs.add(index) else dirtyTabs.remove(index)
                     updateTabTitle(index)
                     updateTabHeaderStyles()
+                    // 如果脏状态发生变化，更新标题栏
+                    if (wasDirty != isDirty) {
+                        mainWindow.titleBar.updateTitle()
+                    }
                 }
             })
 
@@ -755,9 +760,14 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                     if (index < 0) return
                     val original = originalTextByIndex[index]
                     val isDirty = original != this@apply.text
+                    val wasDirty = dirtyTabs.contains(index)
                     if (isDirty) dirtyTabs.add(index) else dirtyTabs.remove(index)
                     updateTabTitle(index)
                     updateTabHeaderStyles()
+                    // 如果脏状态发生变化，更新标题栏
+                    if (wasDirty != isDirty) {
+                        mainWindow.titleBar.updateTitle()
+                    }
                 }
             })
 
@@ -1194,6 +1204,9 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             newTabToFile.forEach { (i, f) -> fileToTab[f] = i }
 
             updateNavigation(getCurrentFile())
+            
+            // 更新标题栏（未保存状态可能已变化）
+            mainWindow.titleBar.updateTitle()
 
             // 如果所有标签都关闭了，显示欢迎界面
             if (tabbedPane.tabCount == 0) {
@@ -1237,8 +1250,11 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             dirtyTabs.remove(index)
             originalTextByIndex[index] = ta.text
             updateTabTitle(index)
+            updateTabHeaderStyles()
             updateNavigation(file)
             mainWindow.statusBar.showSuccess("已保存: ${file.name}")
+            // 更新标题栏（未保存状态可能已变化）
+            mainWindow.titleBar.updateTitle()
             return true
         }
 
@@ -1271,6 +1287,8 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             mainWindow.guiContext.getWorkspace().addRecentFile(newFile)
             updateNavigation(newFile)
             mainWindow.statusBar.showSuccess("已保存: ${newFile.name}")
+            // 更新标题栏（未保存状态可能已变化）
+            mainWindow.titleBar.updateTitle()
             return true
         } else {
             // 用户取消了保存对话框
@@ -1313,6 +1331,8 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             mainWindow.guiContext.getWorkspace().addRecentFile(file)
             updateNavigation(file)
             mainWindow.statusBar.showSuccess("已保存: ${file.name}")
+            // 更新标题栏（未保存状态可能已变化）
+            mainWindow.titleBar.updateTitle()
         }
     }
 
@@ -1645,6 +1665,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         // 手动更新脏标记（因为 suppressDirty 阻止了 DocumentListener 的更新）
         if (tabIndex >= 0) {
             val original = originalTextByIndex[tabIndex]
+            val wasDirty = dirtyTabs.contains(tabIndex)
             val isDirty = original != newContent
             if (isDirty) {
                 dirtyTabs.add(tabIndex)
@@ -1653,6 +1674,10 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             }
             updateTabTitle(tabIndex)
             updateTabHeaderStyles()
+            // 如果脏状态发生变化，更新标题栏
+            if (wasDirty != isDirty) {
+                mainWindow.titleBar.updateTitle()
+            }
         }
 
         // 尝试恢复光标位置（如果可能）

@@ -105,6 +105,27 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
      */
     fun updateVcsDisplay() {
         vcsWidget.updateDisplay()
+        // 同时更新标题（工作区可能已变化）
+        updateTitle()
+    }
+
+    /**
+     * 更新标题栏显示的项目名称和未保存文件提示
+     * 参考 jadx：如果有未保存的文件，在标题前显示 *
+     */
+    fun updateTitle() {
+        val workspaceRoot = mainWindow.guiContext.getWorkspace().getWorkspaceRoot()
+        val hasUnsavedChanges = mainWindow.editor.hasUnsavedChanges()
+        
+        val title = when {
+            workspaceRoot != null -> {
+                val projectName = workspaceRoot.name
+                if (hasUnsavedChanges) "* $projectName" else projectName
+            }
+            else -> "EditorX"
+        }
+        
+        titleLabel?.text = title
     }
 
     /**
@@ -159,6 +180,8 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
             isOpaque = false
         }
         add(titleLabel)
+        // 初始化标题
+        updateTitle()
     }
 
     private fun setupRightActions() {
