@@ -56,6 +56,15 @@ interface GuiExtension {
     fun addToolBarItem(id: String, iconRef: IconRef?, text: String, action: () -> Unit)
 
     /**
+     * 在 ActivityBar 添加一个入口（侧边栏视图）
+     * @param id 入口的唯一标识符（建议全局唯一）
+     * @param iconRef 图标引用（图标尺寸由 ActivityBar 统一设置）
+     * @param tooltip 提示文本
+     * @param viewProvider 视图提供器
+     */
+    fun addActivityBarItem(id: String, iconRef: IconRef?, tooltip: String, viewProvider: GuiViewProvider)
+
+    /**
      * 设置 ToolBar 按钮的启用/禁用状态
      * @param id 按钮的唯一标识符
      * @param enabled 是否启用

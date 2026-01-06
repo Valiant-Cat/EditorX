@@ -15,11 +15,13 @@ import javax.swing.*
 class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
     companion object {
         private const val ICON_SIZE = 20
+        private const val OWNER_SYSTEM = "_system_"
     }
 
     private val buttonGroup = ButtonGroup()
     private val buttonMap = mutableMapOf<String, JButton>()
     private val guiViewProviderMap = mutableMapOf<String, GuiViewProvider>()
+    private val ownerById = mutableMapOf<String, String>()
     private var activeId: String? = null
     private var autoSelected: Boolean = false
 
@@ -47,16 +49,19 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
         background = backgroundColor
     }
 
-    fun addItem(id: String, tooltip: String, iconPath: String, viewProvider: GuiViewProvider) {
+    fun addItem(ownerId: String, id: String, tooltip: String, iconRef: IconRef?, viewProvider: GuiViewProvider) {
         // 若重复注册同一 id（例如插件启停/重载），先清理旧项，避免 ButtonGroup 持有多余引用
         removeViewProvider(id)
 
-        val icon = IconLoader.getIcon(IconRef(iconPath), ICON_SIZE) ?: createDefaultIcon()
+        val icon =
+            iconRef?.let { ref -> IconLoader.getIcon(ref, ICON_SIZE) }
+                ?: createDefaultIcon()
         val btn = createActivityButton(icon, tooltip, id)
         val wasEmpty = buttonMap.isEmpty()
         buttonGroup.add(btn)
         buttonMap[id] = btn
         guiViewProviderMap[id] = viewProvider
+        ownerById[id] = ownerId
 
         // 按照排序顺序重新排列所有按钮
         reorderButtons()
@@ -198,11 +203,18 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
         val button = buttonMap.remove(id) ?: return
         buttonGroup.remove(button)
         guiViewProviderMap.remove(id)
+        ownerById.remove(id)
+        mainWindow.sideBar.removeView(id)
         if (activeId == id) activeId = null
         reorderButtons()
         updateAllButtonStates()
         revalidate()
         repaint()
+    }
+
+    fun removeItems(ownerId: String) {
+        val ids = ownerById.filterValues { it == ownerId }.keys.toList()
+        ids.forEach { id -> removeViewProvider(id) }
     }
 
     fun clearviewProviders() {
@@ -249,9 +261,10 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
     private fun setupDefaultActivityBarItems() {
         // 注册 Explorer 到 ActivityBar
         addItem(
+            OWNER_SYSTEM,
             Constants.ACTIVITY_BAR_DEFAULT_ID,
             "Explorer",
-            iconPath = "icons/filetype/folder.svg",
+            iconRef = IconRef("icons/filetype/folder.svg"),
             object : CachedGuiViewProvider() {
                 override fun createView() = Explorer(mainWindow)
             }

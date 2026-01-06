@@ -7,6 +7,7 @@ import editorx.core.filetype.SyntaxHighlighter
 import editorx.core.gui.EditorMenuItem
 import editorx.core.gui.GuiContext
 import editorx.core.gui.GuiExtension
+import editorx.core.gui.GuiViewProvider
 import editorx.core.plugin.FileHandler
 import editorx.core.util.IconRef
 import editorx.gui.MainWindow
@@ -63,6 +64,10 @@ class GuiExtensionImpl(
 
     override fun addToolBarItem(id: String, iconRef: IconRef?, text: String, action: () -> Unit) {
         mainWindow?.toolBar?.addItem(pluginId, id, iconRef, text, action)
+    }
+
+    override fun addActivityBarItem(id: String, iconRef: IconRef?, tooltip: String, viewProvider: GuiViewProvider) {
+        mainWindow?.activityBar?.addItem(pluginId, id, tooltip, iconRef, viewProvider)
     }
 
     override fun setToolBarItemEnabled(id: String, enabled: Boolean) {
