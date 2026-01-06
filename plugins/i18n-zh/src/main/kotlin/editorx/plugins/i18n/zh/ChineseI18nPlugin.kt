@@ -147,6 +147,8 @@ private val dictionary = buildMap {
     put(I18nKeys.Explorer.DELETE, "删除")
     put(I18nKeys.Explorer.REFRESH, "刷新")
     put(I18nKeys.Explorer.REVEAL_IN_SYSTEM, "在系统中显示")
+    put(I18nKeys.Explorer.VIEW_MODE_PROJECT, "项目")
+    put(I18nKeys.Explorer.WORKSPACE_NOT_OPENED, "未打开工作区")
 
     put(I18nKeys.Editor.CLOSE, "关闭")
     put(I18nKeys.Editor.CLOSE_OTHERS, "关闭其他标签")
@@ -299,4 +301,3 @@ class ChineseI18nPlugin : I18nPlugin(Locale.SIMPLIFIED_CHINESE) {
 
     override fun translate(key: String): String? = dictionary[key]
 }
-

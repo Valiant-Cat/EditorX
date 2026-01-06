@@ -230,6 +230,8 @@ object I18nKeys {
         const val DELETE = "explorer.delete"
         const val REFRESH = "explorer.refresh"
         const val REVEAL_IN_SYSTEM = "explorer.revealInSystem"
+        const val VIEW_MODE_PROJECT = "explorer.viewMode.project"
+        const val WORKSPACE_NOT_OPENED = "explorer.workspaceNotOpened"
     }
 
     /**
@@ -392,4 +394,3 @@ object I18nKeys {
         const val CANNOT_DELETE = "cache.cannotDelete"
     }
 }
-

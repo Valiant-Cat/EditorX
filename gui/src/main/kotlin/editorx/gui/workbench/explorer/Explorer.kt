@@ -1,5 +1,7 @@
 package editorx.gui.workbench.explorer
 
+import editorx.core.i18n.I18n
+import editorx.core.i18n.I18nKeys
 import editorx.core.util.IconLoader
 import editorx.core.util.IconRef
 import editorx.core.util.IconUtils
@@ -34,11 +36,13 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         private const val SETTINGS_KEY_VIEW_MODE = "explorer.viewMode"
     }
 
-    private enum class ExplorerViewMode(val displayName: String) {
-        PROJECT("项目"),
+    private enum class ExplorerViewMode(val nameKey: String) {
+        PROJECT(I18nKeys.Explorer.VIEW_MODE_PROJECT),
         JADX("Jadx");
 
-        override fun toString(): String = displayName
+        fun displayName(): String = I18n.translate(nameKey)
+
+        override fun toString(): String = displayName()
     }
 
     private val searchField = JTextField()
@@ -54,6 +58,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
     private var viewModeTextLabel: JLabel? = null
     private var viewMode: ExplorerViewMode = loadSavedViewMode()
     private var lastKnownFile: File? = null
+    private val i18nListener: () -> Unit = { SwingUtilities.invokeLater { updateI18n() } }
 
     // 任务取消机制
     private var currentTask: Thread? = null
@@ -68,6 +73,9 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
 
         // 监听主题变更
         ThemeManager.addThemeChangeListener { updateTheme() }
+
+        // 监听语言变更
+        I18n.addListener(i18nListener)
     }
 
     private fun updateTheme() {
@@ -89,6 +97,17 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         )
         // 刷新文件树以更新文本颜色
         tree.updateUI()
+    }
+
+    private fun updateI18n() {
+        updateViewModeDisplay()
+        val rootDir = mainWindow.guiContext.getWorkspace().getWorkspaceRoot()
+        if (rootDir == null || !rootDir.exists()) showEmptyRoot()
+    }
+
+    override fun removeNotify() {
+        super.removeNotify()
+        I18n.removeListener(i18nListener)
     }
 
     private fun loadSavedViewMode(): ExplorerViewMode {
@@ -190,7 +209,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
      * 更新显示模式 Widget 的显示内容
      */
     private fun updateViewModeDisplay() {
-        viewModeTextLabel?.text = viewMode.displayName
+        viewModeTextLabel?.text = viewMode.displayName()
     }
 
     /**
@@ -200,7 +219,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         val menu = JPopupMenu()
 
         ExplorerViewMode.entries.forEach { mode ->
-            val item = JMenuItem(mode.displayName).apply {
+            val item = JMenuItem(mode.displayName()).apply {
                 // 当前选中的模式使用粗体
                 if (mode == viewMode) {
                     font = font.deriveFont(Font.BOLD)
@@ -570,7 +589,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
     }
 
     private fun showEmptyRoot() {
-        val placeholder = DefaultMutableTreeNode("未打开工作区")
+        val placeholder = DefaultMutableTreeNode(I18n.translate(I18nKeys.Explorer.WORKSPACE_NOT_OPENED))
         treeModel.setRoot(placeholder)
         tree.isEnabled = true
         tree.updateUI()
