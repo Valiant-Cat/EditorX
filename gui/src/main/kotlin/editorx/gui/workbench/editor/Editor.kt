@@ -2866,20 +2866,6 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             content.startsWith("// 获取 Java 代码时出错")) {
             return null
         }
-
-        // 若 JADX 全量产物已就绪（.jadx/sources 存在），则优先使用对应的 Java 文件。
-        // 如果当前缓存不是来自该 Java 文件（或文件已更新），返回 null 以触发重新加载。
-        val jadxJavaFile = findJadxJavaSourceForSmali(smaliFile)
-        if (jadxJavaFile != null) {
-            val jadxLm = runCatching { jadxJavaFile.lastModified() }.getOrDefault(0L)
-            val jadxLen = runCatching { jadxJavaFile.length() }.getOrDefault(-1L)
-            if (cached.javaSourcePath != jadxJavaFile.absolutePath ||
-                cached.javaSourceLastModified != jadxLm ||
-                cached.javaSourceLength != jadxLen
-            ) {
-                return null
-            }
-        }
         return content
     }
 
@@ -3184,6 +3170,10 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             }
 
             CODE_TAB_TITLE -> {
+                // 切换到 Code 前，先保存当前 Smali 视图文本（否则切回 Smali 会回到旧内容）
+                // 注意：这里保存的是编辑器当前文本，不依赖磁盘文件是否已保存。
+                smaliOriginalContent = textArea.text
+
                 textArea.putClientProperty("suppressDirty", true)
                 textArea.isEditable = false
                 val cached = getCachedJavaIfFresh(currentFile)
@@ -3303,42 +3293,6 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         val smaliLastModified = runCatching { smaliFile.lastModified() }.getOrDefault(0L)
         val smaliLength = runCatching { smaliFile.length() }.getOrDefault(-1L)
 
-        // JADX 全量反编译完成后（.jadx/sources 存在）：
-        // Smali -> Code 优先直接读取 JADX 生成的 Java 文件，避免走“实时 smali->dex->jadx”流程。
-        val jadxJavaFile = findJadxJavaSourceForSmali(smaliFile)
-        if (jadxJavaFile != null) {
-            if (Thread.currentThread().isInterrupted) {
-                throw CancellationException("任务被取消")
-            }
-            val jadxLm = runCatching { jadxJavaFile.lastModified() }.getOrDefault(0L)
-            val jadxLen = runCatching { jadxJavaFile.length() }.getOrDefault(-1L)
-            val cached = smaliJavaContentCache[smaliFile]
-            if (cached != null &&
-                cached.sourceLastModified == smaliLastModified &&
-                cached.sourceLength == smaliLength &&
-                cached.javaSourcePath == jadxJavaFile.absolutePath &&
-                cached.javaSourceLastModified == jadxLm &&
-                cached.javaSourceLength == jadxLen
-            ) {
-                logger.info("使用缓存的 JADX Java 内容（文件: ${smaliFile.name}）")
-                return cached.javaContent
-            }
-
-            val content = Files.readString(jadxJavaFile.toPath())
-            if (Thread.currentThread().isInterrupted) {
-                throw CancellationException("任务被取消")
-            }
-            smaliJavaContentCache[smaliFile] = SmaliJavaCacheEntry(
-                sourceLastModified = smaliLastModified,
-                sourceLength = smaliLength,
-                javaContent = content,
-                javaSourcePath = jadxJavaFile.absolutePath,
-                javaSourceLastModified = jadxLm,
-                javaSourceLength = jadxLen,
-            )
-            return content
-        }
-
         // 如果已经缓存了 Java 内容且源文件未变化，直接返回（文件级缓存）
         val cached = smaliJavaContentCache[smaliFile]
         if (cached != null && cached.sourceLastModified == smaliLastModified && cached.sourceLength == smaliLength) {
@@ -3347,7 +3301,27 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         }
 
         try {
-            // 策略1: 查找对应的 Java 文件（如果是从 JADX 反编译的 APK）
+            // 策略1: 优先实时反编译（不依赖 .jadx 快照文件）
+            if (Thread.currentThread().isInterrupted) {
+                throw CancellationException("任务被取消")
+            }
+            logger.info("策略1: 尝试使用实时反编译")
+            val decompiledJava = tryDecompileWithJadx(smaliFile)
+            if (decompiledJava != null) {
+                logger.info("实时反编译成功")
+                if (Thread.currentThread().isInterrupted) {
+                    throw CancellationException("任务被取消")
+                }
+                smaliJavaContentCache[smaliFile] = SmaliJavaCacheEntry(
+                    sourceLastModified = smaliLastModified,
+                    sourceLength = smaliLength,
+                    javaContent = decompiledJava
+                )
+                return decompiledJava
+            }
+            logger.warn("实时反编译失败，回退到查找已有 Java 源码文件")
+
+            // 策略2: 查找对应的 Java 文件（例如 java_src/sources 等）
             // smali 文件路径通常类似: .../smali/com/example/MyClass.smali
             // Java 文件路径通常类似: .../java_src/com/example/MyClass.java 或 .../sources/com/example/MyClass.java
             val smaliPath = smaliFile.absolutePath
@@ -3441,34 +3415,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                 currentDir = currentDir.parentFile
             }
 
-            // 策略3: 尝试使用 JADX 实时反编译（类似 MT 管理器）
-            // 检查线程是否被中断（任务被取消）
-            if (Thread.currentThread().isInterrupted) {
-                throw CancellationException("任务被取消")
-            }
-            logger.info("策略3: 尝试使用 JADX 实时反编译")
-            val decompiledJava = tryDecompileWithJadx(smaliFile)
-            if (decompiledJava != null) {
-                logger.info("实时反编译成功")
-                // 再次检查是否被中断，避免在写入缓存时被取消
-                if (Thread.currentThread().isInterrupted) {
-                    throw CancellationException("任务被取消")
-                }
-                smaliJavaContentCache[smaliFile] = SmaliJavaCacheEntry(
-                    sourceLastModified = smaliLastModified,
-                    sourceLength = smaliLength,
-                    javaContent = decompiledJava
-                )
-                return decompiledJava
-            }
-            logger.warn("实时反编译失败")
-
-            // 检查线程是否被中断（任务被取消）
-            if (Thread.currentThread().isInterrupted) {
-                throw CancellationException("任务被取消")
-            }
-
-            // 策略4: 如果找不到，返回提示信息（不写入缓存，避免任务被取消后缓存错误消息）
+            // 策略3: 如果找不到，返回提示信息（不写入缓存，避免任务被取消后缓存错误消息）
             // 检查线程是否被中断（任务被取消）
             if (Thread.currentThread().isInterrupted) {
                 throw CancellationException("任务被取消")
@@ -3477,13 +3424,8 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                 // 未找到对应的 Java 源码文件
                 // 
                 // 提示：
-                // 1. 如果这是从 APK 反编译的 smali 文件，请确保已使用 JADX 反编译生成 Java 源码
-                // 2. Java 源码通常位于以下目录之一：
-                //    - .jadx/sources/
-                //    - java_src/
-                //    - sources/
-                //    - 与 smali 文件同目录
-                // 3. 或者确保已安装 jadx 工具，可以实时反编译
+                // 1. 可尝试确认已安装 jadx + smali（用于实时反编译）
+                // 2. 或检查是否存在 java_src/、sources/ 等 Java 源码目录
                 //
                 // 当前 smali 文件路径: ${smaliFile.absolutePath}
             """.trimIndent()
@@ -3685,27 +3627,6 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             logger.warn("提取类名失败", e)
             return null
         }
-    }
-
-    private fun findJadxJavaSourceForSmali(smaliFile: File): File? {
-        val workspaceRoot = mainWindow.guiContext.getWorkspace().getWorkspaceRoot() ?: return null
-        val sourcesRoot = File(workspaceRoot, ".jadx/sources")
-        if (!sourcesRoot.exists() || !sourcesRoot.isDirectory) return null
-
-        val className = extractClassNameFromSmaliPath(smaliFile.absolutePath) ?: return null
-        val rel = className.replace('.', '/')
-        val direct = File(sourcesRoot, "$rel.java")
-        if (direct.exists() && direct.canRead()) return direct
-
-        // 内部类/匿名类：Jadx 可能合并到外部类文件里，尝试回退到外部类
-        val outer = className.substringBefore('$', missingDelimiterValue = "")
-        if (outer.isNotEmpty()) {
-            val outerRel = outer.replace('.', '/')
-            val outerJava = File(sourcesRoot, "$outerRel.java")
-            if (outerJava.exists() && outerJava.canRead()) return outerJava
-        }
-
-        return null
     }
 
     // 移除 Smali 底部视图标签
