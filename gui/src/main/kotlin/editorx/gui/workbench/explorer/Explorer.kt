@@ -32,13 +32,11 @@ import javax.swing.tree.TreePath
 class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
     companion object {
         private const val TOP_BAR_ICON_SIZE = 16
-        private const val JADX_OUTPUT_DIR_NAME = ".jadx"
         private const val SETTINGS_KEY_VIEW_MODE = "explorer.viewMode"
     }
 
     private enum class ExplorerViewMode(val nameKey: String) {
-        PROJECT(I18nKeys.Explorer.VIEW_MODE_PROJECT),
-        JADX("Jadx");
+        PROJECT(I18nKeys.Explorer.VIEW_MODE_PROJECT);
 
         fun displayName(): String = I18n.translate(nameKey)
 
@@ -112,8 +110,13 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
 
     private fun loadSavedViewMode(): ExplorerViewMode {
         val raw = mainWindow.guiContext.getSettings().get(SETTINGS_KEY_VIEW_MODE, ExplorerViewMode.PROJECT.name)
-        return runCatching { ExplorerViewMode.valueOf(raw ?: ExplorerViewMode.PROJECT.name) }
-            .getOrDefault(ExplorerViewMode.PROJECT)
+        // 如果保存的模式是 JADX（旧版本），回退到 PROJECT 模式
+        return if (raw == "JADX") {
+            ExplorerViewMode.PROJECT
+        } else {
+            runCatching { ExplorerViewMode.valueOf(raw ?: ExplorerViewMode.PROJECT.name) }
+                .getOrDefault(ExplorerViewMode.PROJECT)
+        }
     }
 
     private fun persistViewMode(mode: ExplorerViewMode) {
@@ -595,36 +598,6 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         tree.updateUI()
     }
 
-    private fun buildJadxTreeRoot(workspaceRoot: File): DefaultMutableTreeNode {
-        val jadxDir = File(workspaceRoot, JADX_OUTPUT_DIR_NAME)
-        val root = DefaultMutableTreeNode("${workspaceRoot.name}（Jadx）")
-
-        val sourcesDir = File(jadxDir, "sources")
-        val resourcesDir = File(jadxDir, "resources")
-
-        val javaExts = setOf("java", "kt", "kts")
-        if (sourcesDir.exists() && sourcesDir.isDirectory) {
-            val sourcesNode =
-                FileNode(
-                    sourcesDir,
-                    displayName = "源码",
-                    chainSeparator = ".",
-                    childFilter = { f -> f.isDirectory || f.extension.lowercase() in javaExts }
-                ).apply { loadChildrenIfNeeded(true) }
-            root.add(sourcesNode)
-        }
-
-        if (resourcesDir.exists() && resourcesDir.isDirectory) {
-            val resourcesNode = FileNode(resourcesDir, displayName = "资源").apply { loadChildrenIfNeeded(true) }
-            root.add(resourcesNode)
-        }
-
-        if (root.childCount == 0) {
-            root.add(DefaultMutableTreeNode("未找到 Jadx 反编译结果，请先反编译 APK 或等待反编译完成"))
-        }
-
-        return root
-    }
 
     private fun refreshRootPreserveSelection() {
         refreshRootInternal(preserveSelection = true)
@@ -647,14 +620,9 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                     return@Thread
                 }
 
-                val newRoot = when (viewMode) {
-                    ExplorerViewMode.PROJECT -> FileNode(
-                        rootDir,
-                        childFilter = { f -> f.name != JADX_OUTPUT_DIR_NAME },
-                    ).apply { loadChildrenIfNeeded(true) }
-
-                    ExplorerViewMode.JADX -> buildJadxTreeRoot(rootDir)
-                }
+                val newRoot = FileNode(
+                    rootDir,
+                ).apply { loadChildrenIfNeeded(true) }
 
                 // 检查是否被取消
                 if (isTaskCancelled) return@Thread
@@ -785,7 +753,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
     )
 
     private fun captureTreeState(): TreeState? {
-        val root = treeModel.root as? DefaultMutableTreeNode ?: return null
+        if (treeModel.root !is DefaultMutableTreeNode) return null
         val expanded = getExpandedPaths()
         val selected = (tree.lastSelectedPathComponent as? FileNode)?.file?.absolutePath
         return TreeState(expanded, selected)
@@ -1412,26 +1380,6 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
 
         private fun getIconForFile(file: File): Icon? {
             if (file.isDirectory) {
-                // JADX 输出目录结构：sources / resources
-                if (file.parentFile?.name == JADX_OUTPUT_DIR_NAME) {
-                    when (file.name.lowercase()) {
-                        "sources" -> {
-                            return fileIconCache.getOrPut("jadxSourcesRoot") {
-                                val base: Icon =
-                                    ExplorerIcons.SourceRoot ?: ExplorerIcons.Folder ?: createDefaultIcon()
-                                IconUtils.resizeIcon(base, 16, 16)
-                            }
-                        }
-
-                        "resources" -> {
-                            return fileIconCache.getOrPut("jadxResourcesRoot") {
-                                val base: Icon =
-                                    ExplorerIcons.ResourcesRoot ?: ExplorerIcons.Folder ?: createDefaultIcon()
-                                IconUtils.resizeIcon(base, 16, 16)
-                            }
-                        }
-                    }
-                }
 
                 // 检查是否是根目录（assets、res、smali）
                 val workspaceRoot = mainWindow.guiContext.getWorkspace().getWorkspaceRoot()

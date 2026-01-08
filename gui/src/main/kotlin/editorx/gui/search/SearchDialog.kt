@@ -525,8 +525,8 @@ class SearchDialog(
             if (parts.any { it in SKIP_DIR_NAMES }) return true
 
             val name = path.fileName?.toString()?.lowercase().orEmpty()
-            // 允许扫描内部的 JADX 产物目录（用于 Java 源码搜索）
-            if (name.startsWith(".") && name != ".jadx") return true
+            // 跳过隐藏目录（以点开头的目录）
+            if (name.startsWith(".")) return true
 
             val ext = name.substringAfterLast('.', "")
             if (ext in BINARY_EXTS) return true
