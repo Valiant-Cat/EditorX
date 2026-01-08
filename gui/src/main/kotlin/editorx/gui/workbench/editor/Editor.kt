@@ -187,7 +187,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                 }
 
                 override fun getTabAreaInsets(placement: Int): java.awt.Insets {
-                    return java.awt.Insets(0, 0, 0, 0) // 移除标签区域边距
+                    return java.awt.Insets(3, 6, 3, 6) // 调整标签页内边距
                 }
 
                 override fun paintContentBorder(g: java.awt.Graphics?, placement: Int, selectedIndex: Int) {
@@ -212,6 +212,27 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                         g2d.fillRect(x, y, w, h)
                     } finally {
                         g2d.dispose()
+                    }
+                }
+
+                override fun paintTab(
+                    g: Graphics,
+                    tabPlacement: Int,
+                    rects: Array<out Rectangle>,
+                    tabIndex: Int,
+                    iconRect: Rectangle,
+                    textRect: Rectangle
+                ) {
+                    // 重写此方法，确保选中和未选中 Tab 的内容位置一致
+                    // 先调用父类方法绘制基础内容
+                    super.paintTab(g, tabPlacement, rects, tabIndex, iconRect, textRect)
+
+                    // 如果有自定义 Tab 组件，确保其位置不受选中状态影响
+                    val tabComponent = tabbedPane.getTabComponentAt(tabIndex)
+                    if (tabComponent != null) {
+                        // 确保 Tab 组件的位置和大小一致
+                        val rect = rects[tabIndex]
+                        tabComponent.bounds = rect
                     }
                 }
             })
@@ -389,7 +410,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         
         // 触发 tabbedPane 的重绘，更新 tab 背景
         tabbedPane.repaint()
-        
+
         revalidate()
         repaint()
     }
@@ -1670,8 +1691,6 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             val label = comp.getClientProperty("titleLabel") as? JLabel
             label?.foreground =
                 if (isSelected) ThemeManager.editorTabSelectedForeground else ThemeManager.editorTabForeground
-            label?.font =
-                (label?.font ?: Font("Dialog", Font.PLAIN, 12)).deriveFont(if (isSelected) Font.BOLD else Font.PLAIN)
 
             // 关闭按钮显示策略（CardLayout 切换保持占位）
             val slot = comp.getClientProperty("closeSlot") as? JPanel
@@ -3029,6 +3048,41 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         runCatching { scroll.horizontalScrollBar.value = state.hScroll.coerceAtLeast(0) }
     }
 
+    private fun caretFromViewportTop(textArea: TextArea, scroll: RTextScrollPane): Int {
+        val rect = runCatching { scroll.viewport.viewRect }.getOrNull() ?: return 0
+        if (rect.width <= 0 || rect.height <= 0) return 0
+        val p = Point(rect.x + 1, rect.y + 1)
+        return runCatching { textArea.viewToModel2D(p) }.getOrDefault(0).coerceAtLeast(0)
+    }
+
+    private fun captureCodeViewState(textArea: TextArea, scroll: RTextScrollPane): EditorViewState {
+        val v = runCatching { scroll.verticalScrollBar.value }.getOrDefault(0)
+        val h = runCatching { scroll.horizontalScrollBar.value }.getOrDefault(0)
+        val caretRaw = runCatching { textArea.caretPosition }.getOrDefault(0)
+        val caretAnchored =
+            if (caretRaw == 0 && v > 0) caretFromViewportTop(textArea, scroll) else caretRaw
+        return EditorViewState(caretPosition = caretAnchored, vScroll = v, hScroll = h)
+    }
+
+    private fun restoreCodeViewState(textArea: TextArea, scroll: RTextScrollPane, state: EditorViewState) {
+        val vTarget = state.vScroll.coerceAtLeast(0)
+        val hTarget = state.hScroll.coerceAtLeast(0)
+        runCatching { scroll.verticalScrollBar.value = vTarget }
+        runCatching { scroll.horizontalScrollBar.value = hTarget }
+
+        val docLen = runCatching { textArea.document.length }.getOrDefault(0)
+        var caret = state.caretPosition.coerceIn(0, docLen)
+        val vNow = runCatching { scroll.verticalScrollBar.value }.getOrDefault(0)
+        if (caret == 0 && vNow > 0) {
+            caret = caretFromViewportTop(textArea, scroll).coerceIn(0, docLen)
+        }
+        runCatching { textArea.caretPosition = caret }
+
+        // 防止 focus/caret 带来的“滚回顶部”
+        runCatching { scroll.verticalScrollBar.value = vTarget }
+        runCatching { scroll.horizontalScrollBar.value = hTarget }
+    }
+
     private fun getVisibleTextArea(file: File): TextArea? {
         val index = fileToTab[file] ?: return null
         val base = tabTextAreas[index]
@@ -3337,7 +3391,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                     val codeArea = smaliCodeTextAreas[currentFile]
                     val codeScroll = smaliCodeScrollPanes[currentFile]
                     if (codeArea != null && codeScroll != null) {
-                        smaliCodeViewStates[currentFile] = captureViewState(codeArea, codeScroll)
+                        smaliCodeViewStates[currentFile] = captureCodeViewState(codeArea, codeScroll)
                     }
                 }
             }
@@ -3376,17 +3430,31 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                 val smaliSnapshot = smaliTextArea.text
                 val cached = getCachedJavaIfFresh(currentFile, smaliSnapshot)
                 if (cached != null) {
-                    val stateBefore = captureViewState(codeTextArea, codeScroll)
-                    codeTextArea.putClientProperty("suppressDirty", true)
-                    codeTextArea.text = cached
-                    codeTextArea.syntaxEditingStyle = org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_JAVA
-                    codeTextArea.isEditable = false
-                    codeTextArea.discardAllEdits()
-                    codeTextArea.putClientProperty("suppressDirty", false)
+                    val stateBefore = captureCodeViewState(codeTextArea, codeScroll)
+                    val javaStyle = org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_JAVA
+                    val needsTextUpdate = codeTextArea.text != cached
+                    val needsStyleUpdate = codeTextArea.syntaxEditingStyle != javaStyle
+                    if (needsTextUpdate || needsStyleUpdate) {
+                        codeTextArea.putClientProperty("suppressDirty", true)
+                        if (needsTextUpdate) {
+                            codeTextArea.text = cached
+                        }
+                        if (needsStyleUpdate) {
+                            codeTextArea.syntaxEditingStyle = javaStyle
+                        }
+                        codeTextArea.isEditable = false
+                        codeTextArea.discardAllEdits()
+                        codeTextArea.putClientProperty("suppressDirty", false)
+                    } else {
+                        codeTextArea.isEditable = false
+                    }
                     hideSmaliLoadingIndicatorIfIdle()
                     val restoreState = smaliCodeViewStates[currentFile] ?: stateBefore
                     SwingUtilities.invokeLater {
-                        restoreViewState(codeTextArea, codeScroll, restoreState)
+                        restoreCodeViewState(codeTextArea, codeScroll, restoreState)
+                        SwingUtilities.invokeLater {
+                            restoreCodeViewState(codeTextArea, codeScroll, restoreState)
+                        }
                         codeTextArea.requestFocusInWindow()
                     }
                     // 查找条：切换视图后同步高亮目标
@@ -3402,7 +3470,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                     showSmaliLoadingOverlay(currentFile)
                     scheduleSmaliConversion(currentFile, tabIndex, codeTextArea, smaliSnapshot)
                     smaliCodeViewStates[currentFile]?.let { state ->
-                        SwingUtilities.invokeLater { restoreViewState(codeTextArea, codeScroll, state) }
+                        SwingUtilities.invokeLater { restoreCodeViewState(codeTextArea, codeScroll, state) }
                     }
                     // 查找条：切换视图后同步高亮目标（异步结果回来也会更新）
                     val bar = findReplaceBars[currentFile]
@@ -3441,7 +3509,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
 
                     if (shouldUpdateTextArea) {
                         val scroll = smaliCodeScrollPanes[file]
-                        val stateBefore = if (scroll != null) captureViewState(fallbackTextArea, scroll) else null
+                        val stateBefore = if (scroll != null) captureCodeViewState(fallbackTextArea, scroll) else null
                         fallbackTextArea.putClientProperty("suppressDirty", true)
                         fallbackTextArea.text = javaContent
                         fallbackTextArea.syntaxEditingStyle =
@@ -3450,7 +3518,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                         fallbackTextArea.discardAllEdits()
                         fallbackTextArea.putClientProperty("suppressDirty", false)
                         if (scroll != null && stateBefore != null) {
-                            SwingUtilities.invokeLater { restoreViewState(fallbackTextArea, scroll, stateBefore) }
+                            SwingUtilities.invokeLater { restoreCodeViewState(fallbackTextArea, scroll, stateBefore) }
                         }
                         // 查找条：Code 文本刷新后同步高亮/计数
                         val bar = findReplaceBars[file]
