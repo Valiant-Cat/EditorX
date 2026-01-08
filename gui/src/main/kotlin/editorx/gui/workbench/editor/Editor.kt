@@ -210,6 +210,12 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                     try {
                         g2d.color = theme.surface
                         g2d.fillRect(x, y, w, h)
+
+                        // 为选中的 tab 添加底部指示器（指针）
+                        if (isSelected) {
+                            g2d.color = theme.primary
+                            g2d.fillRect(x, y + h - 2, w, 2)
+                        }
                     } finally {
                         g2d.dispose()
                     }
@@ -332,26 +338,26 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
     private fun updateTheme() {
         val theme = ThemeManager.currentTheme
         background = theme.editorBackground
-        
+
         // 更新所有已存在的 TextArea 和 RTextScrollPane 的背景色
         for (i in 0 until tabbedPane.tabCount) {
             val tabContent = tabbedPane.getComponentAt(i) as? TabContent ?: continue
             val scrollPane = tabContent.scrollPane
-            
+
             // 更新 RTextScrollPane 的背景色
             scrollPane.background = theme.editorBackground
             scrollPane.viewport.background = theme.editorBackground
-            
+
             // 更新滚动条的背景色
             scrollPane.verticalScrollBar.background = theme.editorBackground
             scrollPane.horizontalScrollBar.background = theme.editorBackground
-            
+
             // 更新 TextArea 的背景色和前景色
             val textArea = tabTextAreas[i] ?: continue
             textArea.background = theme.editorBackground
             textArea.foreground = theme.onSurface
         }
-        
+
         // 更新 tabbedPane 的背景色和前景色
         tabbedPane.background = theme.surface
         tabbedPane.foreground = theme.onSurfaceVariant
@@ -364,10 +370,10 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                 // 某些 tab 可能不支持设置颜色，忽略
             }
         }
-        
+
         // 更新所有 tab header 的样式
         updateTabHeaderStyles()
-        
+
         // 更新底部 manifest 视图标签
         manifestViewTabs?.let { tabs ->
             tabs.border = BorderFactory.createMatteBorder(1, 0, 0, 0, theme.outline)
@@ -387,7 +393,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             tabs.updateUI()
             tabs.repaint()
         }
-        
+
         // 更新底部 smali 视图标签
         smaliViewTabs?.let { tabs ->
             tabs.border = BorderFactory.createMatteBorder(1, 0, 0, 0, theme.outline)
@@ -407,7 +413,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             tabs.updateUI()
             tabs.repaint()
         }
-        
+
         // 触发 tabbedPane 的重绘，更新 tab 背景
         tabbedPane.repaint()
 
@@ -802,7 +808,23 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
     }
 
     // VSCode 风格的 Tab 头：固定槽位 + hover/选中显示 close 按钮
-    private fun createVSCodeTabHeader(file: File): JPanel = JPanel().apply {
+    private fun createVSCodeTabHeader(file: File): JPanel = object : JPanel() {
+        override fun paintComponent(g: Graphics) {
+            super.paintComponent(g)
+            // 如果当前 tab 被选中，绘制底部指示器
+            val idx = tabbedPane.indexOfTabComponent(this)
+            if (idx >= 0 && idx == tabbedPane.selectedIndex) {
+                val theme = ThemeManager.currentTheme
+                val g2d = g.create() as Graphics2D
+                try {
+                    g2d.color = theme.primary
+                    g2d.fillRect(0, height - 2, width, 2)
+                } finally {
+                    g2d.dispose()
+                }
+            }
+        }
+    }.apply {
         layout = java.awt.BorderLayout(); isOpaque = true; background = ThemeManager.currentTheme.surface
         cursor = java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)
         val header = this
@@ -986,7 +1008,23 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
 
     }
 
-    private fun createCustomTabHeader(title: String, icon: Icon?): JPanel = JPanel().apply {
+    private fun createCustomTabHeader(title: String, icon: Icon?): JPanel = object : JPanel() {
+        override fun paintComponent(g: Graphics) {
+            super.paintComponent(g)
+            // 如果当前 tab 被选中，绘制底部指示器
+            val idx = tabbedPane.indexOfTabComponent(this)
+            if (idx >= 0 && idx == tabbedPane.selectedIndex) {
+                val theme = ThemeManager.currentTheme
+                val g2d = g.create() as Graphics2D
+                try {
+                    g2d.color = theme.primary
+                    g2d.fillRect(0, height - 2, width, 2)
+                } finally {
+                    g2d.dispose()
+                }
+            }
+        }
+    }.apply {
         layout = BorderLayout(); isOpaque = true; background = ThemeManager.currentTheme.surface
         cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
         val header = this
@@ -1718,8 +1756,14 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                 }
             }
 
-            // 不再使用下划线，保持背景一致（可留 2px 空白保持高度统一）
-            comp.border = BorderFactory.createEmptyBorder(0, 0, 2, 0)
+            // 为选中的 tab 添加底部指示器（指针），未选中的留 2px 空白保持高度统一
+            if (isSelected) {
+                comp.border = BorderFactory.createEmptyBorder(0, 0, 0, 0)
+            } else {
+                comp.border = BorderFactory.createEmptyBorder(0, 0, 2, 0)
+            }
+            // 强制重绘以显示指示器
+            comp.repaint()
         }
     }
 
