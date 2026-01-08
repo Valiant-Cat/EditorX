@@ -2297,6 +2297,10 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         val scrollComp = textArea.parent?.parent as? java.awt.Component
         val tabIndex = scrollComp?.let { getTabIndexForComponent(it) } ?: tabbedPane.selectedIndex
         val file = if (tabIndex >= 0) tabToFile[tabIndex] else null
+        val smaliCodeViewFile = file?.takeIf {
+            it.name.endsWith(".smali", ignoreCase = true) && smaliCodeTextAreas[it] === textArea
+        }
+        val pluginTargetTextArea = if (smaliCodeViewFile != null) tabTextAreas[tabIndex] ?: textArea else textArea
 
         // 检查是否有格式化器可用
         val hasFormatter = file != null && FormatterManager.getFormatter(file) != null
@@ -2330,9 +2334,9 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         val view = EditorMenuView(
             file = file,
             languageId = languageId,
-            editable = textArea.isEditable,
-            selectionStart = textArea.selectionStart,
-            selectionEnd = textArea.selectionEnd,
+            editable = pluginTargetTextArea.isEditable,
+            selectionStart = pluginTargetTextArea.selectionStart,
+            selectionEnd = pluginTargetTextArea.selectionEnd,
         )
         val pluginItems = EditorContextMenuManager.getItems(view)
         if (pluginItems.isNotEmpty()) {
@@ -2341,26 +2345,40 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                     get() = EditorMenuView(
                         file = file,
                         languageId = languageId,
-                        editable = textArea.isEditable,
-                        selectionStart = textArea.selectionStart,
-                        selectionEnd = textArea.selectionEnd,
+                        editable = pluginTargetTextArea.isEditable,
+                        selectionStart = pluginTargetTextArea.selectionStart,
+                        selectionEnd = pluginTargetTextArea.selectionEnd,
                     )
 
-                override fun getText(): String = textArea.text
+                override fun getText(): String = pluginTargetTextArea.text
 
                 override fun replaceText(newText: String) {
-                    if (!textArea.isEditable) return
-                    replaceTextAreaContent(textArea, newText)
+                    if (!pluginTargetTextArea.isEditable) return
+                    replaceTextAreaContent(pluginTargetTextArea, newText)
+                    val currentFile = smaliCodeViewFile ?: return
+                    val tabs = smaliViewTabs ?: return
+                    if (smaliFile != currentFile) return
+                    if (tabs.getTitleAt(tabs.selectedIndex) != CODE_TAB_TITLE) return
+                    showSmaliLoadingIndicator()
+                    showSmaliLoadingOverlay(currentFile)
+                    scheduleSmaliConversion(currentFile, tabs.selectedIndex, textArea, pluginTargetTextArea.text)
                 }
 
-                override fun getSelectedText(): String? = textArea.selectedText
+                override fun getSelectedText(): String? = pluginTargetTextArea.selectedText
 
                 override fun replaceSelectedText(newText: String) {
-                    if (!textArea.isEditable) return
-                    val start = textArea.selectionStart
-                    val end = textArea.selectionEnd
+                    if (!pluginTargetTextArea.isEditable) return
+                    val start = pluginTargetTextArea.selectionStart
+                    val end = pluginTargetTextArea.selectionEnd
                     if (start == end) return
-                    textArea.replaceRange(newText, start, end)
+                    pluginTargetTextArea.replaceRange(newText, start, end)
+                    val currentFile = smaliCodeViewFile ?: return
+                    val tabs = smaliViewTabs ?: return
+                    if (smaliFile != currentFile) return
+                    if (tabs.getTitleAt(tabs.selectedIndex) != CODE_TAB_TITLE) return
+                    showSmaliLoadingIndicator()
+                    showSmaliLoadingOverlay(currentFile)
+                    scheduleSmaliConversion(currentFile, tabs.selectedIndex, textArea, pluginTargetTextArea.text)
                 }
             }
 
@@ -2889,6 +2907,21 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             background = theme.editorBackground
             foreground = theme.onSurface
         }
+        // Code 视图也需要右键菜单（例如 StringFog 解密）
+        val textAreaForMenu = area
+        area.addMouseListener(object : MouseAdapter() {
+            override fun mousePressed(e: MouseEvent) {
+                if (e.isPopupTrigger) {
+                    showTextAreaContextMenu(textAreaForMenu, e.x, e.y)
+                }
+            }
+
+            override fun mouseReleased(e: MouseEvent) {
+                if (e.isPopupTrigger) {
+                    showTextAreaContextMenu(textAreaForMenu, e.x, e.y)
+                }
+            }
+        })
         val scroll = RTextScrollPane(area).apply {
             border = javax.swing.BorderFactory.createEmptyBorder()
             background = theme.editorBackground
