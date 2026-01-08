@@ -9,6 +9,7 @@ import java.io.File
 import javax.swing.BorderFactory
 import javax.swing.JButton
 import javax.swing.JCheckBox
+import javax.swing.JComboBox
 import javax.swing.JLabel
 import javax.swing.JOptionPane
 import javax.swing.JPanel
@@ -186,8 +187,28 @@ object StringResourceLocalesDialog {
 
         val addLocaleButton = JButton("添加翻译…").apply {
             addActionListener {
-                val dirField = JTextField("").apply { preferredSize = Dimension(220, 26) }
                 val valueField = JTextField("").apply { preferredSize = Dimension(360, 26) }
+
+                val allLocaleDirs = buildList {
+                    val resRoot = File(workspaceRoot, "res")
+                    val fromFs = resRoot.listFiles()
+                        ?.filter { it.isDirectory }
+                        ?.mapNotNull { it.name }
+                        ?.filter { AppInfoEditor.isLocaleValuesDirName(it) && it != "values" }
+                        ?: emptyList()
+                    addAll(fromFs)
+                    addAll(existingValueByDir.keys)
+                    addAll(manualAddedRows.keys)
+                }
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() && it != "values" }
+                    .distinct()
+                    .sorted()
+
+                val dirCombo = JComboBox(allLocaleDirs.toTypedArray()).apply {
+                    isEditable = true
+                    preferredSize = Dimension(220, 26)
+                }
 
                 val form = JPanel(GridBagLayout()).apply {
                     border = BorderFactory.createEmptyBorder(6, 6, 6, 6)
@@ -212,7 +233,7 @@ object StringResourceLocalesDialog {
                         c.gridy++
                     }
 
-                    row("语言目录", dirField)
+                    row("语言目录", dirCombo)
                     row("翻译内容", valueField)
                     c.gridx = 1
                     c.weightx = 1.0
@@ -232,7 +253,9 @@ object StringResourceLocalesDialog {
                 )
                 if (option != JOptionPane.OK_OPTION) return@addActionListener
 
-                val normalized = dirField.text.trim()
+                val normalized = (dirCombo.editor.item as? String ?: dirCombo.selectedItem as? String)
+                    ?.trim()
+                    .orEmpty()
                 val translation = valueField.text.trim()
                 if (normalized.isEmpty()) {
                     JOptionPane.showMessageDialog(null, "请填写语言目录（例如 values-en）", "提示", JOptionPane.WARNING_MESSAGE)
