@@ -1,6 +1,5 @@
 package editorx.plugins.android
 
-import java.awt.Graphics2D
 import java.awt.RenderingHints
 import java.awt.image.BufferedImage
 import java.io.File
@@ -46,9 +45,33 @@ data class AndroidAppInfoUpdate(
     val createMissingDensityIcons: Boolean,
 )
 
-object AndroidAppInfoEditor {
+object AppInfoEditor {
     private val manifestPackageRegex =
         """<manifest[^>]*\bpackage\s*=\s*["']([^"']+)["']""".toRegex()
+
+    fun isLocaleValuesDirName(dirName: String): Boolean {
+        if (dirName == "values") return true
+        if (!dirName.startsWith("values-")) return false
+
+        val qualifier = dirName.removePrefix("values-")
+        val parts = qualifier.split('-').filter { it.isNotBlank() }
+        val first = parts.firstOrNull() ?: return false
+
+        // BCP-47: values-b+zh+Hans+CN
+        if (first.startsWith("b+")) return true
+
+        // legacy: values-en / values-zh-rCN / values-en-rUS-night
+        if (Regex("^[a-z]{2}$").matches(first)) return true
+
+        // 3-letter language codes exist，但与资源限定符 "car"（UI mode: car）冲突；对 car 做保守处理。
+        if (Regex("^[a-z]{3}$").matches(first)) {
+            if (first != "car") return true
+            val second = parts.getOrNull(1) ?: return false
+            return Regex("^r([A-Z]{2}|\\d{3})$").matches(second)
+        }
+
+        return false
+    }
 
     fun readAppInfo(workspaceRoot: File): AndroidAppInfo? {
         val manifestFile = File(workspaceRoot, "AndroidManifest.xml")
@@ -109,7 +132,7 @@ object AndroidAppInfoEditor {
         if (!resRoot.isDirectory) return emptyList()
 
         val valuesDirs = resRoot.listFiles()
-            ?.filter { it.isDirectory && it.name.startsWith("values") }
+            ?.filter { it.isDirectory && isLocaleValuesDirName(it.name) }
             ?.sortedBy { it.name }
             ?: emptyList()
 
@@ -299,7 +322,7 @@ object AndroidAppInfoEditor {
         if (!resRoot.isDirectory) return ApplyResult(false, "未找到 res 目录：${resRoot.absolutePath}")
 
         val allValuesDirs = resRoot.listFiles()
-            ?.filter { it.isDirectory && it.name.startsWith("values") }
+            ?.filter { it.isDirectory && isLocaleValuesDirName(it.name) }
             ?: emptyList()
 
         // 1) 始终保证 values 目录写入

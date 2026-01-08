@@ -11,7 +11,6 @@ import java.awt.GridBagLayout
 import java.awt.Insets
 import javax.swing.BorderFactory
 import javax.swing.JButton
-import javax.swing.JCheckBox
 import javax.swing.JLabel
 import javax.swing.JOptionPane
 import javax.swing.JPanel
@@ -33,7 +32,7 @@ object AppInfoDialog {
             return
         }
 
-        val current = AndroidAppInfoEditor.readAppInfo(workspaceRoot)
+        val current = AppInfoEditor.readAppInfo(workspaceRoot)
         if (current == null) {
             JOptionPane.showMessageDialog(
                 null,
@@ -60,14 +59,14 @@ object AppInfoDialog {
 
         val openLocalesButton = JButton(I18n.translate(I18nKeys.Toolbar.EDIT_APP_LOCALES) + "…").apply {
             addActionListener {
-                AppNameLocalesDialog.show(gui)
+                AppNameDialog.show(gui)
                 refreshFieldsFromWorkspace(gui, packageField, labelField, iconField)
             }
         }
 
         val openDensitiesButton = JButton(I18n.translate(I18nKeys.Toolbar.EDIT_APP_ICONS) + "…").apply {
             addActionListener {
-                AppIconDensitiesDialog.show(gui)
+                AppIconDialog.show(gui)
                 refreshFieldsFromWorkspace(gui, packageField, labelField, iconField)
             }
         }
@@ -115,7 +114,7 @@ object AppInfoDialog {
         gui.showProgress("正在更新 App 信息…", indeterminate = true)
         Thread {
             try {
-                val result = AndroidAppInfoEditor.applyUpdate(workspaceRoot, update)
+                val result = AppInfoEditor.applyUpdate(workspaceRoot, update)
                 SwingUtilities.invokeLater {
                     gui.hideProgress()
                     if (result.success) {
@@ -221,7 +220,7 @@ object AppInfoDialog {
         iconField: JTextField,
     ) {
         val root = gui.getWorkspaceRoot() ?: return
-        val current = AndroidAppInfoEditor.readAppInfo(root) ?: return
+        val current = AppInfoEditor.readAppInfo(root) ?: return
         packageField.text = current.packageName ?: ""
         labelField.text = current.labelValue ?: ""
         iconField.text = current.iconValue ?: ""

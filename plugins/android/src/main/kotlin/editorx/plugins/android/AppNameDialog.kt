@@ -4,12 +4,11 @@ import editorx.core.gui.GuiExtension
 import editorx.core.i18n.I18n
 import editorx.core.i18n.I18nKeys
 import org.slf4j.LoggerFactory
-import java.io.File
 import javax.swing.JOptionPane
 import javax.swing.SwingUtilities
 
-object AppNameLocalesDialog {
-    private val logger = LoggerFactory.getLogger(AppNameLocalesDialog::class.java)
+object AppNameDialog {
+    private val logger = LoggerFactory.getLogger(AppNameDialog::class.java)
 
     fun show(gui: GuiExtension) {
         val workspaceRoot = gui.getWorkspaceRoot()
@@ -23,7 +22,7 @@ object AppNameLocalesDialog {
             return
         }
 
-        val current = AndroidAppInfoEditor.readAppInfo(workspaceRoot)
+        val current = AppInfoEditor.readAppInfo(workspaceRoot)
         if (current == null) {
             JOptionPane.showMessageDialog(
                 null,
@@ -35,7 +34,7 @@ object AppNameLocalesDialog {
         }
 
         val initialKey = extractStringKeyOrDefault(current.labelValue)
-        val existingForKey = AndroidAppInfoEditor.listStringValuesForKey(workspaceRoot, initialKey.trim().ifEmpty { "app_name" })
+        val existingForKey = AppInfoEditor.listStringValuesForKey(workspaceRoot, initialKey.trim().ifEmpty { "app_name" })
         val defaultExisting = existingForKey.firstOrNull { it.valuesDir == "values" }?.value
         val rawLabel = current.labelValue?.trim().orEmpty()
         val initialDefaultValue = when {
@@ -70,7 +69,7 @@ object AppNameLocalesDialog {
         gui.showProgress("正在更新多语言…", indeterminate = true)
         Thread {
             try {
-                val result = AndroidAppInfoEditor.applyUpdate(workspaceRoot, update)
+                val result = AppInfoEditor.applyUpdate(workspaceRoot, update)
                 SwingUtilities.invokeLater {
                     gui.hideProgress()
                     JOptionPane.showMessageDialog(

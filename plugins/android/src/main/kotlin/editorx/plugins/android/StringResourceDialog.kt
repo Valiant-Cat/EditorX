@@ -38,6 +38,7 @@ object StringResourceLocalesDialog {
         val keyField = JTextField(initialKey.trim().ifEmpty { "app_name" }).apply { preferredSize = Dimension(220, 26) }
         val defaultValueField = JTextField(initialDefaultValue?.trim().orEmpty()).apply { preferredSize = Dimension(360, 26) }
         val syncAll = JCheckBox("一键同步：将所有已存在语言都设置为默认名称", false)
+        val onlyShowConfiguredForKey = JCheckBox("只显示已配置该 key 的多语言", true)
 
         // 当 key 变化时，默认名称需要跟随更新；当用户手动编辑默认名称后，不再自动覆盖。
         var userEditedDefault = false
@@ -46,6 +47,8 @@ object StringResourceLocalesDialog {
 
         val removedDirs = linkedSetOf<String>()
         var currentExistingDirs = emptySet<String>()
+        val existingValueByDir = linkedMapOf<String, String?>()
+        val manualAddedRows = linkedMapOf<String, String>()
         defaultValueField.document.addDocumentListener(object : DocumentListener {
             override fun insertUpdate(e: DocumentEvent?) = onChange()
             override fun removeUpdate(e: DocumentEvent?) = onChange()
@@ -60,7 +63,7 @@ object StringResourceLocalesDialog {
             }
         })
 
-        val tableModel = object : DefaultTableModel(arrayOf("values* 目录", "翻译"), 0) {
+        val tableModel = object : DefaultTableModel(arrayOf("语言目录", "翻译"), 0) {
             override fun isCellEditable(row: Int, column: Int): Boolean = column == 1
         }
         val table = JTable(tableModel).apply {
@@ -81,6 +84,7 @@ object StringResourceLocalesDialog {
                     if (dir.isNotEmpty() && dir in currentExistingDirs) {
                         removedDirs.add(dir)
                     }
+                    manualAddedRows.remove(dir)
                     tableModel.removeRow(row)
                 }
                 isEnabled = table.selectedRowCount > 0
@@ -92,9 +96,17 @@ object StringResourceLocalesDialog {
 
         fun reloadTable(forceUpdateDefault: Boolean) {
             val key = keyField.text.trim().ifEmpty { "app_name" }
-            val existing = AndroidAppInfoEditor.listStringValuesForKey(workspaceRoot, key)
+            val existing = AppInfoEditor.listStringValuesForKey(workspaceRoot, key)
             currentExistingDirs = existing.map { it.valuesDir }.toSet()
             removedDirs.clear()
+            manualAddedRows.clear()
+            existingValueByDir.clear()
+            existing
+                .filter { it.valuesDir != "values" }
+                .sortedBy { it.valuesDir }
+                .forEach { entry ->
+                    existingValueByDir[entry.valuesDir] = entry.value
+                }
 
             val defaultExisting = existing.firstOrNull { it.valuesDir == "values" }?.value
             if (forceUpdateDefault || (!userEditedDefault && lastAutoFilledKey != key)) {
@@ -118,12 +130,11 @@ object StringResourceLocalesDialog {
             }
 
             tableModel.setRowCount(0)
-            existing
-                .filter { it.valuesDir != "values" }
-                .sortedBy { it.valuesDir }
-                .forEach { entry ->
-                    tableModel.addRow(arrayOf(entry.valuesDir, entry.value ?: ""))
-                }
+            existingValueByDir.forEach { (dir, valueOrNull) ->
+                if (dir in removedDirs) return@forEach
+                if (onlyShowConfiguredForKey.isSelected && valueOrNull.isNullOrBlank()) return@forEach
+                tableModel.addRow(arrayOf(dir, valueOrNull ?: ""))
+            }
         }
         reloadTable(forceUpdateDefault = false)
 
@@ -137,30 +148,134 @@ object StringResourceLocalesDialog {
             }
         })
 
-        val addLocaleButton = JButton("添加语言…").apply {
+        fun tableHasDir(dir: String): Boolean {
+            for (i in 0 until tableModel.rowCount) {
+                val existingDir = (tableModel.getValueAt(i, 0) as? String)?.trim().orEmpty()
+                if (existingDir == dir) return true
+            }
+            return false
+        }
+
+        fun isRowConfigured(row: Int): Boolean {
+            val value = (tableModel.getValueAt(row, 1) as? String)?.trim().orEmpty()
+            return value.isNotEmpty()
+        }
+
+        fun applyOnlyShowConfiguredFilter() {
+            if (!onlyShowConfiguredForKey.isSelected) {
+                // 取消过滤：把项目里存在但当前未显示的 values* 行补回来（不覆盖已编辑内容）
+                existingValueByDir.forEach { (dir, valueOrNull) ->
+                    if (dir in removedDirs) return@forEach
+                    if (tableHasDir(dir)) return@forEach
+                    tableModel.addRow(arrayOf(dir, valueOrNull ?: ""))
+                }
+                return
+            }
+
+            // 启用过滤：仅隐藏“项目已有目录”中未配置该 key 的行；手动新增行不隐藏（否则无法继续编辑）
+            for (row in (tableModel.rowCount - 1) downTo 0) {
+                val dir = (tableModel.getValueAt(row, 0) as? String)?.trim().orEmpty()
+                if (dir.isEmpty()) continue
+                val isManualRow = dir !in currentExistingDirs
+                if (isManualRow) continue
+                if (!isRowConfigured(row)) {
+                    tableModel.removeRow(row)
+                }
+            }
+        }
+
+        val addLocaleButton = JButton("添加翻译…").apply {
             addActionListener {
-                val dir = JOptionPane.showInputDialog(
+                val dirField = JTextField("").apply { preferredSize = Dimension(220, 26) }
+                val valueField = JTextField("").apply { preferredSize = Dimension(360, 26) }
+
+                val form = JPanel(GridBagLayout()).apply {
+                    border = BorderFactory.createEmptyBorder(6, 6, 6, 6)
+                    val c = GridBagConstraints().apply {
+                        insets = Insets(6, 6, 6, 6)
+                        fill = GridBagConstraints.HORIZONTAL
+                        weightx = 1.0
+                        gridx = 0
+                        gridy = 0
+                        anchor = GridBagConstraints.WEST
+                    }
+
+                    fun row(label: String, comp: java.awt.Component) {
+                        c.gridx = 0
+                        c.weightx = 0.0
+                        c.fill = GridBagConstraints.NONE
+                        add(JLabel(label), c)
+                        c.gridx = 1
+                        c.weightx = 1.0
+                        c.fill = GridBagConstraints.HORIZONTAL
+                        add(comp, c)
+                        c.gridy++
+                    }
+
+                    row("语言目录", dirField)
+                    row("翻译内容", valueField)
+                    c.gridx = 1
+                    c.weightx = 1.0
+                    c.fill = GridBagConstraints.HORIZONTAL
+                    add(
+                        JLabel("<html><small>示例：values-en、values-zh-rCN、values-b+zh+Hans+CN</small></html>"),
+                        c
+                    )
+                }
+
+                val option = JOptionPane.showConfirmDialog(
                     null,
-                    "请输入 values 目录名（例如 values-en、values-zh-rCN）",
-                    "添加语言",
+                    form,
+                    "添加翻译",
+                    JOptionPane.OK_CANCEL_OPTION,
                     JOptionPane.PLAIN_MESSAGE
-                ) ?: return@addActionListener
-                val normalized = dir.trim()
-                if (!normalized.startsWith("values") || normalized.isEmpty()) {
-                    JOptionPane.showMessageDialog(null, "目录名需以 values 开头", "提示", JOptionPane.WARNING_MESSAGE)
+                )
+                if (option != JOptionPane.OK_OPTION) return@addActionListener
+
+                val normalized = dirField.text.trim()
+                val translation = valueField.text.trim()
+                if (normalized.isEmpty()) {
+                    JOptionPane.showMessageDialog(null, "请填写语言目录（例如 values-en）", "提示", JOptionPane.WARNING_MESSAGE)
                     return@addActionListener
                 }
-                for (i in 0 until tableModel.rowCount) {
-                    val existingDir = (tableModel.getValueAt(i, 0) as? String)?.trim()
-                    if (existingDir == normalized) return@addActionListener
+                if (normalized == "values") {
+                    JOptionPane.showMessageDialog(null, "默认语言请在“默认语言”输入框中设置", "提示", JOptionPane.WARNING_MESSAGE)
+                    return@addActionListener
                 }
-                tableModel.addRow(arrayOf(normalized, ""))
+                if (!AppInfoEditor.isLocaleValuesDirName(normalized)) {
+                    JOptionPane.showMessageDialog(null, "语言目录格式不合法：$normalized", "提示", JOptionPane.WARNING_MESSAGE)
+                    return@addActionListener
+                }
+                if (translation.isEmpty()) {
+                    JOptionPane.showMessageDialog(null, "请填写翻译内容", "提示", JOptionPane.WARNING_MESSAGE)
+                    return@addActionListener
+                }
+
+                if (tableHasDir(normalized)) return@addActionListener
+
+                tableModel.addRow(arrayOf(normalized, translation))
+                manualAddedRows[normalized] = translation
             }
+        }
+
+        onlyShowConfiguredForKey.addActionListener {
+            applyOnlyShowConfiguredFilter()
         }
 
         val content = JPanel(BorderLayout()).apply {
             border = BorderFactory.createEmptyBorder(10, 12, 10, 12)
-            add(buildForm(keyField, defaultValueField, syncAll, table, addLocaleButton, removeSelectedButton), BorderLayout.CENTER)
+            add(
+                buildForm(
+                    keyField = keyField,
+                    defaultNameField = defaultValueField,
+                    syncAll = syncAll,
+                    table = table,
+                    addLocaleButton = addLocaleButton,
+                    removeSelectedButton = removeSelectedButton,
+                    onlyShowConfiguredForKey = onlyShowConfiguredForKey,
+                ),
+                BorderLayout.CENTER
+            )
             add(JLabel(hintHtml), BorderLayout.SOUTH)
         }
 
@@ -209,6 +324,7 @@ object StringResourceLocalesDialog {
         table: JTable,
         addLocaleButton: JButton,
         removeSelectedButton: JButton,
+        onlyShowConfiguredForKey: JCheckBox,
     ): JPanel {
         val grid = JPanel(GridBagLayout())
         val c = GridBagConstraints().apply {
@@ -247,12 +363,22 @@ object StringResourceLocalesDialog {
         val scroll = JScrollPane(table).apply { preferredSize = Dimension(520, 180) }
         val localesPanel = JPanel(BorderLayout()).apply {
             add(scroll, BorderLayout.CENTER)
+            val actionRow = JPanel(java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 0, 6)).apply {
+                isOpaque = false
+                add(addLocaleButton)
+                add(javax.swing.Box.createHorizontalStrut(8))
+                add(removeSelectedButton)
+            }
+            val filterRow = JPanel(java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 0, 0)).apply {
+                isOpaque = false
+                add(onlyShowConfiguredForKey)
+            }
             add(
-                JPanel(java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 0, 6)).apply {
+                JPanel().apply {
                     isOpaque = false
-                    add(addLocaleButton)
-                    add(javax.swing.Box.createHorizontalStrut(8))
-                    add(removeSelectedButton)
+                    layout = javax.swing.BoxLayout(this, javax.swing.BoxLayout.Y_AXIS)
+                    add(filterRow)
+                    add(actionRow)
                 },
                 BorderLayout.SOUTH
             )

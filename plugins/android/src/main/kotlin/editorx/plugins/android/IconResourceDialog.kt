@@ -3,7 +3,6 @@ package editorx.plugins.android
 import editorx.core.gui.GuiExtension
 import editorx.core.i18n.I18n
 import editorx.core.i18n.I18nKeys
-import org.slf4j.LoggerFactory
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.Image
@@ -19,15 +18,20 @@ import javax.swing.JScrollPane
 import javax.swing.JTextField
 import javax.swing.ListSelectionModel
 import javax.swing.JTable
-import javax.swing.SwingUtilities
 import javax.swing.event.DocumentEvent
 import javax.swing.event.DocumentListener
 import javax.swing.table.AbstractTableModel
 
-object AppIconDensitiesDialog {
-    private val logger = LoggerFactory.getLogger(AppIconDensitiesDialog::class.java)
+data class ResourcePreviewEditDialogResult(
+    val resourceRef: String,
+    val pngFile: File,
+    val generateMultiDensity: Boolean,
+    val createMissingDensities: Boolean,
+)
 
-    private class IconCandidateTableModel(
+object AndroidResourcePreviewEditDialog {
+
+    private class ResourceCandidateTableModel(
         private var items: List<IconCandidate>
     ) : AbstractTableModel() {
         fun setItems(newItems: List<IconCandidate>) {
@@ -52,7 +56,6 @@ object AppIconDensitiesDialog {
         }
 
         override fun getRowCount(): Int = items.size
-
         override fun getColumnCount(): Int = 3
 
         override fun getColumnName(column: Int): String {
@@ -75,7 +78,17 @@ object AppIconDensitiesDialog {
         }
     }
 
-    fun show(gui: GuiExtension) {
+    fun showImageResource(
+        gui: GuiExtension,
+        title: String,
+        initialResourceRef: String,
+        resourceRefLabel: String,
+        candidatesLabel: String,
+        footerHintHtml: String,
+        resolveCandidates: (workspaceRoot: File, resourceRef: String) -> List<IconCandidate>,
+        resolvePreviewCandidates: (workspaceRoot: File, resourceRef: String) -> List<IconCandidate>,
+        choosePngButtonText: String = "更新资源…",
+    ): ResourcePreviewEditDialogResult? {
         val workspaceRoot = gui.getWorkspaceRoot()
         if (workspaceRoot == null) {
             JOptionPane.showMessageDialog(
@@ -84,25 +97,14 @@ object AppIconDensitiesDialog {
                 I18n.translate(I18nKeys.Dialog.TIP),
                 JOptionPane.INFORMATION_MESSAGE
             )
-            return
+            return null
         }
 
-        val current = AndroidAppInfoEditor.readAppInfo(workspaceRoot)
-        if (current == null) {
-            JOptionPane.showMessageDialog(
-                null,
-                "未找到或无法读取 AndroidManifest.xml",
-                I18n.translate(I18nKeys.Dialog.ERROR),
-                JOptionPane.ERROR_MESSAGE
-            )
-            return
-        }
-
-        val iconRefField = JTextField(current.iconValue ?: "").apply { preferredSize = Dimension(360, 26) }
-        val generateMultiDensity = JCheckBox("按密度生成多尺寸图标（mdpi/hdpi/xhdpi/xxhdpi/xxxhdpi）", true)
+        val resourceRefField = JTextField(initialResourceRef).apply { preferredSize = Dimension(360, 26) }
+        val generateMultiDensity = JCheckBox("按密度生成多尺寸资源（mdpi/hdpi/xhdpi/xxhdpi/xxxhdpi）", true)
         val createMissing = JCheckBox("创建缺失的密度目录/文件（res/mipmap-*/ 或 res/drawable-*）", false)
 
-        val iconPreview = JLabel().apply {
+        val preview = JLabel().apply {
             preferredSize = Dimension(72, 72)
             minimumSize = Dimension(72, 72)
             maximumSize = Dimension(72, 72)
@@ -114,8 +116,8 @@ object AppIconDensitiesDialog {
             )
         }
 
-        val iconCandidatesModel = IconCandidateTableModel(emptyList())
-        val iconCandidatesTable = JTable(iconCandidatesModel).apply {
+        val candidatesModel = ResourceCandidateTableModel(emptyList())
+        val candidatesTable = JTable(candidatesModel).apply {
             setSelectionMode(ListSelectionModel.SINGLE_SELECTION)
             setRowSelectionAllowed(true)
             setColumnSelectionAllowed(false)
@@ -123,46 +125,50 @@ object AppIconDensitiesDialog {
             autoResizeMode = JTable.AUTO_RESIZE_LAST_COLUMN
             setShowGrid(true)
         }
-        val iconCandidatesScroll = JScrollPane(iconCandidatesTable).apply {
+        val candidatesScroll = JScrollPane(candidatesTable).apply {
             preferredSize = Dimension(360, 140)
         }
 
         fun previewCandidate(candidate: IconCandidate?) {
             if (candidate == null) {
-                iconPreview.icon = null
-                iconPreview.text = "无预览"
+                preview.icon = null
+                preview.text = "无预览"
                 return
             }
-            iconPreview.icon = null
-            iconPreview.text = "无预览"
-            setPreviewFromFile(iconPreview, candidate.file)
+            preview.icon = null
+            preview.text = "无预览"
+            setPreviewFromFile(preview, candidate.file)
         }
-        iconCandidatesTable.selectionModel.addListSelectionListener {
+        candidatesTable.selectionModel.addListSelectionListener {
             if (it.valueIsAdjusting) return@addListSelectionListener
-            previewCandidate(iconCandidatesModel.getItem(iconCandidatesTable.selectedRow))
+            previewCandidate(candidatesModel.getItem(candidatesTable.selectedRow))
         }
 
-        fun refreshCurrentIconEcho() {
-            val iconValue = iconRefField.text.trim().ifEmpty { current.iconValue?.trim().orEmpty() }
-            val candidates = AndroidAppInfoEditor.resolveIconCandidates(workspaceRoot, iconValue)
+        fun refreshCandidates() {
+            val resourceRef = resourceRefField.text.trim().ifEmpty { initialResourceRef.trim() }
+            if (resourceRef.isBlank()) {
+                candidatesModel.setItems(emptyList())
+                previewCandidate(null)
+                return
+            }
 
-            val directPreviewables = candidates.filter { it.width != null && it.height != null }
-            val fallbackPreviewables = AndroidAppInfoEditor.resolveIconPreviewCandidates(workspaceRoot, iconValue)
-            val previewables = if (directPreviewables.isNotEmpty()) directPreviewables else fallbackPreviewables
+            val direct = resolveCandidates(workspaceRoot, resourceRef).filter { it.width != null && it.height != null }
+            val fallback = resolvePreviewCandidates(workspaceRoot, resourceRef)
+            val previewables = if (direct.isNotEmpty()) direct else fallback
 
-            iconCandidatesModel.setItems(previewables)
-            val best = iconCandidatesModel.bestRowIndex()
+            candidatesModel.setItems(previewables)
+            val best = candidatesModel.bestRowIndex()
             if (best != null) {
-                iconCandidatesTable.setRowSelectionInterval(best, best)
+                candidatesTable.setRowSelectionInterval(best, best)
             } else {
                 previewCandidate(null)
             }
         }
-        refreshCurrentIconEcho()
-        iconRefField.document.addDocumentListener(object : DocumentListener {
-            override fun insertUpdate(e: DocumentEvent?) = refreshCurrentIconEcho()
-            override fun removeUpdate(e: DocumentEvent?) = refreshCurrentIconEcho()
-            override fun changedUpdate(e: DocumentEvent?) = refreshCurrentIconEcho()
+        refreshCandidates()
+        resourceRefField.document.addDocumentListener(object : DocumentListener {
+            override fun insertUpdate(e: DocumentEvent?) = refreshCandidates()
+            override fun removeUpdate(e: DocumentEvent?) = refreshCandidates()
+            override fun changedUpdate(e: DocumentEvent?) = refreshCandidates()
         })
 
         val pngPathField = JTextField("").apply {
@@ -170,7 +176,7 @@ object AppIconDensitiesDialog {
             preferredSize = Dimension(280, 26)
         }
         var selectedPng: File? = null
-        val choosePngButton = JButton("更新资源…").apply {
+        val choosePngButton = JButton(choosePngButtonText).apply {
             addActionListener {
                 gui.showFileChooser { file ->
                     if (file == null) return@showFileChooser
@@ -194,7 +200,7 @@ object AppIconDensitiesDialog {
                     }
                     selectedPng = file
                     pngPathField.text = file.absolutePath
-                    setPreviewFromFile(iconPreview, file)
+                    setPreviewFromFile(preview, file)
                 }
             }
         }
@@ -241,19 +247,18 @@ object AppIconDensitiesDialog {
                         c.weighty = 0.0
                     }
 
-                    val iconPreviewPanel = JPanel(java.awt.GridBagLayout()).apply {
+                    val previewPanel = JPanel(java.awt.GridBagLayout()).apply {
                         add(
-                            iconPreview,
+                            preview,
                             java.awt.GridBagConstraints().apply {
                                 anchor = java.awt.GridBagConstraints.CENTER
                             }
                         )
                     }
-                    rowNoTitle(iconPreviewPanel)
+                    rowNoTitle(previewPanel)
 
-                    row("图标资源", iconRefField)
-
-                    row("图标尺寸", iconCandidatesScroll, fillBoth = true, weighty = 1.0)
+                    row(resourceRefLabel, resourceRefField)
+                    row(candidatesLabel, candidatesScroll, fillBoth = true, weighty = 1.0)
 
                     val pngRow = JPanel(java.awt.GridBagLayout())
                     val pc = java.awt.GridBagConstraints().apply {
@@ -291,82 +296,46 @@ object AppIconDensitiesDialog {
                 },
                 BorderLayout.CENTER
             )
-            add(
-                JLabel("<html><small>保存后会按配置替换/生成 res/mipmap*/ 或 res/drawable*/ 下的同名图标文件（png/webp），并更新 AndroidManifest.xml。</small></html>"),
-                BorderLayout.SOUTH
-            )
+            add(JLabel(footerHintHtml), BorderLayout.SOUTH)
         }
 
         val option = JOptionPane.showConfirmDialog(
             null,
             panel,
-            I18n.translate(I18nKeys.Toolbar.EDIT_APP_ICONS),
+            title,
             JOptionPane.OK_CANCEL_OPTION,
             JOptionPane.PLAIN_MESSAGE
         )
-        if (option != JOptionPane.OK_OPTION) return
+        if (option != JOptionPane.OK_OPTION) return null
 
-        val iconRef = iconRefField.text.trim()
-        if (iconRef.isEmpty()) {
-            JOptionPane.showMessageDialog(null, "请填写图标资源引用，例如 @mipmap/ic_launcher", I18n.translate(I18nKeys.Dialog.TIP), JOptionPane.WARNING_MESSAGE)
-            return
+        val resourceRef = resourceRefField.text.trim()
+        if (resourceRef.isEmpty()) {
+            JOptionPane.showMessageDialog(
+                null,
+                "请填写资源引用，例如 @mipmap/ic_launcher 或 @drawable/ic_launcher",
+                I18n.translate(I18nKeys.Dialog.TIP),
+                JOptionPane.WARNING_MESSAGE
+            )
+            return null
         }
+
         val png = selectedPng
         if (png == null) {
-            JOptionPane.showMessageDialog(null, "请选择 PNG 图标文件", I18n.translate(I18nKeys.Dialog.TIP), JOptionPane.WARNING_MESSAGE)
-            return
+            JOptionPane.showMessageDialog(
+                null,
+                "请选择 PNG 图片文件",
+                I18n.translate(I18nKeys.Dialog.TIP),
+                JOptionPane.WARNING_MESSAGE
+            )
+            return null
         }
 
-        val update = AndroidAppInfoUpdate(
-            packageName = null,
-            labelText = null,
-            useStringAppName = false,
-            labelStringKey = "app_name",
-            updateAllLocalesForAppName = false,
-            appNameByValuesDir = null,
-            removeStringFromValuesDirs = null,
-            iconValue = iconRef,
-            replaceIconPngFromFile = png,
-            generateMultiDensityIcons = generateMultiDensity.isSelected,
-            createMissingDensityIcons = createMissing.isSelected,
+        return ResourcePreviewEditDialogResult(
+            resourceRef = resourceRef,
+            pngFile = png,
+            generateMultiDensity = generateMultiDensity.isSelected,
+            createMissingDensities = createMissing.isSelected,
         )
-
-        gui.showProgress("正在更新图标…", indeterminate = true)
-        Thread {
-            try {
-                val result = AndroidAppInfoEditor.applyUpdate(workspaceRoot, update)
-                SwingUtilities.invokeLater {
-                    gui.hideProgress()
-                    JOptionPane.showMessageDialog(
-                        null,
-                        result.message,
-                        if (result.success) I18n.translate(I18nKeys.Dialog.INFO) else I18n.translate(I18nKeys.Dialog.ERROR),
-                        if (result.success) JOptionPane.INFORMATION_MESSAGE else JOptionPane.ERROR_MESSAGE
-                    )
-                }
-            } catch (e: Exception) {
-                logger.error("更新图标失败", e)
-                SwingUtilities.invokeLater {
-                    gui.hideProgress()
-                    JOptionPane.showMessageDialog(
-                        null,
-                        "更新失败：${e.message ?: "未知错误"}",
-                        I18n.translate(I18nKeys.Dialog.ERROR),
-                        JOptionPane.ERROR_MESSAGE
-                    )
-                }
-            }
-        }.start()
-    }
-
-    private fun setPreviewFromCandidates(preview: JLabel, candidates: List<IconCandidate>) {
-        val sorted = candidates.sortedByDescending { (it.width ?: 0) * (it.height ?: 0) }
-        // 优先尝试可读取的图片（通常为 PNG）
-        for (c in sorted) {
-            val before = preview.icon
-            setPreviewFromFile(preview, c.file)
-            if (preview.icon != null && preview.icon != before) return
-        }
     }
 
     private fun setPreviewFromFile(preview: JLabel, file: File?) {
@@ -393,3 +362,4 @@ object AppIconDensitiesDialog {
         preview.text = ""
     }
 }
+
