@@ -32,8 +32,6 @@ class ApkBuildService : BuildService {
     }
 
     override fun build(workspaceRoot: File, onProgress: (String) -> Unit): BuildResult {
-        onProgress(I18n.translate(I18nKeys.ToolbarMessage.COMPILING_APK))
-
         // 准备输出文件
         val distDir = File(workspaceRoot, "dist").apply { mkdirs() }
         val baseName = workspaceRoot.name.ifEmpty { "output" }
@@ -43,6 +41,12 @@ class ApkBuildService : BuildService {
             outputApk = File(distDir, "${baseName}-recompiled-$index.apk")
             index++
         }
+
+        return buildTo(workspaceRoot, outputApk, onProgress)
+    }
+
+    fun buildTo(workspaceRoot: File, outputApk: File, onProgress: (String) -> Unit): BuildResult {
+        onProgress(I18n.translate(I18nKeys.ToolbarMessage.COMPILING_APK))
 
         // 使用 ApkTool 构建
         val buildResult = ApkTool.build(workspaceRoot, outputApk)

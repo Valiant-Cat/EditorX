@@ -9,9 +9,12 @@ import java.awt.Dimension
 import java.awt.GridBagConstraints
 import java.awt.GridBagLayout
 import java.awt.Insets
+import java.io.File
+import java.awt.KeyboardFocusManager
 import javax.swing.BorderFactory
 import javax.swing.JButton
 import javax.swing.JLabel
+import javax.swing.JDialog
 import javax.swing.JOptionPane
 import javax.swing.JPanel
 import javax.swing.JTextField
@@ -88,64 +91,132 @@ object AppInfoDialog {
             )
         }
 
-        val option = JOptionPane.showConfirmDialog(
-            null,
-            panel,
-            I18n.translate(I18nKeys.Toolbar.EDIT_APP_INFO),
-            JOptionPane.OK_CANCEL_OPTION,
-            JOptionPane.PLAIN_MESSAGE
+        val option = showDialogWithButtons(
+            title = I18n.translate(I18nKeys.Toolbar.EDIT_APP_INFO),
+            content = panel,
         )
-        if (option != JOptionPane.OK_OPTION) return
+        if (option == 0) return
 
-        val update = AndroidAppInfoUpdate(
-            packageName = packageField.text,
-            labelText = null,
-            useStringAppName = false,
-            labelStringKey = "app_name",
-            updateAllLocalesForAppName = false,
-            appNameByValuesDir = null,
-            removeStringFromValuesDirs = null,
-            iconValue = null,
-            replaceIconPngFromFile = null,
-            generateMultiDensityIcons = false,
-            createMissingDensityIcons = false,
-        )
+        val desiredPackage = packageField.text.trim()
+        val currentPackage = (current.packageName ?: "").trim()
+        if (desiredPackage.isEmpty()) {
+            JOptionPane.showMessageDialog(
+                null,
+                "包名不能为空",
+                I18n.translate(I18nKeys.Dialog.ERROR),
+                JOptionPane.ERROR_MESSAGE
+            )
+            return
+        }
 
-        gui.showProgress("正在更新 App 信息…", indeterminate = true)
-        Thread {
-            try {
-                val result = AppInfoEditor.applyUpdate(workspaceRoot, update)
-                SwingUtilities.invokeLater {
-                    gui.hideProgress()
-                    if (result.success) {
+        val shouldBuild = option == 2
+
+        fun runBuild() {
+            val packageForName = desiredPackage.ifEmpty { currentPackage }.ifEmpty { "unknown.package" }
+            val projectName = workspaceRoot.name.ifEmpty { "project" }
+            val distDir = File(workspaceRoot, "dist").apply { mkdirs() }
+            val safePackage = sanitizeFilePart(packageForName)
+            val safeProject = sanitizeFilePart(projectName)
+
+            var output = File(distDir, "${safeProject}_${safePackage}.apk")
+            var index = 1
+            while (output.exists()) {
+                output = File(distDir, "${safeProject}_${safePackage}_$index.apk")
+                index++
+            }
+
+            gui.showProgress("正在构建 APK…", indeterminate = true)
+            Thread {
+                try {
+                    val service = ApkBuildService()
+                    val result = service.buildTo(workspaceRoot, output) { msg ->
+                        SwingUtilities.invokeLater { gui.showProgress(msg, indeterminate = true) }
+                    }
+                    SwingUtilities.invokeLater {
+                        gui.hideProgress()
+                        if (result.status == editorx.core.service.BuildStatus.SUCCESS) {
+                            gui.refreshExplorer(preserveSelection = true)
+                            JOptionPane.showMessageDialog(
+                                null,
+                                I18n.translate(I18nKeys.ToolbarMessage.BUILD_GENERATED)
+                                    .format(output.absolutePath),
+                                I18n.translate(I18nKeys.ToolbarMessage.COMPILE_COMPLETE),
+                                JOptionPane.INFORMATION_MESSAGE
+                            )
+                        } else {
+                            JOptionPane.showMessageDialog(
+                                null,
+                                result.output ?: (result.errorMessage ?: "构建失败"),
+                                I18n.translate(I18nKeys.Dialog.ERROR),
+                                JOptionPane.ERROR_MESSAGE
+                            )
+                        }
+                    }
+                } catch (e: Exception) {
+                    logger.error("构建失败", e)
+                    SwingUtilities.invokeLater {
+                        gui.hideProgress()
                         JOptionPane.showMessageDialog(
                             null,
-                            result.message,
-                            I18n.translate(I18nKeys.Dialog.INFO),
-                            JOptionPane.INFORMATION_MESSAGE
-                        )
-                    } else {
-                        JOptionPane.showMessageDialog(
-                            null,
-                            result.message,
+                            "构建失败：${e.message ?: "未知错误"}",
                             I18n.translate(I18nKeys.Dialog.ERROR),
                             JOptionPane.ERROR_MESSAGE
                         )
                     }
                 }
-            } catch (e: Exception) {
-                logger.error("更新 App 信息失败", e)
-                SwingUtilities.invokeLater {
-                    gui.hideProgress()
-                    JOptionPane.showMessageDialog(
-                        null,
-                        "更新失败：${e.message ?: "未知错误"}",
-                        I18n.translate(I18nKeys.Dialog.ERROR),
-                        JOptionPane.ERROR_MESSAGE
-                    )
+            }.start()
+        }
+
+        if (desiredPackage != currentPackage) {
+            val update = AndroidAppInfoUpdate(
+                packageName = desiredPackage,
+                labelText = null,
+                useStringAppName = false,
+                labelStringKey = "app_name",
+                updateAllLocalesForAppName = false,
+                appNameByValuesDir = null,
+                removeStringFromValuesDirs = null,
+                iconValue = null,
+                replaceIconPngFromFile = null,
+                generateMultiDensityIcons = false,
+                createMissingDensityIcons = false,
+            )
+
+            gui.showProgress("正在更新 App 信息…", indeterminate = true)
+            Thread {
+                try {
+                    val result = AppInfoEditor.applyUpdate(workspaceRoot, update)
+                    SwingUtilities.invokeLater {
+                        gui.hideProgress()
+                        if (!result.success) {
+                            JOptionPane.showMessageDialog(
+                                null,
+                                result.message,
+                                I18n.translate(I18nKeys.Dialog.ERROR),
+                                JOptionPane.ERROR_MESSAGE
+                            )
+                            return@invokeLater
+                        }
+                        // 更新成功不提示；如选择“保存并构建”，继续构建
+                        if (shouldBuild) runBuild()
+                    }
+                } catch (e: Exception) {
+                    logger.error("更新 App 信息失败", e)
+                    SwingUtilities.invokeLater {
+                        gui.hideProgress()
+                        JOptionPane.showMessageDialog(
+                            null,
+                            "更新失败：${e.message ?: "未知错误"}",
+                            I18n.translate(I18nKeys.Dialog.ERROR),
+                            JOptionPane.ERROR_MESSAGE
+                        )
+                    }
                 }
-            }
-        }.start()
+            }.start()
+        } else {
+            // 未修改包名：仅保存不提示；保存并构建则直接构建
+            if (shouldBuild) runBuild()
+        }
     }
 
     private fun buildForm(
@@ -224,6 +295,83 @@ object AppInfoDialog {
         packageField.text = current.packageName ?: ""
         labelField.text = current.labelValue ?: ""
         iconField.text = current.iconValue ?: ""
+    }
+
+    private fun sanitizeFilePart(raw: String): String {
+        val s = raw.trim()
+        if (s.isEmpty()) return "unknown"
+        return s.replace(Regex("""[\\/:*?"<>|]"""), "_")
+    }
+
+    /**
+     * 自定义弹窗按钮区域，强制按钮从左到右顺序为：取消 / 仅保存 / 保存并构建。
+     *
+     * @return 0=取消/关闭，1=仅保存，2=保存并构建
+     */
+    private fun showDialogWithButtons(title: String, content: JPanel): Int {
+        if (!SwingUtilities.isEventDispatchThread()) {
+            var r = 0
+            SwingUtilities.invokeAndWait { r = showDialogWithButtons(title, content) }
+            return r
+        }
+
+        var result = 0
+
+        val owner = KeyboardFocusManager.getCurrentKeyboardFocusManager().activeWindow
+        val dialog =
+            when (owner) {
+                is java.awt.Frame -> JDialog(owner, title, true)
+                is java.awt.Dialog -> JDialog(owner, title, true)
+                else -> JDialog(null as java.awt.Frame?, title, true)
+            }
+
+        dialog.apply {
+            var saveButtonRef: JButton? = null
+            isResizable = false
+            contentPane = JPanel(BorderLayout()).apply {
+                add(content, BorderLayout.CENTER)
+
+                val footer = JPanel(java.awt.FlowLayout(java.awt.FlowLayout.RIGHT, 8, 8))
+                val cancelButton = JButton("取消").apply {
+                    addActionListener {
+                        result = 0
+                        dialog.dispose()
+                    }
+                }
+                val saveButton = JButton("仅保存").apply {
+                    addActionListener {
+                        result = 1
+                        dialog.dispose()
+                    }
+                }
+                val saveBuildButton = JButton("保存并构建").apply {
+                    addActionListener {
+                        result = 2
+                        dialog.dispose()
+                    }
+                }
+                saveButtonRef = saveButton
+
+                // 从左到右：取消 / 仅保存 / 保存并构建
+                footer.add(cancelButton)
+                footer.add(saveButton)
+                footer.add(saveBuildButton)
+                add(footer, BorderLayout.SOUTH)
+            }
+            rootPane.defaultButton = saveButtonRef
+
+            rootPane.registerKeyboardAction(
+                { dialog.dispose() },
+                javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_ESCAPE, 0),
+                javax.swing.JComponent.WHEN_IN_FOCUSED_WINDOW
+            )
+
+            pack()
+            setLocationRelativeTo(owner)
+        }
+
+        dialog.isVisible = true
+        return result
     }
 
 }

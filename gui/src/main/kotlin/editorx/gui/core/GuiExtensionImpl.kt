@@ -23,6 +23,8 @@ class GuiExtensionImpl(
     private val mainWindow: MainWindow?
 ) : GuiExtension {
 
+    private var progressHandle: editorx.gui.workbench.statusbar.StatusBar.ProgressHandle? = null
+
     override fun getWorkspaceRoot(): File? {
         return guiContext.getWorkspace().getWorkspaceRoot()
     }
@@ -93,11 +95,34 @@ class GuiExtensionImpl(
         onCancel: (() -> Unit)?,
         maximum: Int
     ) {
-        mainWindow?.statusBar?.showProgress(message, indeterminate, cancellable, onCancel, maximum)
+        val bar = mainWindow?.statusBar ?: return
+        val handle = progressHandle ?: bar.beginProgressTask(
+            message = message,
+            indeterminate = indeterminate,
+            cancellable = cancellable,
+            onCancel = onCancel,
+            maximum = maximum
+        ).also { progressHandle = it }
+        bar.updateProgressTask(
+            handle = handle,
+            message = message,
+            indeterminate = indeterminate,
+            cancellable = cancellable,
+            onCancel = onCancel,
+            maximum = maximum
+        )
     }
 
     override fun hideProgress() {
-        mainWindow?.statusBar?.hideProgress()
+        val bar = mainWindow?.statusBar ?: return
+        val handle = progressHandle ?: return
+        progressHandle = null
+        bar.endProgressTask(handle)
+    }
+
+    override fun refreshExplorer(preserveSelection: Boolean) {
+        val explorer = mainWindow?.sideBar?.getView("explorer") as? Explorer ?: return
+        if (preserveSelection) explorer.refreshRootPreserveSelection() else explorer.refreshRoot()
     }
 
     override fun addToolBarItem(id: String, iconRef: IconRef?, text: String, action: () -> Unit) {

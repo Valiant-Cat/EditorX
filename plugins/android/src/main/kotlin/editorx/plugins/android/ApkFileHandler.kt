@@ -75,7 +75,7 @@ class ApkFileHandler(private val gui: GuiExtension) : FileHandler {
         // 在后台线程中处理APK反编译
         Thread {
             try {
-                val outputDir = File(apkFile.parentFile, apkFile.nameWithoutExtension + "_decompiled")
+                val outputDir = File(apkFile.parentFile, apkFile.nameWithoutExtension)
                 
                 // 检查输出目录是否已存在
                 if (outputDir.exists()) {

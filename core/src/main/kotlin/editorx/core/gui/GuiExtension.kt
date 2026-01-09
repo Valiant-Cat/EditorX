@@ -89,6 +89,15 @@ interface GuiExtension {
     fun hideProgress()
 
     /**
+     * 刷新文件树（Explorer）。
+     *
+     * 说明：
+     * - 用于构建/生成文件后让新产物即时出现在文件树中。
+     * - 默认尽量保留当前选择与展开状态。
+     */
+    fun refreshExplorer(preserveSelection: Boolean = true)
+
+    /**
      * 在 ToolBar 添加一个快捷按钮
      * @param id 按钮的唯一标识符
      * @param iconRef 图标引用（图标尺寸由 ToolBar 统一设置）

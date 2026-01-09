@@ -64,12 +64,14 @@ object AppIconDialog {
                 val result = AppInfoEditor.applyUpdate(workspaceRoot, update)
                 SwingUtilities.invokeLater {
                     gui.hideProgress()
-                    JOptionPane.showMessageDialog(
-                        null,
-                        result.message,
-                        if (result.success) I18n.translate(I18nKeys.Dialog.INFO) else I18n.translate(I18nKeys.Dialog.ERROR),
-                        if (result.success) JOptionPane.INFORMATION_MESSAGE else JOptionPane.ERROR_MESSAGE
-                    )
+                    if (!result.success) {
+                        JOptionPane.showMessageDialog(
+                            null,
+                            result.message,
+                            I18n.translate(I18nKeys.Dialog.ERROR),
+                            JOptionPane.ERROR_MESSAGE
+                        )
+                    }
                 }
             } catch (e: Exception) {
                 logger.error("更新图标失败", e)

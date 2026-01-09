@@ -10,6 +10,7 @@ import editorx.gui.MainWindow
 import editorx.gui.search.SearchDialog
 import editorx.gui.settings.SettingsDialog
 import editorx.gui.theme.ThemeManager
+import editorx.gui.workbench.explorer.Explorer
 import java.awt.Font
 import java.awt.Insets
 import java.awt.event.ActionListener
@@ -317,46 +318,33 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
             return
         }
 
-        mainWindow.statusBar.showProgress(I18n.translate(I18nKeys.ToolbarMessage.COMPILING_APK), indeterminate = true)
+        val progressHandle =
+            mainWindow.statusBar.beginProgressTask(I18n.translate(I18nKeys.ToolbarMessage.COMPILING_APK), indeterminate = true)
         compileTask = Thread {
             try {
                 val buildResult = buildProvider.build(workspaceRoot) { progressMessage ->
                     SwingUtilities.invokeLater {
-                        mainWindow.statusBar.showProgress(progressMessage, indeterminate = true)
+                        mainWindow.statusBar.updateProgressTask(progressHandle, progressMessage, indeterminate = true)
                     }
                 }
 
                 SwingUtilities.invokeLater {
-                    mainWindow.statusBar.hideProgress()
+                    mainWindow.statusBar.endProgressTask(progressHandle)
                     when (buildResult.status) {
                         BuildStatus.SUCCESS -> {
                             val outputFile = buildResult.outputFile
                             if (outputFile != null) {
+                                (mainWindow.sideBar.getView("explorer") as? Explorer)?.refreshRootPreserveSelection()
                                 mainWindow.statusBar.showSuccess(
                                     I18n.translate(I18nKeys.ToolbarMessage.COMPILE_SUCCESS)
                                         .format(outputFile.name)
                                 )
-                                val warning = buildResult.errorMessage?.trim().orEmpty()
-                                if (warning.isNotEmpty()) {
-                                    mainWindow.statusBar.showWarning(
-                                        I18n.translate(I18nKeys.ToolbarMessage.SIGN_FAILED).format("APK 未签名")
-                                    )
-                                }
-                                val dialogMessage = buildString {
-                                    append(
-                                        I18n.translate(I18nKeys.ToolbarMessage.BUILD_GENERATED)
-                                            .format(outputFile.absolutePath)
-                                    )
-                                    if (warning.isNotEmpty()) {
-                                        append("\n\n")
-                                        append(warning)
-                                    }
-                                }
                                 JOptionPane.showMessageDialog(
                                     mainWindow,
-                                    dialogMessage,
+                                    I18n.translate(I18nKeys.ToolbarMessage.BUILD_GENERATED)
+                                        .format(outputFile.absolutePath),
                                     I18n.translate(I18nKeys.ToolbarMessage.COMPILE_COMPLETE),
-                                    if (warning.isNotEmpty()) JOptionPane.WARNING_MESSAGE else JOptionPane.INFORMATION_MESSAGE
+                                    JOptionPane.INFORMATION_MESSAGE
                                 )
                             } else {
                                 mainWindow.statusBar.showSuccess(
@@ -396,7 +384,7 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
                 }
             } catch (e: Exception) {
                 SwingUtilities.invokeLater {
-                    mainWindow.statusBar.hideProgress()
+                    mainWindow.statusBar.endProgressTask(progressHandle)
                     mainWindow.statusBar.showError(
                         "${I18n.translate(I18nKeys.ToolbarMessage.COMPILE_FAILED).split("(")[0].trim()}: ${e.message}"
                     )
@@ -417,5 +405,3 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
     }
 
 }
-
-
