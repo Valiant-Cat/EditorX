@@ -61,6 +61,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
     // 任务取消机制
     private var currentTask: Thread? = null
     private var isTaskCancelled = false
+    private var progressHandle: editorx.gui.workbench.statusbar.StatusBar.ProgressHandle? = null
 
     init {
         isOpaque = false  // 使 Explorer 透明，显示 SideBar 的背景色
@@ -906,29 +907,34 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         cancellable: Boolean = false,
         maximum: Int = 100
     ) {
-        SwingUtilities.invokeLater {
-            mainWindow.statusBar.showProgress(
-                message,
-                indeterminate,
-                cancellable,
-                { cancelCurrentTask() },
-                maximum
-            )
-        }
+        val bar = mainWindow.statusBar
+        val handle =
+            progressHandle ?: bar.beginProgressTask(
+                message = message,
+                indeterminate = indeterminate,
+                cancellable = cancellable,
+                onCancel = { cancelCurrentTask() },
+                maximum = maximum
+            ).also { progressHandle = it }
+        bar.updateProgressTask(
+            handle = handle,
+            message = message,
+            indeterminate = indeterminate,
+            cancellable = cancellable,
+            onCancel = { cancelCurrentTask() },
+            maximum = maximum
+        )
     }
 
     private fun updateProgress(value: Int, message: String? = null) {
-        SwingUtilities.invokeLater {
-            if (message != null) {
-                mainWindow.statusBar.updateProgress(value, message)
-            } else {
-                mainWindow.statusBar.updateProgress(value, "处理中...")
-            }
-        }
+        val handle = progressHandle ?: return
+        mainWindow.statusBar.updateProgressTask(handle, value, message ?: "处理中...")
     }
 
     private fun hideProgress() {
-        SwingUtilities.invokeLater { mainWindow.statusBar.hideProgress() }
+        val handle = progressHandle ?: return
+        progressHandle = null
+        mainWindow.statusBar.endProgressTask(handle)
     }
 
     private fun cancelCurrentTask() {

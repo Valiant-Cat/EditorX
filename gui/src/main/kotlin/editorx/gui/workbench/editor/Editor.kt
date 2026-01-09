@@ -94,7 +94,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             isDaemon = true
         }
     }
-    private var smaliProgressVisible = false
+    private var smaliProgressHandle: editorx.gui.workbench.statusbar.StatusBar.ProgressHandle? = null
 
     private val bottomContainer = JPanel(BorderLayout()).apply {
         isOpaque = false
@@ -2911,22 +2911,29 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
 
     private fun showSmaliLoadingIndicator() {
         runOnEdt {
-            if (!smaliProgressVisible) {
-                mainWindow.statusBar.showProgress(
+            if (smaliProgressHandle == null) {
+                smaliProgressHandle = mainWindow.statusBar.beginProgressTask(
                     message = SMALI_PROGRESS_MESSAGE,
                     indeterminate = true,
                     cancellable = false
                 )
-                smaliProgressVisible = true
+            } else {
+                mainWindow.statusBar.updateProgressTask(
+                    handle = smaliProgressHandle!!,
+                    message = SMALI_PROGRESS_MESSAGE,
+                    indeterminate = true,
+                    cancellable = false
+                )
             }
         }
     }
 
     private fun hideSmaliLoadingIndicatorIfIdle() {
         runOnEdt {
-            if (smaliProgressVisible && smaliConversionTasks.isEmpty()) {
-                mainWindow.statusBar.hideProgress()
-                smaliProgressVisible = false
+            val handle = smaliProgressHandle
+            if (handle != null && smaliConversionTasks.isEmpty()) {
+                smaliProgressHandle = null
+                mainWindow.statusBar.endProgressTask(handle)
             }
         }
     }

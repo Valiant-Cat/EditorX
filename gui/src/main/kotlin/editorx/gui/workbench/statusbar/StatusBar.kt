@@ -10,6 +10,7 @@ import java.awt.Font
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import javax.swing.*
+import javax.swing.SwingUtilities.invokeLater
 
 class StatusBar(private val mainWindow: MainWindow) : JPanel() {
     private val statusLabel = JLabel().apply {
@@ -32,6 +33,17 @@ class StatusBar(private val mainWindow: MainWindow) : JPanel() {
         font = font.deriveFont(Font.PLAIN, 11f)
         isVisible = false
     }
+
+    private val tasksButton = JButton("0").apply {
+        isVisible = false
+        isFocusable = false
+        margin = java.awt.Insets(1, 6, 1, 6)
+        isBorderPainted = true
+        isContentAreaFilled = false
+        toolTipText = "后台任务"
+        addActionListener { showTasksPopup() }
+    }
+
     private val progressBar = JProgressBar().apply {
         isStringPainted = true
         isVisible = false
@@ -54,6 +66,26 @@ class StatusBar(private val mainWindow: MainWindow) : JPanel() {
     private var progressLastUpdateTime = 0L
     private val progressUpdateThrottleMs = 50L // 限制更新频率为每50ms最多一次
     private var onProgressCancel: (() -> Unit)? = null
+
+    @JvmInline
+    value class ProgressHandle(val id: Long)
+
+    private data class ProgressTask(
+        val id: Long,
+        var message: String,
+        var indeterminate: Boolean,
+        var cancellable: Boolean,
+        var maximum: Int,
+        var value: Int,
+        var onCancel: (() -> Unit)?,
+    )
+
+    private val taskLock = Any()
+    private var nextTaskId = 1L
+    private val tasks = LinkedHashMap<Long, ProgressTask>()
+    private var pinnedTaskId: Long? = null
+    private var lastUpdatedTaskId: Long? = null
+    private var legacyHandle: ProgressHandle? = null
 
     // 行号和列号
     private val lineColumnLabel = JLabel("").apply {
@@ -112,6 +144,8 @@ class StatusBar(private val mainWindow: MainWindow) : JPanel() {
     }
 
     private fun setupRightComponents() {
+        add(tasksButton)
+        add(Box.createHorizontalStrut(6))
         add(progressLabel)
         add(Box.createHorizontalStrut(8))
         add(progressBar)
@@ -160,76 +194,212 @@ class StatusBar(private val mainWindow: MainWindow) : JPanel() {
         onCancel: (() -> Unit)? = null,
         maximum: Int = 100
     ) {
-        progressBar.apply {
-            isVisible = true
-            isIndeterminate = indeterminate
-            string = "" // 进度条本身不显示文本
-            setMaximum(maximum)
-            if (indeterminate) {
-                // 不确定性进度条：使用来回动画，不设置具体值
-                value = 0
+        val handle = synchronized(taskLock) {
+            val existing = legacyHandle
+            if (existing != null && tasks.containsKey(existing.id)) {
+                existing
+            } else {
+                val h = beginProgressTaskLocked(message, indeterminate, cancellable, onCancel, maximum)
+                legacyHandle = h
+                h
             }
         }
-        // 在进度标签中显示进度信息
-        progressLabel.apply {
-            text = message
-            isVisible = true
+        updateProgressTask(handle, message, indeterminate, cancellable, onCancel, maximum)
+    }
+
+    fun beginProgressTask(
+        message: String,
+        indeterminate: Boolean = true,
+        cancellable: Boolean = false,
+        onCancel: (() -> Unit)? = null,
+        maximum: Int = 100
+    ): ProgressHandle {
+        val handle = synchronized(taskLock) {
+            beginProgressTaskLocked(message, indeterminate, cancellable, onCancel, maximum)
         }
-        progressCancelButton.isVisible = cancellable
-        onProgressCancel = onCancel
-        // 只在首次显示进度时才重新布局
-        if (!progressBar.isVisible) {
-            revalidate()
+        refreshProgressUiAsync()
+        return handle
+    }
+
+    fun updateProgressTask(
+        handle: ProgressHandle,
+        message: String,
+        indeterminate: Boolean = true,
+        cancellable: Boolean = false,
+        onCancel: (() -> Unit)? = null,
+        maximum: Int = 100
+    ) {
+        synchronized(taskLock) {
+            val task = tasks[handle.id] ?: return
+            task.message = message
+            task.indeterminate = indeterminate
+            task.cancellable = cancellable
+            task.onCancel = onCancel
+            if (maximum > 0) task.maximum = maximum
+            if (indeterminate) task.value = 0
+            lastUpdatedTaskId = task.id
         }
-        // 只重绘进度相关组件，不重绘整个状态栏
-        progressLabel.repaint()
-        progressBar.repaint()
-        progressCancelButton.repaint()
+        refreshProgressUiAsync()
     }
 
     fun updateProgress(value: Int, message: String) {
-        val currentTime = System.currentTimeMillis()
+        val handle = synchronized(taskLock) { legacyHandle } ?: return
+        updateProgressTask(handle, value, message)
+    }
 
-        // 防抖：限制更新频率
-        if (currentTime - progressLastUpdateTime < progressUpdateThrottleMs) {
-            return
-        }
+    fun updateProgressTask(handle: ProgressHandle, value: Int, message: String) {
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - progressLastUpdateTime < progressUpdateThrottleMs) return
         progressLastUpdateTime = currentTime
 
-        progressBar.apply {
-            isVisible = true
-            isIndeterminate = false // 确定性进度条
-            this.value = minOf(value, maximum) // 确保不超过最大值
-            string = "" // 进度条不显示文本
+        synchronized(taskLock) {
+            val task = tasks[handle.id] ?: return
+            task.indeterminate = false
+            task.value = value
+            task.message = message
+            lastUpdatedTaskId = task.id
         }
-        // 在进度标签中显示进度信息
-        progressLabel.apply {
-            val percentage =
-                if (progressBar.maximum > 0) {
-                    (value * 100) / progressBar.maximum
-                } else {
-                    0
-                }
-            text = "$message ($percentage%)"
-            isVisible = true
-        }
-        // 只重绘进度条，不重绘整个状态栏
-        progressBar.repaint()
+        refreshProgressUiAsync()
     }
 
     fun hideProgress() {
-        progressBar.isVisible = false
-        progressCancelButton.isVisible = false
-        progressLabel.isVisible = false
-        onProgressCancel = null
-        statusLabel.text = I18n.translate(I18nKeys.Status.READY) // 恢复默认状态
-        // 只在隐藏进度时才重新布局
+        val handle = synchronized(taskLock) { legacyHandle } ?: return
+        endProgressTask(handle)
+        synchronized(taskLock) { if (legacyHandle?.id == handle.id) legacyHandle = null }
+    }
+
+    fun endProgressTask(handle: ProgressHandle) {
+        synchronized(taskLock) {
+            tasks.remove(handle.id)
+            if (pinnedTaskId == handle.id) pinnedTaskId = null
+            if (lastUpdatedTaskId == handle.id) lastUpdatedTaskId = null
+        }
+        refreshProgressUiAsync()
+    }
+
+    private fun beginProgressTaskLocked(
+        message: String,
+        indeterminate: Boolean,
+        cancellable: Boolean,
+        onCancel: (() -> Unit)?,
+        maximum: Int
+    ): ProgressHandle {
+        val id = nextTaskId++
+        tasks[id] = ProgressTask(
+            id = id,
+            message = message,
+            indeterminate = indeterminate,
+            cancellable = cancellable,
+            maximum = maximum,
+            value = 0,
+            onCancel = onCancel,
+        )
+        lastUpdatedTaskId = id
+        return ProgressHandle(id)
+    }
+
+    private fun activeTask(): ProgressTask? {
+        val id = pinnedTaskId ?: lastUpdatedTaskId ?: tasks.keys.lastOrNull()
+        return if (id == null) null else tasks[id]
+    }
+
+    private fun refreshProgressUiAsync() {
+        if (SwingUtilities.isEventDispatchThread()) {
+            refreshProgressUi()
+        } else {
+            invokeLater { refreshProgressUi() }
+        }
+    }
+
+    private fun refreshProgressUi() {
+        val snapshot = synchronized(taskLock) {
+            val task = activeTask()
+            val size = tasks.size
+            Triple(task, size, tasks.values.toList())
+        }
+
+        val active = snapshot.first
+        val size = snapshot.second
+
+        tasksButton.isVisible = size > 1
+        tasksButton.text = size.toString()
+
+        if (active == null) {
+            progressBar.isVisible = false
+            progressCancelButton.isVisible = false
+            progressLabel.isVisible = false
+            onProgressCancel = null
+            revalidate()
+            repaint()
+            return
+        }
+
+        progressBar.apply {
+            isVisible = true
+            isIndeterminate = active.indeterminate
+            string = ""
+            setMaximum(active.maximum)
+            value = if (active.indeterminate) 0 else minOf(active.value, maximum)
+        }
+        progressLabel.apply {
+            text =
+                if (active.indeterminate) {
+                    active.message
+                } else {
+                    val percentage =
+                        if (active.maximum > 0) {
+                            (active.value * 100) / active.maximum
+                        } else 0
+                    "${active.message} ($percentage%)"
+                }
+            isVisible = true
+        }
+        progressCancelButton.isVisible = active.cancellable
+        onProgressCancel = active.onCancel
+
         revalidate()
-        // 只重绘相关组件
-        progressLabel.repaint()
-        progressBar.repaint()
-        progressCancelButton.repaint()
-        statusLabel.repaint()
+        repaint()
+    }
+
+    private fun showTasksPopup() {
+        val button = tasksButton
+        if (!button.isVisible) return
+
+        val snapshot = synchronized(taskLock) {
+            val currentPinned = pinnedTaskId
+            tasks.values.map { it.copy() } to currentPinned
+        }
+        val list = snapshot.first
+        val currentPinned = snapshot.second
+
+        val popup = JPopupMenu()
+        if (list.isEmpty()) return
+
+        for (t in list) {
+            val label =
+                if (t.indeterminate) t.message
+                else {
+                    val percentage = if (t.maximum > 0) (t.value * 100) / t.maximum else 0
+                    "${t.message} ($percentage%)"
+                }
+            val item = JCheckBoxMenuItem(label, currentPinned == t.id).apply {
+                addActionListener {
+                    synchronized(taskLock) { pinnedTaskId = t.id }
+                    refreshProgressUiAsync()
+                }
+            }
+            popup.add(item)
+        }
+
+        popup.addSeparator()
+        popup.add(JMenuItem("显示最新任务").apply {
+            addActionListener {
+                synchronized(taskLock) { pinnedTaskId = null }
+                refreshProgressUiAsync()
+            }
+        })
+
+        popup.show(button, 0, button.height)
     }
 
     fun clear() {
