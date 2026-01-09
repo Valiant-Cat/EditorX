@@ -510,6 +510,13 @@ exec "$APP_HOME/MacOS/EditorX" "$@"
 EOF
     chmod +x "$contents_dir/bin/editorx"
 
+    # 拷贝内置工具（apktool.jar / smali.jar 等），保证 .app 内可用
+    if [ -d "$install_dir/tools" ]; then
+        rm -rf "$contents_dir/tools"
+        cp -R "$install_dir/tools" "$contents_dir/tools"
+        chmod +x "$contents_dir/tools/apktool" 2>/dev/null || true
+    fi
+
     # 修改过 bundle 内容后需要重新签名，否则可能提示“已损坏”
     if [ -x "/usr/bin/codesign" ]; then
         /usr/bin/codesign -s - --force --deep "$out_dir/EditorX.app"

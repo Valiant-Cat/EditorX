@@ -32,6 +32,17 @@ application {
     mainClass.set("editorx.gui.GuiAppKt")
 }
 
+// 将仓库内置工具随 installDist / distZip 一并分发（macOS .app 打包也复用 installDist 目录）
+distributions {
+    main {
+        contents {
+            from(rootProject.file("tools")) {
+                into("tools")
+            }
+        }
+    }
+}
+
 // 禁用 distTar 任务，只生成 zip
 tasks.named<Tar>("distTar") {
     enabled = false

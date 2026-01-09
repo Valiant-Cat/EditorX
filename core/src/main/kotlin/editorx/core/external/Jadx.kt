@@ -1,5 +1,6 @@
 package editorx.core.external
 
+import editorx.core.util.AppPaths
 import java.io.File
 
 /**
@@ -94,11 +95,11 @@ object Jadx {
     }
 
     private fun computeJadxPath(): String? {
-        val projectRoot = File(System.getProperty("user.dir"))
+        val appHome = AppPaths.appHome().toFile()
 
-        locateExecutable(File(projectRoot, "toolchain/jadx"), "jadx")?.let { return it }
+        locateExecutable(File(appHome, "toolchain/jadx"), "jadx")?.let { return it }
 
-        val legacy = File(projectRoot, "tools/jadx")
+        val legacy = File(appHome, "tools/jadx")
         if (legacy.exists() && ensureExecutable(legacy)) {
             return legacy.absolutePath
         }

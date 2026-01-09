@@ -1,5 +1,6 @@
 package editorx.plugins.android
 
+import com.android.apksig.ApkSigner
 import editorx.core.external.ApkTool
 import editorx.core.i18n.I18n
 import editorx.core.i18n.I18nKeys
@@ -8,7 +9,12 @@ import editorx.core.service.BuildResult
 import editorx.core.service.BuildStatus
 import org.slf4j.LoggerFactory
 import java.io.File
-import java.util.*
+import java.nio.file.AtomicMoveNotSupportedException
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.security.KeyStore
+import java.security.PrivateKey
+import java.security.cert.X509Certificate
 
 /**
  * Android 构建提供者
@@ -92,36 +98,60 @@ class ApkBuildService : BuildService {
     private fun signWithDebugKeystore(apkFile: File): SignResult {
         val keystore = ensureDebugKeystore()
             ?: return SignResult(false, I18n.translate(I18nKeys.ToolbarMessage.KEYSTORE_NOT_FOUND))
-        val apksigner = locateApkSigner()
-            ?: return SignResult(
-                false,
-                I18n.translate(I18nKeys.ToolbarMessage.APKSIGNER_NOT_FOUND)
-            )
-
-        val processBuilder =
-            ProcessBuilder(
-                apksigner,
-                "sign",
-                "--ks",
-                keystore.absolutePath,
-                "--ks-pass",
-                "pass:android",
-                "--key-pass",
-                "pass:android",
-                "--ks-key-alias",
+        return runCatching {
+            val (privateKey, certificates) = loadKeyAndCerts(keystore)
+            val signerConfig = ApkSigner.SignerConfig.Builder(
                 "androiddebugkey",
-                apkFile.absolutePath
-            )
-        processBuilder.redirectErrorStream(true)
-        return try {
-            val process = processBuilder.start()
-            val output = process.inputStream.bufferedReader().use { it.readText() }
-            val exitCode = process.waitFor()
-            if (exitCode == 0) SignResult(true, null)
-            else SignResult(false, "apksigner exit code $exitCode\n$output")
-        } catch (e: Exception) {
+                privateKey,
+                certificates
+            ).build()
+
+            val tmpSigned = File(apkFile.parentFile, apkFile.nameWithoutExtension + "-signed.tmp.apk")
+            if (tmpSigned.exists()) tmpSigned.delete()
+
+            ApkSigner.Builder(listOf(signerConfig))
+                .setInputApk(apkFile)
+                .setOutputApk(tmpSigned)
+                // 保持兼容性：debug 签名默认开启 v1 + v2
+                .setV1SigningEnabled(true)
+                .setV2SigningEnabled(true)
+                .build()
+                .sign()
+
+            // 以“覆盖原文件”的方式对齐 apksigner 行为
+            try {
+                Files.move(
+                    tmpSigned.toPath(),
+                    apkFile.toPath(),
+                    StandardCopyOption.REPLACE_EXISTING,
+                    StandardCopyOption.ATOMIC_MOVE
+                )
+            } catch (_: AtomicMoveNotSupportedException) {
+                Files.move(
+                    tmpSigned.toPath(),
+                    apkFile.toPath(),
+                    StandardCopyOption.REPLACE_EXISTING
+                )
+            }
+            SignResult(true, null)
+        }.getOrElse { e ->
             SignResult(false, e.message ?: I18n.translate(I18nKeys.ToolbarMessage.SIGN_EXCEPTION))
         }
+    }
+
+    private fun loadKeyAndCerts(keystoreFile: File): Pair<PrivateKey, List<X509Certificate>> {
+        val ks = KeyStore.getInstance("JKS")
+        keystoreFile.inputStream().use { ks.load(it, "android".toCharArray()) }
+
+        val key = ks.getKey("androiddebugkey", "android".toCharArray()) as? PrivateKey
+            ?: throw IllegalStateException(I18n.translate(I18nKeys.ToolbarMessage.KEYSTORE_NOT_FOUND))
+
+        val chain = ks.getCertificateChain("androiddebugkey")
+            ?.mapNotNull { it as? X509Certificate }
+            ?: emptyList()
+        if (chain.isEmpty()) throw IllegalStateException(I18n.translate(I18nKeys.ToolbarMessage.KEYSTORE_NOT_FOUND))
+
+        return key to chain
     }
 
     private fun ensureDebugKeystore(): File? {
@@ -185,36 +215,5 @@ class ApkBuildService : BuildService {
         return null
     }
 
-    private fun locateApkSigner(): String? {
-        val projectRoot = File(System.getProperty("user.dir"))
-        val local = File(projectRoot, "tools/apksigner")
-        if (local.exists() && local.canExecute()) return local.absolutePath
-
-        try {
-            val process = ProcessBuilder("apksigner", "--version").start()
-            if (process.waitFor() == 0) return "apksigner"
-        } catch (_: Exception) {
-        }
-
-        val sdkRoot = System.getenv("ANDROID_HOME") ?: System.getenv("ANDROID_SDK_ROOT")
-        if (!sdkRoot.isNullOrBlank()) {
-            val buildTools = File(sdkRoot, "build-tools")
-            if (buildTools.isDirectory) {
-                val candidates = buildTools.listFiles()?.filter { it.isDirectory }
-                    ?.sortedByDescending { it.name.lowercase(Locale.getDefault()) }
-                if (candidates != null) {
-                    for (dir in candidates) {
-                        val exe = File(dir, "apksigner")
-                        if (exe.exists()) return exe.absolutePath
-                        val exeWin = File(dir, "apksigner.bat")
-                        if (exeWin.exists()) return exeWin.absolutePath
-                    }
-                }
-            }
-        }
-        return null
-    }
-
     private data class SignResult(val success: Boolean, val message: String?)
 }
-

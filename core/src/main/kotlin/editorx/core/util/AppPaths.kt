@@ -19,19 +19,44 @@ object AppPaths {
     private const val HOME_ENV = "EDITORX_HOME"
 
     /**
-     * 返回插件目录。
+     * 返回应用 Home 目录。
      *
      * 优先级：
      * 1) `-Deditorx.home=/path/to/appHome`
      * 2) 环境变量 `EDITORX_HOME=/path/to/appHome`
      * 3) 根据 core jar 位置推导（installDist: lib/..；否则 jar 所在目录）
-     * 4) 回退到当前工作目录下的 `plugins/`
+     * 4) 回退到当前工作目录（`user.dir`）
      */
-    fun pluginsDir(): Path {
-        val home = appHomeFromPropertyOrEnv()
+    fun appHome(): Path {
+        return appHomeFromPropertyOrEnv()
             ?: appHomeFromCodeSource()
             ?: Path.of(System.getProperty("user.dir", "."))
-        return home.resolve("plugins")
+    }
+
+    /**
+     * 返回插件目录。
+     *
+     * 约定：
+     * - installDist: `<appHome>/plugins`
+     * - jpackage app-image: `<appHome>/plugins`
+     * - 开发态：`<user.dir>/plugins`
+     */
+    fun pluginsDir(): Path {
+        return appHome().resolve("plugins")
+    }
+
+    /**
+     * 返回内置工具目录（如 apktool.jar / smali.jar 等）。
+     */
+    fun toolsDir(): Path {
+        return appHome().resolve("tools")
+    }
+
+    /**
+     * 返回用户自定义工具链目录（优先放置可执行文件）。
+     */
+    fun toolchainDir(): Path {
+        return appHome().resolve("toolchain")
     }
 
     private fun appHomeFromPropertyOrEnv(): Path? {

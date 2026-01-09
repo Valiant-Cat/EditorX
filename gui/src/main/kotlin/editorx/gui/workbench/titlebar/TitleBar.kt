@@ -336,12 +336,27 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
                                     I18n.translate(I18nKeys.ToolbarMessage.COMPILE_SUCCESS)
                                         .format(outputFile.name)
                                 )
+                                val warning = buildResult.errorMessage?.trim().orEmpty()
+                                if (warning.isNotEmpty()) {
+                                    mainWindow.statusBar.showWarning(
+                                        I18n.translate(I18nKeys.ToolbarMessage.SIGN_FAILED).format("APK 未签名")
+                                    )
+                                }
+                                val dialogMessage = buildString {
+                                    append(
+                                        I18n.translate(I18nKeys.ToolbarMessage.BUILD_GENERATED)
+                                            .format(outputFile.absolutePath)
+                                    )
+                                    if (warning.isNotEmpty()) {
+                                        append("\n\n")
+                                        append(warning)
+                                    }
+                                }
                                 JOptionPane.showMessageDialog(
                                     mainWindow,
-                                    I18n.translate(I18nKeys.ToolbarMessage.BUILD_GENERATED)
-                                        .format(outputFile.absolutePath),
+                                    dialogMessage,
                                     I18n.translate(I18nKeys.ToolbarMessage.COMPILE_COMPLETE),
-                                    JOptionPane.INFORMATION_MESSAGE
+                                    if (warning.isNotEmpty()) JOptionPane.WARNING_MESSAGE else JOptionPane.INFORMATION_MESSAGE
                                 )
                             } else {
                                 mainWindow.statusBar.showSuccess(
@@ -402,6 +417,5 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
     }
 
 }
-
 
 

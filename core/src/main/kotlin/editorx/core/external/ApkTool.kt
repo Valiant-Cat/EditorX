@@ -1,5 +1,6 @@
 package editorx.core.external
 
+import editorx.core.util.AppPaths
 import java.io.File
 
 /**
@@ -10,19 +11,24 @@ object ApkTool {
 
     data class RunResult(val status: Status, val exitCode: Int, val output: String)
 
-    @Volatile
-    private var cachedPath: String? = null
+    private sealed interface Tool {
+        data class Executable(val path: String) : Tool
+        data class Jar(val jarPath: String) : Tool
+    }
 
-    fun locate(): String? {
-        cachedPath?.let { return it }
-        val resolved = computeApktoolPath()
-        cachedPath = resolved
+    @Volatile
+    private var cachedTool: Tool? = null
+
+    private fun locateTool(): Tool? {
+        cachedTool?.let { return it }
+        val resolved = computeApktool()
+        cachedTool = resolved
         return resolved
     }
 
     fun build(workspaceRoot: File, outputApk: File, cancelSignal: (() -> Boolean)? = null): RunResult {
-        val executable = locate() ?: return RunResult(Status.NOT_FOUND, -1, "apktool not found")
-        val command = listOf(executable, "b", workspaceRoot.absolutePath, "-o", outputApk.absolutePath)
+        val tool = locateTool() ?: return RunResult(Status.NOT_FOUND, -1, "apktool not found")
+        val command = tool.commandPrefix() + listOf("b", workspaceRoot.absolutePath, "-o", outputApk.absolutePath)
         return run(command, workspaceRoot, cancelSignal)
     }
 
@@ -32,14 +38,13 @@ object ApkTool {
         force: Boolean = true,
         cancelSignal: (() -> Boolean)? = null
     ): RunResult {
-        val executable = locate() ?: return RunResult(Status.NOT_FOUND, -1, "apktool not found")
-        val command = mutableListOf(
-            executable,
+        val tool = locateTool() ?: return RunResult(Status.NOT_FOUND, -1, "apktool not found")
+        val command = (tool.commandPrefix() + listOf(
             "d",
             apkFile.absolutePath,
             "-o",
             outputDir.absolutePath
-        )
+        )).toMutableList()
         if (force) command += "-f"
         val workingDir = apkFile.parentFile
         return run(command, workingDir, cancelSignal)
@@ -73,22 +78,42 @@ object ApkTool {
         }
     }
 
-    private fun computeApktoolPath(): String? {
-        val projectRoot = File(System.getProperty("user.dir"))
-
-        locateExecutable(File(projectRoot, "toolchain/apktool"), "apktool")?.let { return it }
-
-        val legacy = File(projectRoot, "tools/apktool")
-        if (legacy.exists() && ensureExecutable(legacy)) {
-            return legacy.absolutePath
+    private fun Tool.commandPrefix(): List<String> {
+        return when (this) {
+            is Tool.Executable -> listOf(path)
+            is Tool.Jar -> listOf(javaBin(), "-jar", jarPath)
         }
+    }
+
+    private fun javaBin(): String {
+        val home = System.getProperty("java.home").orEmpty()
+        if (home.isNotBlank()) {
+            val candidate = File(home, "bin/java")
+            if (candidate.exists() && candidate.canExecute()) return candidate.absolutePath
+        }
+        return "java"
+    }
+
+    private fun computeApktool(): Tool? {
+        val appHome = AppPaths.appHome().toFile()
+
+        locateExecutable(File(appHome, "toolchain/apktool"), "apktool")?.let { return Tool.Executable(it) }
+
+        // 内置工具：优先使用 apktool.jar，避免依赖系统 java 命令
+        val bundledJar = File(appHome, "tools/apktool.jar")
+        if (bundledJar.exists() && bundledJar.isFile) return Tool.Jar(bundledJar.absolutePath)
 
         try {
             val process = ProcessBuilder("apktool", "--version").start()
             if (process.waitFor() == 0) {
-                return "apktool"
+                return Tool.Executable("apktool")
             }
         } catch (_: Exception) {
+        }
+
+        val legacy = File(appHome, "tools/apktool")
+        if (legacy.exists() && ensureExecutable(legacy)) {
+            return Tool.Executable(legacy.absolutePath)
         }
 
         val commonPaths = listOf(
@@ -100,7 +125,7 @@ object ApkTool {
         for (path in commonPaths) {
             val candidate = File(path)
             if (candidate.exists() && ensureExecutable(candidate)) {
-                return candidate.absolutePath
+                return Tool.Executable(candidate.absolutePath)
             }
         }
         return null

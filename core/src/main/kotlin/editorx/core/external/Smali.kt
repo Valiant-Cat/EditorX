@@ -1,5 +1,6 @@
 package editorx.core.external
 
+import editorx.core.util.AppPaths
 import java.io.File
 import java.nio.file.Files
 import java.nio.charset.StandardCharsets
@@ -104,7 +105,7 @@ object Smali {
                 System.out.println("====================")
 
                 listOf(
-                    "java",
+                    javaBin(),
                     "-cp",
                     classpath,
                     "org.jf.smali.Main",
@@ -136,6 +137,15 @@ object Smali {
         }
     }
 
+    private fun javaBin(): String {
+        val home = System.getProperty("java.home").orEmpty()
+        if (home.isNotBlank()) {
+            val candidate = File(home, "bin/java")
+            if (candidate.exists() && candidate.canExecute()) return candidate.absolutePath
+        }
+        return "java"
+    }
+
     private fun run(command: List<String>, workingDir: File?, cancelSignal: (() -> Boolean)?): RunResult {
         val pb = ProcessBuilder(command)
         pb.redirectErrorStream(true)
@@ -165,11 +175,11 @@ object Smali {
     }
 
     private fun computeSmaliPath(): String? {
-        val projectRoot = File(System.getProperty("user.dir"))
+        val appHome = AppPaths.appHome().toFile()
 
         // 优先查找项目内置的工具
         // 1. 查找 tools/smali 包装脚本（类似 apktool）
-        val toolsDir = File(projectRoot, "tools")
+        val toolsDir = File(appHome, "tools")
         val smaliScript = File(toolsDir, "smali")
         if (smaliScript.exists() && ensureExecutable(smaliScript)) {
             return smaliScript.absolutePath
@@ -183,7 +193,7 @@ object Smali {
         }
 
         // 3. 查找 toolchain/smali 可执行文件
-        locateExecutable(File(projectRoot, "toolchain/smali"), "smali")?.let { return it }
+        locateExecutable(File(appHome, "toolchain/smali"), "smali")?.let { return it }
 
         try {
             val process = ProcessBuilder("smali", "--version").start()

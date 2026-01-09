@@ -17,7 +17,7 @@ class GitPlugin : Plugin {
     override fun activate(pluginContext: PluginContext) {
         pluginContext.gui()?.addActivityBarItem(
             id = "git",
-            iconRef = IconRef("icons/vcs.svg"),
+            iconRef = IconRef("icons/vcs.svg", GitPlugin::class.java.classLoader),
             tooltip = "Source Control",
             viewProvider = object : CachedGuiViewProvider() {
                 override fun createView(): JComponent {
