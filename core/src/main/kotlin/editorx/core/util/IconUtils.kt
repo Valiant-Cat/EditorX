@@ -24,18 +24,24 @@ object IconUtils {
                     val oldAA = g2.getRenderingHint(RenderingHints.KEY_ANTIALIASING)
                     val oldTx = g2.transform
 
-                    g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR)
+                    // 使用更高质量的插值算法
+                    g2.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC)
                     g2.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
                     g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+                    // 确保文本和图形渲染质量
+                    g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON)
+                    g2.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON)
 
                     val originalWidth = icon.iconWidth
                     val originalHeight = icon.iconHeight
                     val scaleX = width.toDouble() / originalWidth
                     val scaleY = height.toDouble() / originalHeight
+                    
+                    // 先平移后缩放，这样坐标计算更清晰
+                    g2.translate(x.toDouble(), y.toDouble())
                     g2.scale(scaleX, scaleY)
-                    val scaledX = x / scaleX
-                    val scaledY = y / scaleY
-                    icon.paintIcon(c, g2, scaledX.toInt(), scaledY.toInt())
+                    // 在变换后的坐标系中，图标应在 (0, 0) 位置绘制
+                    icon.paintIcon(c, g2, 0, 0)
 
                     g2.transform = oldTx
                     // 恢复渲染 hint：老值可能为 null，不能直接 setRenderingHint(null)

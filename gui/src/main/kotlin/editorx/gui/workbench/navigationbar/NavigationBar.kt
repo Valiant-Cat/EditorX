@@ -35,7 +35,7 @@ class NavigationBar(private val mainWindow: MainWindow) : JPanel() {
         minimumSize = java.awt.Dimension(0, 28)
         updateTheme()
         // 移除底部边框，因为它在 StatusBar 中，不需要单独边框
-        border = EmptyBorder(4, 8, 4, 12)
+        border = EmptyBorder(0, 8, 0, 12)
 
         // 监听主题变更
         ThemeManager.addThemeChangeListener { updateTheme() }

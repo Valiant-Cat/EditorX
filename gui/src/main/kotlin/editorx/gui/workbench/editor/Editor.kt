@@ -1,13 +1,20 @@
 package editorx.gui.workbench.editor
 
 import editorx.gui.core.FileTypeManager
+import editorx.gui.core.EditorContextMenuManager
 import editorx.gui.core.FormatterManager
+import editorx.core.filetype.LanguageFileType
 import editorx.core.external.Jadx
 import editorx.core.external.Smali
+import editorx.core.gui.DiffHunk
+import editorx.core.gui.EditorMenuHandler
+import editorx.core.gui.EditorMenuView
 import editorx.gui.core.FileHandlerManager
 import editorx.gui.theme.ThemeManager
 import editorx.gui.MainWindow
 import editorx.gui.workbench.explorer.ExplorerIcons
+import editorx.core.util.IconLoader
+import editorx.core.util.IconRef
 import editorx.core.util.IconUtils
 import editorx.gui.shortcut.ShortcutIds
 import editorx.gui.shortcut.ShortcutManager
@@ -15,6 +22,8 @@ import org.fife.ui.rtextarea.RTextScrollPane
 import org.slf4j.LoggerFactory
 import java.awt.*
 import java.awt.dnd.*
+import java.awt.event.AdjustmentListener
+import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
@@ -59,13 +68,23 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
     private var smaliViewTabs: JTabbedPane? = null
     private var isSmaliMode = false
     private var smaliFile: File? = null
-    private var smaliOriginalContent: String? = null
     private val smaliTabState = mutableMapOf<File, Int>()
+    private val smaliCodeTextAreas = mutableMapOf<File, TextArea>()
+    private val smaliCodeScrollPanes = mutableMapOf<File, RTextScrollPane>()
+    private data class EditorViewState(val caretPosition: Int, val vScroll: Int, val hScroll: Int)
+    private val smaliTextViewStates = mutableMapOf<File, EditorViewState>()
+    private val smaliCodeViewStates = mutableMapOf<File, EditorViewState>()
 
     private data class SmaliJavaCacheEntry(
         val sourceLastModified: Long,
         val sourceLength: Long,
-        val javaContent: String
+        val javaContent: String,
+        val sourceTextHash: Int? = null,
+        val sourceTextLength: Int? = null,
+        // Java 内容来源（可选）：用于在 JADX 全量产物就绪后覆盖旧缓存
+        val javaSourcePath: String? = null,
+        val javaSourceLastModified: Long? = null,
+        val javaSourceLength: Long? = null,
     )
 
     private val smaliJavaContentCache = mutableMapOf<File, SmaliJavaCacheEntry>()
@@ -89,6 +108,39 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
     private val editorContentPanel = JPanel(BorderLayout()).apply {
         add(tabbedPane, BorderLayout.CENTER)
         add(bottomContainer, BorderLayout.SOUTH)
+    }
+
+    private data class CustomTabKey(val ownerId: String, val tabId: String)
+
+    private class CustomTabContent(val key: CustomTabKey, component: Component) : JPanel(BorderLayout()) {
+        init {
+            isOpaque = false
+            border = BorderFactory.createEmptyBorder(0, 0, 0, 0)
+            add(component, BorderLayout.CENTER)
+        }
+
+        fun setContent(component: Component) {
+            removeAll()
+            add(component, BorderLayout.CENTER)
+            revalidate()
+            repaint()
+        }
+    }
+
+    private class DiffTabContent(
+        val key: CustomTabKey,
+        val file: File,
+        val leftHeader: JLabel,
+        val rightHeader: JLabel,
+        val leftArea: TextArea,
+        val rightArea: TextArea,
+    ) : JPanel(BorderLayout()) {
+        init {
+            isOpaque = false
+            border = BorderFactory.createEmptyBorder(0, 0, 0, 0)
+        }
+
+        val baseTitle: String get() = "Diff · ${file.name}"
     }
 
     private class TabContent(val scrollPane: RTextScrollPane) : JPanel(BorderLayout()) {
@@ -135,7 +187,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                 }
 
                 override fun getTabAreaInsets(placement: Int): java.awt.Insets {
-                    return java.awt.Insets(0, 0, 0, 0) // 移除标签区域边距
+                    return java.awt.Insets(3, 6, 3, 6) // 调整标签页内边距
                 }
 
                 override fun paintContentBorder(g: java.awt.Graphics?, placement: Int, selectedIndex: Int) {
@@ -158,8 +210,35 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                     try {
                         g2d.color = theme.surface
                         g2d.fillRect(x, y, w, h)
+
+                        // 为选中的 tab 添加底部指示器（指针）
+                        if (isSelected) {
+                            g2d.color = theme.primary
+                            g2d.fillRect(x, y + h - 2, w, 2)
+                        }
                     } finally {
                         g2d.dispose()
+                    }
+                }
+
+                override fun paintTab(
+                    g: Graphics,
+                    tabPlacement: Int,
+                    rects: Array<out Rectangle>,
+                    tabIndex: Int,
+                    iconRect: Rectangle,
+                    textRect: Rectangle
+                ) {
+                    // 重写此方法，确保选中和未选中 Tab 的内容位置一致
+                    // 先调用父类方法绘制基础内容
+                    super.paintTab(g, tabPlacement, rects, tabIndex, iconRect, textRect)
+
+                    // 如果有自定义 Tab 组件，确保其位置不受选中状态影响
+                    val tabComponent = tabbedPane.getTabComponentAt(tabIndex)
+                    if (tabComponent != null) {
+                        // 确保 Tab 组件的位置和大小一致
+                        val rect = rects[tabIndex]
+                        tabComponent.bounds = rect
                     }
                 }
             })
@@ -259,26 +338,26 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
     private fun updateTheme() {
         val theme = ThemeManager.currentTheme
         background = theme.editorBackground
-        
+
         // 更新所有已存在的 TextArea 和 RTextScrollPane 的背景色
         for (i in 0 until tabbedPane.tabCount) {
             val tabContent = tabbedPane.getComponentAt(i) as? TabContent ?: continue
             val scrollPane = tabContent.scrollPane
-            
+
             // 更新 RTextScrollPane 的背景色
             scrollPane.background = theme.editorBackground
             scrollPane.viewport.background = theme.editorBackground
-            
+
             // 更新滚动条的背景色
             scrollPane.verticalScrollBar.background = theme.editorBackground
             scrollPane.horizontalScrollBar.background = theme.editorBackground
-            
+
             // 更新 TextArea 的背景色和前景色
             val textArea = tabTextAreas[i] ?: continue
             textArea.background = theme.editorBackground
             textArea.foreground = theme.onSurface
         }
-        
+
         // 更新 tabbedPane 的背景色和前景色
         tabbedPane.background = theme.surface
         tabbedPane.foreground = theme.onSurfaceVariant
@@ -291,10 +370,10 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                 // 某些 tab 可能不支持设置颜色，忽略
             }
         }
-        
+
         // 更新所有 tab header 的样式
         updateTabHeaderStyles()
-        
+
         // 更新底部 manifest 视图标签
         manifestViewTabs?.let { tabs ->
             tabs.border = BorderFactory.createMatteBorder(1, 0, 0, 0, theme.outline)
@@ -314,7 +393,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             tabs.updateUI()
             tabs.repaint()
         }
-        
+
         // 更新底部 smali 视图标签
         smaliViewTabs?.let { tabs ->
             tabs.border = BorderFactory.createMatteBorder(1, 0, 0, 0, theme.outline)
@@ -334,10 +413,10 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             tabs.updateUI()
             tabs.repaint()
         }
-        
+
         // 触发 tabbedPane 的重绘，更新 tab 背景
         tabbedPane.repaint()
-        
+
         revalidate()
         repaint()
     }
@@ -364,8 +443,388 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         updateEditorContent()
     }
 
+    fun openCustomTab(ownerId: String, tabId: String, title: String, iconRef: IconRef?, component: Component) {
+        val key = CustomTabKey(ownerId, tabId)
+        val icon = iconRef?.let { IconLoader.getIcon(it, 16) }
+
+        val existingIndex = (0 until tabbedPane.tabCount).firstOrNull { idx ->
+            val content = tabbedPane.getComponentAt(idx)
+            (content as? CustomTabContent)?.key == key
+        }
+
+        if (existingIndex != null) {
+            val content = tabbedPane.getComponentAt(existingIndex) as? CustomTabContent ?: return
+            content.setContent(component)
+            tabbedPane.setTitleAt(existingIndex, title)
+            tabbedPane.setIconAt(existingIndex, icon)
+
+            val header = tabbedPane.getTabComponentAt(existingIndex) as? JComponent
+            val titleLabel = header?.getClientProperty("titleLabel") as? JLabel
+            titleLabel?.text = title
+            if (icon != null) titleLabel?.icon = icon
+
+            tabbedPane.selectedIndex = existingIndex
+            showEditorContent()
+            return
+        }
+
+        val content = CustomTabContent(key, component)
+        tabbedPane.addTab(title, icon, content, null)
+        val index = tabbedPane.indexOfComponent(content)
+        val header = createCustomTabHeader(title, icon)
+        tabbedPane.setTabComponentAt(index, header)
+        attachPopupToHeader(header)
+        tabbedPane.selectedIndex = index
+        showEditorContent()
+    }
+
+    fun closeCustomTabs(ownerId: String) {
+        for (idx in tabbedPane.tabCount - 1 downTo 0) {
+            when (val content = tabbedPane.getComponentAt(idx)) {
+                is CustomTabContent -> if (content.key.ownerId == ownerId) closeTab(idx)
+                is DiffTabContent -> if (content.key.ownerId == ownerId) closeTab(idx)
+            }
+        }
+    }
+
+    fun openDiffTab(
+        ownerId: String,
+        tabId: String,
+        title: String,
+        file: File?,
+        leftTitle: String,
+        leftText: String,
+        rightTitle: String,
+        rightText: String,
+        hunks: List<DiffHunk>,
+    ) {
+        if (file == null) {
+            val diffView = createDiffViewReadOnly(null, leftTitle, leftText, rightTitle, rightText, hunks)
+            openCustomTab(ownerId, tabId, title, iconRef = null, component = diffView)
+            return
+        }
+
+        openDiffFileTab(ownerId, tabId, title, file, leftTitle, leftText, rightTitle, rightText, hunks)
+    }
+
+    private fun openDiffFileTab(
+        ownerId: String,
+        tabId: String,
+        title: String,
+        file: File,
+        leftTitle: String,
+        leftText: String,
+        rightTitle: String,
+        rightText: String,
+        hunks: List<DiffHunk>,
+    ) {
+        val key = CustomTabKey(ownerId, tabId)
+
+        // 若该文件已以普通方式打开，优先关闭普通 tab（避免同一文件多个 tab 导致保存/脏标记冲突）
+        fileToTab[file]?.let { existingIdx ->
+            val existing = tabbedPane.getComponentAt(existingIdx)
+            if (existing !is DiffTabContent) {
+                closeTab(existingIdx)
+                if (fileToTab.containsKey(file)) return
+            }
+        }
+
+        // 复用已有 Diff tab
+        val existingIdx = fileToTab[file]
+        if (existingIdx != null) {
+            val existing = tabbedPane.getComponentAt(existingIdx) as? DiffTabContent
+            if (existing != null && existing.key == key) {
+                existing.leftHeader.text = leftTitle
+                existing.rightHeader.text = rightTitle
+
+                existing.leftArea.isEditable = false
+                existing.leftArea.text = leftText
+                existing.leftArea.caretPosition = 0
+                runCatching { existing.leftArea.detectSyntax(file) }
+
+                // 右侧若未修改，允许刷新；避免覆盖用户正在编辑的内容
+                val dirty = dirtyTabs.contains(existingIdx)
+                if (!dirty) {
+                    existing.rightArea.putClientProperty("suppressDirty", true)
+                    existing.rightArea.text = rightText
+                    existing.rightArea.caretPosition = 0
+                    runCatching { existing.rightArea.detectSyntax(file) }
+                    originalTextByIndex[existingIdx] = existing.rightArea.text
+                    dirtyTabs.remove(existingIdx)
+                    existing.rightArea.putClientProperty("suppressDirty", false)
+                }
+
+                applyDiffHighlights(existing.leftArea, existing.rightArea, hunks)
+                tabbedPane.selectedIndex = existingIdx
+                showEditorContent()
+                updateTabTitle(existingIdx)
+                updateTabHeaderStyles()
+                return
+            }
+        }
+
+        val view = createDiffViewEditableRight(key, file, leftTitle, leftText, rightTitle, rightText, hunks)
+
+        tabbedPane.addTab(title, resolveTabIcon(file), view, null)
+        val index = tabbedPane.indexOfComponent(view)
+
+        val header = createCustomTabHeader("Diff · ${file.name}", resolveTabIcon(file))
+        tabbedPane.setTabComponentAt(index, header)
+        attachPopupToHeader(header)
+
+        // 作为“文件 tab”注册，复用保存/脏标记逻辑（右侧可编辑）
+        fileToTab[file] = index
+        tabToFile[index] = file
+        tabTextAreas[index] = view.rightArea
+        originalTextByIndex[index] = view.rightArea.text
+        dirtyTabs.remove(index)
+
+        tabbedPane.selectedIndex = index
+        showEditorContent()
+        updateTabTitle(index)
+        updateTabHeaderStyles()
+        updateNavigation(file)
+    }
+
+    private fun createDiffViewReadOnly(
+        file: File?,
+        leftTitle: String,
+        leftText: String,
+        rightTitle: String,
+        rightText: String,
+        hunks: List<DiffHunk>,
+    ): JComponent {
+        val leftArea = createReadOnlyTextArea(file, leftText)
+        val rightArea = createReadOnlyTextArea(file, rightText)
+
+        applyDiffHighlights(leftArea, rightArea, hunks)
+
+        val leftScroll = RTextScrollPane(leftArea).apply {
+            border = BorderFactory.createEmptyBorder(0, 0, 0, 0)
+            // RTextScrollPane 的 viewport 可能不支持 setBorder（会抛异常），避免直接设置 viewport.border
+            viewport.background = ThemeManager.currentTheme.editorBackground
+        }
+        val rightScroll = RTextScrollPane(rightArea).apply {
+            border = BorderFactory.createEmptyBorder(0, 0, 0, 0)
+            viewport.background = ThemeManager.currentTheme.editorBackground
+        }
+
+        // 同步滚动（避免一侧滚动另一侧不动）
+        syncScrollBars(leftScroll.verticalScrollBar, rightScroll.verticalScrollBar)
+        syncScrollBars(leftScroll.horizontalScrollBar, rightScroll.horizontalScrollBar)
+
+        fun side(title: String, scroll: JComponent): JComponent {
+            val header = JLabel(title).apply {
+                border = BorderFactory.createEmptyBorder(6, 10, 6, 10)
+                foreground = ThemeManager.currentTheme.onSurfaceVariant
+                font = font.deriveFont(Font.PLAIN, 11f)
+            }
+            return JPanel(BorderLayout()).apply {
+                isOpaque = false
+                border = BorderFactory.createEmptyBorder(0, 0, 0, 0)
+                add(header, BorderLayout.NORTH)
+                add(scroll, BorderLayout.CENTER)
+            }
+        }
+
+        val split = JSplitPane(
+            JSplitPane.HORIZONTAL_SPLIT,
+            side(leftTitle, leftScroll),
+            side(rightTitle, rightScroll)
+        ).apply {
+            resizeWeight = 0.5
+            isContinuousLayout = true
+            dividerSize = 6
+            border = BorderFactory.createEmptyBorder(0, 0, 0, 0)
+        }
+
+        return JPanel(BorderLayout()).apply {
+            isOpaque = false
+            border = BorderFactory.createEmptyBorder(0, 0, 0, 0)
+            add(split, BorderLayout.CENTER)
+        }
+    }
+
+    private fun createDiffViewEditableRight(
+        key: CustomTabKey,
+        file: File,
+        leftTitle: String,
+        leftText: String,
+        rightTitle: String,
+        rightText: String,
+        hunks: List<DiffHunk>,
+    ): DiffTabContent {
+        val leftArea = createReadOnlyTextArea(file, leftText)
+        val rightArea = createEditableTextArea(file, rightText)
+
+        applyDiffHighlights(leftArea, rightArea, hunks)
+
+        val leftScroll = RTextScrollPane(leftArea).apply {
+            border = BorderFactory.createEmptyBorder(0, 0, 0, 0)
+            viewport.background = ThemeManager.currentTheme.editorBackground
+        }
+        val rightScroll = RTextScrollPane(rightArea).apply {
+            border = BorderFactory.createEmptyBorder(0, 0, 0, 0)
+            viewport.background = ThemeManager.currentTheme.editorBackground
+        }
+
+        syncScrollBars(leftScroll.verticalScrollBar, rightScroll.verticalScrollBar)
+        syncScrollBars(leftScroll.horizontalScrollBar, rightScroll.horizontalScrollBar)
+
+        fun headerLabel(text: String): JLabel = JLabel(text).apply {
+            border = BorderFactory.createEmptyBorder(6, 10, 6, 10)
+            foreground = ThemeManager.currentTheme.onSurfaceVariant
+            font = font.deriveFont(Font.PLAIN, 11f)
+        }
+
+        val leftHeader = headerLabel(leftTitle)
+        val rightHeader = headerLabel(rightTitle)
+
+        fun side(header: JLabel, scroll: JComponent): JComponent {
+            return JPanel(BorderLayout()).apply {
+                isOpaque = false
+                border = BorderFactory.createEmptyBorder(0, 0, 0, 0)
+                add(header, BorderLayout.NORTH)
+                add(scroll, BorderLayout.CENTER)
+            }
+        }
+
+        val split = JSplitPane(
+            JSplitPane.HORIZONTAL_SPLIT,
+            side(leftHeader, leftScroll),
+            side(rightHeader, rightScroll)
+        ).apply {
+            resizeWeight = 0.5
+            isContinuousLayout = true
+            dividerSize = 6
+            border = BorderFactory.createEmptyBorder(0, 0, 0, 0)
+        }
+
+        return DiffTabContent(
+            key = key,
+            file = file,
+            leftHeader = leftHeader,
+            rightHeader = rightHeader,
+            leftArea = leftArea,
+            rightArea = rightArea
+        ).apply {
+            add(split, BorderLayout.CENTER)
+        }
+    }
+
+    private fun createReadOnlyTextArea(file: File?, text: String): TextArea {
+        return TextArea().apply {
+            isEditable = false
+            isCodeFoldingEnabled = false
+            background = ThemeManager.currentTheme.editorBackground
+            foreground = ThemeManager.currentTheme.onSurface
+            this.text = text
+            caretPosition = 0
+            if (file != null) {
+                detectSyntax(file)
+            }
+        }
+    }
+
+    private fun createEditableTextArea(file: File, text: String): TextArea {
+        return TextArea().apply {
+            isEditable = true
+            background = ThemeManager.currentTheme.editorBackground
+            foreground = ThemeManager.currentTheme.onSurface
+            caretColor = ThemeManager.currentTheme.onSurface
+            this.text = text
+            caretPosition = 0
+            runCatching { detectSyntax(file) }
+
+            addCaretListener {
+                val caretPos = caretPosition
+                val line = try {
+                    getLineOfOffset(caretPos) + 1
+                } catch (_: Exception) {
+                    1
+                }
+                val col = caretPos - getLineStartOffsetOfCurrentLine(this) + 1
+                mainWindow.statusBar.setLineColumn(line, col)
+            }
+            document.addDocumentListener(object : javax.swing.event.DocumentListener {
+                override fun insertUpdate(e: javax.swing.event.DocumentEvent?) = recomputeDirty()
+                override fun removeUpdate(e: javax.swing.event.DocumentEvent?) = recomputeDirty()
+                override fun changedUpdate(e: javax.swing.event.DocumentEvent?) = recomputeDirty()
+                private fun recomputeDirty() {
+                    if (getClientProperty("suppressDirty") == true) return
+                    val scrollComp = this@apply.parent?.parent as? java.awt.Component ?: return
+                    val index = getTabIndexForComponent(scrollComp)
+                    if (index < 0) return
+                    val original = originalTextByIndex[index]
+                    val isDirty = original != this@apply.text
+                    if (isDirty) dirtyTabs.add(index) else dirtyTabs.remove(index)
+                    updateTabTitle(index)
+                    updateTabHeaderStyles()
+                    mainWindow.titleBar.updateTitle()
+                }
+            })
+        }
+    }
+
+    private fun applyDiffHighlights(left: TextArea, right: TextArea, hunks: List<DiffHunk>) {
+        // 颜色以“轻提示”为主，避免遮挡文本
+        val addColor = Color(46, 160, 67, 45)
+        val delColor = Color(248, 81, 73, 45)
+
+        runCatching { left.removeAllLineHighlights() }
+        runCatching { right.removeAllLineHighlights() }
+
+        hunks.forEach { h ->
+            if (h.leftCount > 0) {
+                val start = (h.leftStart - 1).coerceAtLeast(0)
+                for (i in 0 until h.leftCount) {
+                    runCatching { left.addLineHighlight(start + i, delColor) }
+                }
+            }
+            if (h.rightCount > 0) {
+                val start = (h.rightStart - 1).coerceAtLeast(0)
+                for (i in 0 until h.rightCount) {
+                    runCatching { right.addLineHighlight(start + i, addColor) }
+                }
+            }
+        }
+    }
+
+    private fun syncScrollBars(a: JScrollBar, b: JScrollBar) {
+        var syncing = false
+        val listener = AdjustmentListener { e ->
+            if (syncing) return@AdjustmentListener
+            syncing = true
+            try {
+                val src = e.adjustable as JScrollBar
+                val dst = if (src === a) b else a
+                dst.value = src.value
+            } finally {
+                syncing = false
+            }
+        }
+        a.addAdjustmentListener(listener)
+        b.addAdjustmentListener(listener)
+    }
+
     // VSCode 风格的 Tab 头：固定槽位 + hover/选中显示 close 按钮
-    private fun createVSCodeTabHeader(file: File): JPanel = JPanel().apply {
+    private fun createVSCodeTabHeader(file: File): JPanel = object : JPanel() {
+        override fun paintComponent(g: Graphics) {
+            super.paintComponent(g)
+            // 如果当前 tab 被选中，绘制底部指示器
+            val idx = tabbedPane.indexOfTabComponent(this)
+            if (idx >= 0 && idx == tabbedPane.selectedIndex) {
+                val theme = ThemeManager.currentTheme
+                val g2d = g.create() as Graphics2D
+                try {
+                    g2d.color = theme.primary
+                    g2d.fillRect(0, height - 2, width, 2)
+                } finally {
+                    g2d.dispose()
+                }
+            }
+        }
+    }.apply {
         layout = java.awt.BorderLayout(); isOpaque = true; background = ThemeManager.currentTheme.surface
         cursor = java.awt.Cursor.getPredefinedCursor(java.awt.Cursor.HAND_CURSOR)
         val header = this
@@ -549,6 +1008,212 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
 
     }
 
+    private fun createCustomTabHeader(title: String, icon: Icon?): JPanel = object : JPanel() {
+        override fun paintComponent(g: Graphics) {
+            super.paintComponent(g)
+            // 如果当前 tab 被选中，绘制底部指示器
+            val idx = tabbedPane.indexOfTabComponent(this)
+            if (idx >= 0 && idx == tabbedPane.selectedIndex) {
+                val theme = ThemeManager.currentTheme
+                val g2d = g.create() as Graphics2D
+                try {
+                    g2d.color = theme.primary
+                    g2d.fillRect(0, height - 2, width, 2)
+                } finally {
+                    g2d.dispose()
+                }
+            }
+        }
+    }.apply {
+        layout = BorderLayout(); isOpaque = true; background = ThemeManager.currentTheme.surface
+        cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+        val header = this
+        var hovering = false
+
+        val titleLabel = JLabel(title).apply {
+            border = BorderFactory.createEmptyBorder(0, 8, 0, 6)
+            horizontalAlignment = JLabel.LEFT
+            this.icon = icon
+            iconTextGap = 6
+            cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+        }
+        add(titleLabel, BorderLayout.CENTER)
+
+        val closeSlot = object : JPanel(CardLayout()) {
+            var highlight = false
+            override fun paintComponent(g: Graphics) {
+                if (highlight) {
+                    val g2 = g.create() as Graphics2D
+                    try {
+                        g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
+                        g2.color = Color(255, 255, 255, 20)
+                        g2.fillRoundRect(0, 0, width, height, 6, 6)
+                        g2.color = ThemeManager.currentTheme.outline
+                        g2.stroke = BasicStroke(1f)
+                        g2.drawRoundRect(1, 1, width - 2, height - 2, 6, 6)
+                    } finally {
+                        g2.dispose()
+                    }
+                }
+                super.paintComponent(g)
+            }
+        }.apply {
+            isOpaque = false
+            preferredSize = Dimension(18, 18)
+            minimumSize = Dimension(18, 18)
+            maximumSize = Dimension(18, 18)
+        }
+
+        val empty = JPanel().apply { isOpaque = false }
+        val closeBtn = JLabel("×").apply {
+            font = font.deriveFont(Font.PLAIN, 13f)
+            foreground = ThemeManager.editorTabCloseDefault
+            horizontalAlignment = JLabel.CENTER
+            verticalAlignment = JLabel.CENTER
+            addMouseListener(object : MouseAdapter() {
+                override fun mouseEntered(e: MouseEvent) {
+                    hovering = true
+                    closeSlot.highlight = true
+                    closeSlot.repaint()
+                    foreground = ThemeManager.editorTabCloseSelected
+                    cursor = Cursor.getPredefinedCursor(Cursor.HAND_CURSOR)
+                }
+
+                override fun mouseExited(e: MouseEvent) {
+                    closeSlot.highlight = false
+                    closeSlot.repaint()
+                    hovering = false
+                    val idxLocal = tabbedPane.indexOfTabComponent(header)
+                    val selected = (idxLocal == tabbedPane.selectedIndex)
+                    foreground = if (selected) ThemeManager.editorTabCloseSelected else ThemeManager.editorTabCloseDefault
+                    cursor = Cursor.getDefaultCursor()
+                    val inside = header.mousePosition != null
+                    if (idxLocal >= 0 && idxLocal != tabbedPane.selectedIndex && !inside && !hovering) {
+                        (closeSlot.layout as CardLayout).show(closeSlot, "empty")
+                    }
+                }
+
+                override fun mousePressed(e: MouseEvent) {
+                    val idx = tabbedPane.indexOfTabComponent(header)
+                    if (idx >= 0) {
+                        closeTab(idx)
+                        e.consume()
+                    }
+                }
+            })
+        }
+        closeSlot.add(empty, "empty")
+        closeSlot.add(closeBtn, "btn")
+        (closeSlot.layout as CardLayout).show(closeSlot, "empty")
+        add(closeSlot, BorderLayout.EAST)
+
+        closeSlot.addMouseListener(object : MouseAdapter() {
+            override fun mousePressed(e: MouseEvent) {
+                if (closeBtn.isShowing) {
+                    val idx = tabbedPane.indexOfTabComponent(header)
+                    if (idx >= 0) {
+                        closeTab(idx)
+                        e.consume()
+                    }
+                }
+            }
+
+            override fun mouseEntered(e: MouseEvent) {
+                hovering = true
+                val idx = tabbedPane.indexOfTabComponent(header)
+                if (idx >= 0 && idx != tabbedPane.selectedIndex) {
+                    (closeSlot.layout as CardLayout).show(closeSlot, "btn")
+                }
+                closeSlot.highlight = true
+                closeSlot.repaint()
+            }
+
+            override fun mouseExited(e: MouseEvent) {
+                hovering = false
+                closeSlot.highlight = false
+                closeSlot.repaint()
+                val idx = tabbedPane.indexOfTabComponent(header)
+                val inside = header.mousePosition != null
+                if (idx >= 0 && idx != tabbedPane.selectedIndex && !inside && !hovering) {
+                    (closeSlot.layout as CardLayout).show(closeSlot, "empty")
+                }
+            }
+        })
+
+        putClientProperty("titleLabel", titleLabel)
+        putClientProperty("closeSlot", closeSlot)
+        putClientProperty("closeLabel", closeBtn)
+
+        addMouseListener(object : MouseAdapter() {
+            override fun mouseEntered(e: MouseEvent) {
+                hovering = true
+                val idx = tabbedPane.indexOfTabComponent(header)
+                if (idx >= 0 && idx != tabbedPane.selectedIndex) {
+                    (closeSlot.layout as CardLayout).show(closeSlot, "btn")
+                }
+            }
+
+            override fun mouseExited(e: MouseEvent) {
+                hovering = false
+                val idx = tabbedPane.indexOfTabComponent(header)
+                val inside = header.mousePosition != null
+                if (idx >= 0 && idx != tabbedPane.selectedIndex && !inside && !hovering) {
+                    (closeSlot.layout as CardLayout).show(closeSlot, "empty")
+                }
+            }
+
+            override fun mousePressed(e: MouseEvent) {
+                val idx = tabbedPane.indexOfTabComponent(header)
+                if (idx >= 0) tabbedPane.selectedIndex = idx
+            }
+        })
+
+        addMouseMotionListener(object : MouseMotionAdapter() {
+            override fun mouseMoved(e: MouseEvent) {
+                hovering = true
+                val idx = tabbedPane.indexOfTabComponent(header)
+                if (idx >= 0 && idx != tabbedPane.selectedIndex) {
+                    (closeSlot.layout as CardLayout).show(closeSlot, "btn")
+                }
+            }
+        })
+
+        titleLabel.addMouseListener(object : MouseAdapter() {
+            override fun mousePressed(e: MouseEvent) {
+                val idx = tabbedPane.indexOfTabComponent(header)
+                if (idx >= 0) tabbedPane.selectedIndex = idx
+            }
+
+            override fun mouseEntered(e: MouseEvent) {
+                hovering = true
+                val idx = tabbedPane.indexOfTabComponent(header)
+                if (idx >= 0 && idx != tabbedPane.selectedIndex) {
+                    (closeSlot.layout as CardLayout).show(closeSlot, "btn")
+                }
+            }
+
+            override fun mouseExited(e: MouseEvent) {
+                hovering = false
+                val idx = tabbedPane.indexOfTabComponent(header)
+                val inside = header.mousePosition != null
+                if (idx >= 0 && idx != tabbedPane.selectedIndex && !inside && !hovering) {
+                    (closeSlot.layout as CardLayout).show(closeSlot, "empty")
+                }
+            }
+        })
+
+        titleLabel.addMouseMotionListener(object : MouseMotionAdapter() {
+            override fun mouseMoved(e: MouseEvent) {
+                hovering = true
+                val idx = tabbedPane.indexOfTabComponent(header)
+                if (idx >= 0 && idx != tabbedPane.selectedIndex) {
+                    (closeSlot.layout as CardLayout).show(closeSlot, "btn")
+                }
+            }
+        })
+
+    }
+
     fun openFile(file: File) {
         if (fileToTab.containsKey(file)) {
             tabbedPane.selectedIndex = fileToTab[file]!!
@@ -593,9 +1258,14 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                     if (index < 0) return
                     val original = originalTextByIndex[index]
                     val isDirty = original != this@apply.text
+                    val wasDirty = dirtyTabs.contains(index)
                     if (isDirty) dirtyTabs.add(index) else dirtyTabs.remove(index)
                     updateTabTitle(index)
                     updateTabHeaderStyles()
+                    // 如果脏状态发生变化，更新标题栏
+                    if (wasDirty != isDirty) {
+                        mainWindow.titleBar.updateTitle()
+                    }
                 }
             })
 
@@ -635,13 +1305,13 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             val textAreaForMenu = this
             addMouseListener(object : MouseAdapter() {
                 override fun mousePressed(e: MouseEvent) {
-                    if (SwingUtilities.isRightMouseButton(e)) {
+                    if (e.isPopupTrigger) {
                         showTextAreaContextMenu(textAreaForMenu, e.x, e.y)
                     }
                 }
 
                 override fun mouseReleased(e: MouseEvent) {
-                    if (SwingUtilities.isRightMouseButton(e)) {
+                    if (e.isPopupTrigger) {
                         showTextAreaContextMenu(textAreaForMenu, e.x, e.y)
                     }
                 }
@@ -751,9 +1421,14 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                     if (index < 0) return
                     val original = originalTextByIndex[index]
                     val isDirty = original != this@apply.text
+                    val wasDirty = dirtyTabs.contains(index)
                     if (isDirty) dirtyTabs.add(index) else dirtyTabs.remove(index)
                     updateTabTitle(index)
                     updateTabHeaderStyles()
+                    // 如果脏状态发生变化，更新标题栏
+                    if (wasDirty != isDirty) {
+                        mainWindow.titleBar.updateTitle()
+                    }
                 }
             })
 
@@ -779,13 +1454,13 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             val textAreaForMenu = this
             addMouseListener(object : MouseAdapter() {
                 override fun mousePressed(e: MouseEvent) {
-                    if (SwingUtilities.isRightMouseButton(e)) {
+                    if (e.isPopupTrigger) {
                         showTextAreaContextMenu(textAreaForMenu, e.x, e.y)
                     }
                 }
 
                 override fun mouseReleased(e: MouseEvent) {
-                    if (SwingUtilities.isRightMouseButton(e)) {
+                    if (e.isPopupTrigger) {
                         showTextAreaContextMenu(textAreaForMenu, e.x, e.y)
                     }
                 }
@@ -879,7 +1554,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         val file = getCurrentFile() ?: return
         val findBar = getFindBar(file)
         attachFindBar(file, findBar)
-        val initial = getCurrentTextArea()?.selectedText
+        val initial = getVisibleTextArea(file)?.selectedText
             ?.takeIf { it.isNotBlank() && !it.contains('\n') && !it.contains('\r') }
         findBar.open(FindReplaceBar.Mode.FIND, initial)
     }
@@ -888,7 +1563,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         val file = getCurrentFile() ?: return
         val findBar = getFindBar(file)
         attachFindBar(file, findBar)
-        val initial = getCurrentTextArea()?.selectedText
+        val initial = getVisibleTextArea(file)?.selectedText
             ?.takeIf { it.isNotBlank() && !it.contains('\n') && !it.contains('\r') }
         findBar.open(FindReplaceBar.Mode.REPLACE, initial)
     }
@@ -1054,8 +1729,6 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             val label = comp.getClientProperty("titleLabel") as? JLabel
             label?.foreground =
                 if (isSelected) ThemeManager.editorTabSelectedForeground else ThemeManager.editorTabForeground
-            label?.font =
-                (label?.font ?: Font("Dialog", Font.PLAIN, 12)).deriveFont(if (isSelected) Font.BOLD else Font.PLAIN)
 
             // 关闭按钮显示策略（CardLayout 切换保持占位）
             val slot = comp.getClientProperty("closeSlot") as? JPanel
@@ -1083,8 +1756,14 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                 }
             }
 
-            // 不再使用下划线，保持背景一致（可留 2px 空白保持高度统一）
-            comp.border = BorderFactory.createEmptyBorder(0, 0, 2, 0)
+            // 为选中的 tab 添加底部指示器（指针），未选中的留 2px 空白保持高度统一
+            if (isSelected) {
+                comp.border = BorderFactory.createEmptyBorder(0, 0, 0, 0)
+            } else {
+                comp.border = BorderFactory.createEmptyBorder(0, 0, 2, 0)
+            }
+            // 强制重绘以显示指示器
+            comp.repaint()
         }
     }
 
@@ -1140,7 +1819,11 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             file?.let {
                 fileToTab.remove(it)
                 smaliTabState.remove(it)
+                smaliTextViewStates.remove(it)
+                smaliCodeViewStates.remove(it)
                 smaliJavaContentCache.remove(it)
+                smaliCodeTextAreas.remove(it)
+                smaliCodeScrollPanes.remove(it)
                 cancelSmaliConversion(it)
                 findReplaceBars.remove(it)?.let { bar ->
                     (bar.parent as? Container)?.remove(bar)
@@ -1190,6 +1873,9 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             newTabToFile.forEach { (i, f) -> fileToTab[f] = i }
 
             updateNavigation(getCurrentFile())
+            
+            // 更新标题栏（未保存状态可能已变化）
+            mainWindow.titleBar.updateTitle()
 
             // 如果所有标签都关闭了，显示欢迎界面
             if (tabbedPane.tabCount == 0) {
@@ -1233,8 +1919,11 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             dirtyTabs.remove(index)
             originalTextByIndex[index] = ta.text
             updateTabTitle(index)
+            updateTabHeaderStyles()
             updateNavigation(file)
             mainWindow.statusBar.showSuccess("已保存: ${file.name}")
+            // 更新标题栏（未保存状态可能已变化）
+            mainWindow.titleBar.updateTitle()
             return true
         }
 
@@ -1267,6 +1956,8 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             mainWindow.guiContext.getWorkspace().addRecentFile(newFile)
             updateNavigation(newFile)
             mainWindow.statusBar.showSuccess("已保存: ${newFile.name}")
+            // 更新标题栏（未保存状态可能已变化）
+            mainWindow.titleBar.updateTitle()
             return true
         } else {
             // 用户取消了保存对话框
@@ -1309,6 +2000,8 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             mainWindow.guiContext.getWorkspace().addRecentFile(file)
             updateNavigation(file)
             mainWindow.statusBar.showSuccess("已保存: ${file.name}")
+            // 更新标题栏（未保存状态可能已变化）
+            mainWindow.titleBar.updateTitle()
         }
     }
 
@@ -1324,7 +2017,10 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
 
     private fun updateTabTitle(index: Int) {
         val file = tabToFile[index]
-        val base = file?.name ?: "Untitled"
+        val base = when (val content = tabbedPane.getComponentAt(index)) {
+            is DiffTabContent -> content.baseTitle
+            else -> file?.name ?: "Untitled"
+        }
         val dirty = if (dirtyTabs.contains(index)) "*" else ""
         val component = tabbedPane.getTabComponentAt(index) as? JPanel
         if (component != null) {
@@ -1611,34 +2307,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             val formattedContent = formatter.format(currentContent)
 
             // 如果内容有变化，更新文本区域
-            if (formattedContent != currentContent) {
-                val caretPos = textArea.caretPosition
-                val currentIndex = tabbedPane.selectedIndex
-
-                textArea.putClientProperty("suppressDirty", true)
-
-                // 使用 replaceRange 替换整个文本，这样可以保持撤销历史
-                textArea.replaceRange(formattedContent, 0, currentContent.length)
-
-                textArea.putClientProperty("suppressDirty", false)
-
-                // 手动更新脏标记（因为 suppressDirty 阻止了 DocumentListener 的更新）
-                if (currentIndex >= 0) {
-                    val original = originalTextByIndex[currentIndex]
-                    val isDirty = original != formattedContent
-                    if (isDirty) {
-                        dirtyTabs.add(currentIndex)
-                    } else {
-                        dirtyTabs.remove(currentIndex)
-                    }
-                    updateTabTitle(currentIndex)
-                    updateTabHeaderStyles()
-                }
-
-                // 尝试恢复光标位置（如果可能）
-                val newCaretPos = minOf(caretPos, formattedContent.length)
-                textArea.caretPosition = newCaretPos
-            }
+            replaceTextAreaContent(textArea, formattedContent)
         } catch (e: Exception) {
             logger.error("格式化文件失败: ${file.name}", e)
             JOptionPane.showMessageDialog(
@@ -1650,14 +2319,59 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         }
     }
 
+    private fun replaceTextAreaContent(textArea: TextArea, newContent: String) {
+        val currentContent = textArea.text
+        if (newContent == currentContent) return
+
+        val caretPos = textArea.caretPosition
+        val scrollComp = textArea.parent?.parent as? java.awt.Component
+        val tabIndex = scrollComp?.let { getTabIndexForComponent(it) } ?: tabbedPane.selectedIndex
+
+        textArea.putClientProperty("suppressDirty", true)
+
+        // 使用 replaceRange 替换整个文本，这样可以保持撤销历史
+        textArea.replaceRange(newContent, 0, currentContent.length)
+
+        textArea.putClientProperty("suppressDirty", false)
+
+        // 手动更新脏标记（因为 suppressDirty 阻止了 DocumentListener 的更新）
+        if (tabIndex >= 0) {
+            val original = originalTextByIndex[tabIndex]
+            val wasDirty = dirtyTabs.contains(tabIndex)
+            val isDirty = original != newContent
+            if (isDirty) {
+                dirtyTabs.add(tabIndex)
+            } else {
+                dirtyTabs.remove(tabIndex)
+            }
+            updateTabTitle(tabIndex)
+            updateTabHeaderStyles()
+            // 如果脏状态发生变化，更新标题栏
+            if (wasDirty != isDirty) {
+                mainWindow.titleBar.updateTitle()
+            }
+        }
+
+        // 尝试恢复光标位置（如果可能）
+        val newCaretPos = minOf(caretPos, newContent.length)
+        textArea.caretPosition = newCaretPos
+    }
+
     /**
      * 显示文本区域的右键菜单
      */
     private fun showTextAreaContextMenu(textArea: TextArea, x: Int, y: Int) {
         val menu = JPopupMenu()
 
+        val scrollComp = textArea.parent?.parent as? java.awt.Component
+        val tabIndex = scrollComp?.let { getTabIndexForComponent(it) } ?: tabbedPane.selectedIndex
+        val file = if (tabIndex >= 0) tabToFile[tabIndex] else null
+        val smaliCodeViewFile = file?.takeIf {
+            it.name.endsWith(".smali", ignoreCase = true) && smaliCodeTextAreas[it] === textArea
+        }
+        val pluginTargetTextArea = if (smaliCodeViewFile != null) tabTextAreas[tabIndex] ?: textArea else textArea
+
         // 检查是否有格式化器可用
-        val file = getCurrentFile()
         val hasFormatter = file != null && FormatterManager.getFormatter(file) != null
 
         menu.add(JMenuItem("查找...").apply {
@@ -1665,11 +2379,14 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                 KeyStroke.getKeyStroke(KeyEvent.VK_F, java.awt.Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx)
             addActionListener { showFindBar() }
         })
-        menu.add(JMenuItem("替换...").apply {
-            accelerator =
-                KeyStroke.getKeyStroke(KeyEvent.VK_R, java.awt.Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx)
-            addActionListener { showReplaceBar() }
-        })
+        // Code 视图为只读：仅支持查找，不展示替换入口
+        if (textArea.isEditable) {
+            menu.add(JMenuItem("替换...").apply {
+                accelerator =
+                    KeyStroke.getKeyStroke(KeyEvent.VK_R, java.awt.Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx)
+                addActionListener { showReplaceBar() }
+            })
+        }
 
         if (hasFormatter) {
             menu.addSeparator()
@@ -1678,6 +2395,85 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                 ShortcutManager.getShortcut(ShortcutIds.Editor.FORMAT_FILE)?.let { accelerator = it.keyStroke }
                 addActionListener { formatCurrentFile() }
             })
+        }
+
+        // 插件扩展的编辑器右键菜单项
+        val languageId = file
+            ?.let { FileTypeManager.getFileTypeByFileName(it.name) }
+            ?.let { it as? LanguageFileType }
+            ?.language
+            ?.id
+        val view = EditorMenuView(
+            file = file,
+            languageId = languageId,
+            editable = pluginTargetTextArea.isEditable,
+            selectionStart = pluginTargetTextArea.selectionStart,
+            selectionEnd = pluginTargetTextArea.selectionEnd,
+        )
+        val pluginItems = EditorContextMenuManager.getItems(view)
+        if (pluginItems.isNotEmpty()) {
+            val handler = object : EditorMenuHandler {
+                override val view: EditorMenuView
+                    get() = EditorMenuView(
+                        file = file,
+                        languageId = languageId,
+                        editable = pluginTargetTextArea.isEditable,
+                        selectionStart = pluginTargetTextArea.selectionStart,
+                        selectionEnd = pluginTargetTextArea.selectionEnd,
+                    )
+
+                override fun getText(): String = pluginTargetTextArea.text
+
+                override fun replaceText(newText: String) {
+                    if (!pluginTargetTextArea.isEditable) return
+                    replaceTextAreaContent(pluginTargetTextArea, newText)
+                    val currentFile = smaliCodeViewFile ?: return
+                    val tabs = smaliViewTabs ?: return
+                    if (smaliFile != currentFile) return
+                    if (tabs.getTitleAt(tabs.selectedIndex) != CODE_TAB_TITLE) return
+                    showSmaliLoadingIndicator()
+                    showSmaliLoadingOverlay(currentFile)
+                    scheduleSmaliConversion(currentFile, tabs.selectedIndex, textArea, pluginTargetTextArea.text)
+                }
+
+                override fun getSelectedText(): String? = pluginTargetTextArea.selectedText
+
+                override fun replaceSelectedText(newText: String) {
+                    if (!pluginTargetTextArea.isEditable) return
+                    val start = pluginTargetTextArea.selectionStart
+                    val end = pluginTargetTextArea.selectionEnd
+                    if (start == end) return
+                    pluginTargetTextArea.replaceRange(newText, start, end)
+                    val currentFile = smaliCodeViewFile ?: return
+                    val tabs = smaliViewTabs ?: return
+                    if (smaliFile != currentFile) return
+                    if (tabs.getTitleAt(tabs.selectedIndex) != CODE_TAB_TITLE) return
+                    showSmaliLoadingIndicator()
+                    showSmaliLoadingOverlay(currentFile)
+                    scheduleSmaliConversion(currentFile, tabs.selectedIndex, textArea, pluginTargetTextArea.text)
+                }
+            }
+
+            menu.addSeparator()
+            for (item in pluginItems) {
+                val enabled = runCatching { item.enabledWhen(handler.view) }.getOrDefault(false)
+                menu.add(JMenuItem(item.text).apply {
+                    isEnabled = enabled
+                    addActionListener {
+                        runCatching {
+                            item.action(handler)
+                        }.onFailure { e ->
+                            logger.error("执行编辑器右键菜单项失败: ${item.id}", e)
+                            JOptionPane.showMessageDialog(
+                                this@Editor,
+                                "执行失败: ${e.message}",
+                                "错误",
+                                JOptionPane.ERROR_MESSAGE
+                            )
+                        }
+                    }
+                })
+            }
         }
 
         menu.show(textArea, x, y)
@@ -2140,19 +2936,217 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         future?.cancel(true)
         hideSmaliLoadingOverlay(file)
         hideSmaliLoadingIndicatorIfIdle()
+        // 清除可能被取消任务写入的错误缓存，允许重新加载
+        val cached = smaliJavaContentCache[file]
+        if (cached != null) {
+            val content = cached.javaContent
+            if (content.startsWith("// 未找到对应的 Java 源码文件") ||
+                content.startsWith("// 获取 Java 代码时出错")) {
+                smaliJavaContentCache.remove(file)
+            }
+        }
     }
 
-    private fun getCachedJavaIfFresh(smaliFile: File): String? {
+    private fun getCachedJavaIfFresh(smaliFile: File, smaliTextSnapshot: String?): String? {
         val cached = smaliJavaContentCache[smaliFile] ?: return null
-        val lm = runCatching { smaliFile.lastModified() }.getOrDefault(0L)
-        val len = runCatching { smaliFile.length() }.getOrDefault(-1L)
-        return if (cached.sourceLastModified == lm && cached.sourceLength == len) cached.javaContent else null
+        if (smaliTextSnapshot != null) {
+            val hash = smaliTextSnapshot.hashCode()
+            val len = smaliTextSnapshot.length
+            if (cached.sourceTextHash != hash || cached.sourceTextLength != len) return null
+        } else {
+            val lm = runCatching { smaliFile.lastModified() }.getOrDefault(0L)
+            val len = runCatching { smaliFile.length() }.getOrDefault(-1L)
+            if (cached.sourceLastModified != lm || cached.sourceLength != len) return null
+        }
+        // 如果缓存的是错误消息，返回 null 以触发重新加载
+        // 这样即使之前加载失败，用户切换视图后也能重新尝试
+        val content = cached.javaContent
+        if (content.startsWith("// 未找到对应的 Java 源码文件") ||
+            content.startsWith("// 获取 Java 代码时出错")) {
+            return null
+        }
+        return content
+    }
+
+    private fun ensureSmaliCodeView(file: File): Pair<TextArea, RTextScrollPane> {
+        val existingArea = smaliCodeTextAreas[file]
+        val existingScroll = smaliCodeScrollPanes[file]
+        if (existingArea != null && existingScroll != null) return existingArea to existingScroll
+
+        val theme = ThemeManager.currentTheme
+        val area = createReadOnlyTextArea(null, "").apply {
+            syntaxEditingStyle = org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_JAVA
+            background = theme.editorBackground
+            foreground = theme.onSurface
+        }
+        // Code 视图快捷键：仅查找（Code 视图为只读，不提供替换）
+        runCatching {
+            val shortcutMask = java.awt.Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx
+            area.getInputMap(JComponent.WHEN_FOCUSED).put(
+                KeyStroke.getKeyStroke(KeyEvent.VK_F, shortcutMask),
+                "editor.find"
+            )
+            area.actionMap.put("editor.find", object : AbstractAction() {
+                override fun actionPerformed(e: java.awt.event.ActionEvent?) {
+                    this@Editor.showFindBar()
+                }
+            })
+        }
+        // Code 视图下执行了会改动 Smali 的操作（例如 StringFog 解密）时，
+        // 用户期望在 Code 视图内 Cmd+Z/Cmd+Shift+Z 也能撤销/还原 Smali 的修改
+        runCatching {
+            val shortcutMask = java.awt.Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx
+            val undoKey = KeyStroke.getKeyStroke(KeyEvent.VK_Z, shortcutMask)
+            val redoKey = KeyStroke.getKeyStroke(KeyEvent.VK_Z, shortcutMask or InputEvent.SHIFT_DOWN_MASK)
+            val redoKeyAlt = KeyStroke.getKeyStroke(KeyEvent.VK_Y, shortcutMask)
+
+            area.getInputMap(JComponent.WHEN_FOCUSED).put(undoKey, "editor.smaliProxyUndo")
+            area.actionMap.put("editor.smaliProxyUndo", object : AbstractAction() {
+                override fun actionPerformed(e: java.awt.event.ActionEvent?) {
+                    val index = fileToTab[file] ?: return
+                    val smaliTextArea = tabTextAreas[index] ?: return
+                    runCatching { smaliTextArea.undoLastAction() }
+                    val tabs = smaliViewTabs ?: return
+                    if (smaliFile != file) return
+                    if (tabs.getTitleAt(tabs.selectedIndex) != CODE_TAB_TITLE) return
+                    showSmaliLoadingIndicator()
+                    showSmaliLoadingOverlay(file)
+                    scheduleSmaliConversion(file, tabs.selectedIndex, area, smaliTextArea.text)
+                }
+            })
+
+            fun installRedo(key: KeyStroke) {
+                area.getInputMap(JComponent.WHEN_FOCUSED).put(key, "editor.smaliProxyRedo")
+            }
+            installRedo(redoKey)
+            installRedo(redoKeyAlt)
+            area.actionMap.put("editor.smaliProxyRedo", object : AbstractAction() {
+                override fun actionPerformed(e: java.awt.event.ActionEvent?) {
+                    val index = fileToTab[file] ?: return
+                    val smaliTextArea = tabTextAreas[index] ?: return
+                    runCatching { smaliTextArea.redoLastAction() }
+                    val tabs = smaliViewTabs ?: return
+                    if (smaliFile != file) return
+                    if (tabs.getTitleAt(tabs.selectedIndex) != CODE_TAB_TITLE) return
+                    showSmaliLoadingIndicator()
+                    showSmaliLoadingOverlay(file)
+                    scheduleSmaliConversion(file, tabs.selectedIndex, area, smaliTextArea.text)
+                }
+            })
+        }
+        // Code 视图也需要右键菜单（例如 StringFog 解密）
+        val textAreaForMenu = area
+        area.addMouseListener(object : MouseAdapter() {
+            override fun mousePressed(e: MouseEvent) {
+                if (e.isPopupTrigger) {
+                    showTextAreaContextMenu(textAreaForMenu, e.x, e.y)
+                }
+            }
+
+            override fun mouseReleased(e: MouseEvent) {
+                if (e.isPopupTrigger) {
+                    showTextAreaContextMenu(textAreaForMenu, e.x, e.y)
+                }
+            }
+        })
+        val scroll = RTextScrollPane(area).apply {
+            border = javax.swing.BorderFactory.createEmptyBorder()
+            background = theme.editorBackground
+            viewport.background = theme.editorBackground
+            verticalScrollBar.background = theme.editorBackground
+            horizontalScrollBar.background = theme.editorBackground
+        }
+        smaliCodeTextAreas[file] = area
+        smaliCodeScrollPanes[file] = scroll
+        return area to scroll
+    }
+
+    private fun setTabCenter(tabContent: TabContent, center: Component) {
+        val layout = tabContent.layout as? BorderLayout
+        if (layout == null) {
+            tabContent.removeAll()
+            tabContent.add(tabContent.topSlot, BorderLayout.NORTH)
+            tabContent.add(center, BorderLayout.CENTER)
+        } else {
+            val oldCenter = layout.getLayoutComponent(BorderLayout.CENTER) as? Component
+            if (oldCenter === center) return
+            if (oldCenter != null) tabContent.remove(oldCenter)
+            tabContent.add(center, BorderLayout.CENTER)
+        }
+        tabContent.revalidate()
+        tabContent.repaint()
+    }
+
+    private fun captureViewState(textArea: TextArea, scroll: RTextScrollPane): EditorViewState {
+        val caret = runCatching { textArea.caretPosition }.getOrDefault(0)
+        val v = runCatching { scroll.verticalScrollBar.value }.getOrDefault(0)
+        val h = runCatching { scroll.horizontalScrollBar.value }.getOrDefault(0)
+        return EditorViewState(caretPosition = caret, vScroll = v, hScroll = h)
+    }
+
+    private fun restoreViewState(textArea: TextArea, scroll: RTextScrollPane, state: EditorViewState) {
+        val docLen = runCatching { textArea.document.length }.getOrDefault(0)
+        val caret = state.caretPosition.coerceIn(0, docLen)
+        runCatching { textArea.caretPosition = caret }
+        runCatching { scroll.verticalScrollBar.value = state.vScroll.coerceAtLeast(0) }
+        runCatching { scroll.horizontalScrollBar.value = state.hScroll.coerceAtLeast(0) }
+    }
+
+    private fun caretFromViewportTop(textArea: TextArea, scroll: RTextScrollPane): Int {
+        val rect = runCatching { scroll.viewport.viewRect }.getOrNull() ?: return 0
+        if (rect.width <= 0 || rect.height <= 0) return 0
+        val p = Point(rect.x + 1, rect.y + 1)
+        return runCatching { textArea.viewToModel2D(p) }.getOrDefault(0).coerceAtLeast(0)
+    }
+
+    private fun captureCodeViewState(textArea: TextArea, scroll: RTextScrollPane): EditorViewState {
+        val v = runCatching { scroll.verticalScrollBar.value }.getOrDefault(0)
+        val h = runCatching { scroll.horizontalScrollBar.value }.getOrDefault(0)
+        val caretRaw = runCatching { textArea.caretPosition }.getOrDefault(0)
+        val caretAnchored =
+            if (caretRaw == 0 && v > 0) caretFromViewportTop(textArea, scroll) else caretRaw
+        return EditorViewState(caretPosition = caretAnchored, vScroll = v, hScroll = h)
+    }
+
+    private fun restoreCodeViewState(textArea: TextArea, scroll: RTextScrollPane, state: EditorViewState) {
+        val vTarget = state.vScroll.coerceAtLeast(0)
+        val hTarget = state.hScroll.coerceAtLeast(0)
+        runCatching { scroll.verticalScrollBar.value = vTarget }
+        runCatching { scroll.horizontalScrollBar.value = hTarget }
+
+        val docLen = runCatching { textArea.document.length }.getOrDefault(0)
+        var caret = state.caretPosition.coerceIn(0, docLen)
+        val vNow = runCatching { scroll.verticalScrollBar.value }.getOrDefault(0)
+        if (caret == 0 && vNow > 0) {
+            caret = caretFromViewportTop(textArea, scroll).coerceIn(0, docLen)
+        }
+        runCatching { textArea.caretPosition = caret }
+
+        // 防止 focus/caret 带来的“滚回顶部”
+        runCatching { scroll.verticalScrollBar.value = vTarget }
+        runCatching { scroll.horizontalScrollBar.value = hTarget }
+    }
+
+    private fun getVisibleTextArea(file: File): TextArea? {
+        val index = fileToTab[file] ?: return null
+        val base = tabTextAreas[index]
+
+        val isSmali = file.name.endsWith(".smali", ignoreCase = true)
+        if (!isSmali) return base
+
+        // Smali 的 Code 视图是独立 TextArea，需要在底部 tab 为 CODE 时返回它
+        if (smaliFile != file) return base
+        val tabs = smaliViewTabs ?: return base
+        val selected = tabs.selectedIndex
+        if (selected < 0) return base
+        if (tabs.getTitleAt(selected) != CODE_TAB_TITLE) return base
+        return smaliCodeTextAreas[file] ?: base
     }
 
     private fun getFindBar(file: File): FindReplaceBar {
         return findReplaceBars.getOrPut(file) {
             FindReplaceBar {
-                fileToTab[file]?.let { index -> tabTextAreas[index] }
+                getVisibleTextArea(file)
             }
         }
     }
@@ -2258,10 +3252,8 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             // 读取并保存上一次的视图状态（每个文件独立）
             val savedTabIndex = smaliTabState[file] ?: 0
 
-            // 保存文件引用和原始内容
+            // 保存文件引用
             smaliFile = file
-            val content = Files.readString(file.toPath())
-            smaliOriginalContent = content
 
             // 创建底部标签面板（简洁样式）
             val theme = ThemeManager.currentTheme
@@ -2362,12 +3354,13 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             smaliViewTabs!!.addChangeListener {
                 val selected = smaliViewTabs?.selectedIndex ?: return@addChangeListener
                 if (selected >= 0 && smaliFile != null && smaliFile == file) {
-                    switchSmaliView(selected)
+                    val previous = smaliTabState[file] ?: selected
+                    switchSmaliView(selected, previous)
                 }
             }
 
             // 初始化内容（因为监听器在 restore 之后才安装）
-            switchSmaliView(safeTabIndex)
+            switchSmaliView(safeTabIndex, safeTabIndex)
 
             // 将底部标签面板添加到统一容器中，避免与查找条冲突
             // 如果已有 manifestViewTabs，需要处理布局
@@ -2424,11 +3417,29 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
     }
 
     // 切换 Smali 视图
-    private fun switchSmaliView(tabIndex: Int) {
+    private fun switchSmaliView(tabIndex: Int, previousTabIndex: Int = tabIndex) {
         // 获取当前 smali 文件的编辑器索引
         val fileIndex = smaliFile?.let { fileToTab[it] } ?: return
-        val textArea = tabTextAreas[fileIndex] ?: return
+        val smaliTextArea = tabTextAreas[fileIndex] ?: return
         val currentFile = smaliFile ?: return
+        val tabContent = (tabbedPane.getComponentAt(fileIndex) as? TabContent) ?: return
+
+        if (previousTabIndex != tabIndex) {
+            val previousTitle = runCatching { smaliViewTabs?.getTitleAt(previousTabIndex) }.getOrNull()
+            when (previousTitle) {
+                SMALI_TAB_TITLE -> {
+                    smaliTextViewStates[currentFile] = captureViewState(smaliTextArea, tabContent.scrollPane)
+                }
+
+                CODE_TAB_TITLE -> {
+                    val codeArea = smaliCodeTextAreas[currentFile]
+                    val codeScroll = smaliCodeScrollPanes[currentFile]
+                    if (codeArea != null && codeScroll != null) {
+                        smaliCodeViewStates[currentFile] = captureCodeViewState(codeArea, codeScroll)
+                    }
+                }
+            }
+        }
 
         // 保存当前选择的 tab 状态（用于在切换文件后恢复）
         smaliTabState[currentFile] = tabIndex
@@ -2437,38 +3448,80 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         when (smaliViewTabs!!.getTitleAt(tabIndex)) {
             SMALI_TAB_TITLE -> {
                 cancelSmaliConversion(currentFile)
-                textArea.putClientProperty("suppressDirty", true)
-                textArea.text = smaliOriginalContent ?: ""
-                textArea.isEditable = true
-                textArea.detectSyntax(currentFile)
-                textArea.putClientProperty("suppressDirty", false)
+                setTabCenter(tabContent, tabContent.scrollPane)
+                smaliTextArea.isEditable = true
+                smaliTextArea.detectSyntax(currentFile)
                 hideSmaliLoadingIndicatorIfIdle()
+                val restoreState = smaliTextViewStates[currentFile]
                 SwingUtilities.invokeLater {
-                    textArea.caretPosition = 0
-                    textArea.scrollRectToVisible(Rectangle(0, 0, 1, 1))
+                    if (restoreState != null) {
+                        restoreViewState(smaliTextArea, tabContent.scrollPane, restoreState)
+                    }
+                    smaliTextArea.requestFocusInWindow()
+                }
+                // 查找条：切换视图后同步高亮目标
+                val bar = findReplaceBars[currentFile]
+                if (bar?.isVisible == true) {
+                    attachFindBar(currentFile, bar)
+                    bar.onActiveEditorChanged()
                 }
             }
 
             CODE_TAB_TITLE -> {
-                textArea.putClientProperty("suppressDirty", true)
-                textArea.isEditable = false
-                val cached = getCachedJavaIfFresh(currentFile)
+                val (codeTextArea, codeScroll) = ensureSmaliCodeView(currentFile)
+                setTabCenter(tabContent, codeScroll)
+
+                val smaliSnapshot = smaliTextArea.text
+                val cached = getCachedJavaIfFresh(currentFile, smaliSnapshot)
                 if (cached != null) {
-                    textArea.text = cached
-                    textArea.syntaxEditingStyle = org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_JAVA
-                    textArea.putClientProperty("suppressDirty", false)
+                    val stateBefore = captureCodeViewState(codeTextArea, codeScroll)
+                    val javaStyle = org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_JAVA
+                    val needsTextUpdate = codeTextArea.text != cached
+                    val needsStyleUpdate = codeTextArea.syntaxEditingStyle != javaStyle
+                    if (needsTextUpdate || needsStyleUpdate) {
+                        codeTextArea.putClientProperty("suppressDirty", true)
+                        if (needsTextUpdate) {
+                            codeTextArea.text = cached
+                        }
+                        if (needsStyleUpdate) {
+                            codeTextArea.syntaxEditingStyle = javaStyle
+                        }
+                        codeTextArea.isEditable = false
+                        codeTextArea.discardAllEdits()
+                        codeTextArea.putClientProperty("suppressDirty", false)
+                    } else {
+                        codeTextArea.isEditable = false
+                    }
                     hideSmaliLoadingIndicatorIfIdle()
+                    val restoreState = smaliCodeViewStates[currentFile] ?: stateBefore
                     SwingUtilities.invokeLater {
-                        textArea.caretPosition = 0
-                        textArea.scrollRectToVisible(Rectangle(0, 0, 1, 1))
+                        restoreCodeViewState(codeTextArea, codeScroll, restoreState)
+                        SwingUtilities.invokeLater {
+                            restoreCodeViewState(codeTextArea, codeScroll, restoreState)
+                        }
+                        codeTextArea.requestFocusInWindow()
+                    }
+                    // 查找条：切换视图后同步高亮目标
+                    val bar = findReplaceBars[currentFile]
+                    if (bar?.isVisible == true) {
+                        attachFindBar(currentFile, bar)
+                        bar.onActiveEditorChanged()
                     }
                 } else {
-                    textArea.syntaxEditingStyle = org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_NONE
-                    textArea.text = ""
-                    textArea.putClientProperty("suppressDirty", false)
+                    // 保留上一次的 Java 内容，避免切换时闪烁；转换完成后再覆盖
+                    codeTextArea.isEditable = false
                     showSmaliLoadingIndicator()
                     showSmaliLoadingOverlay(currentFile)
-                    scheduleSmaliConversion(currentFile, tabIndex, textArea)
+                    scheduleSmaliConversion(currentFile, tabIndex, codeTextArea, smaliSnapshot)
+                    smaliCodeViewStates[currentFile]?.let { state ->
+                        SwingUtilities.invokeLater { restoreCodeViewState(codeTextArea, codeScroll, state) }
+                    }
+                    // 查找条：切换视图后同步高亮目标（异步结果回来也会更新）
+                    val bar = findReplaceBars[currentFile]
+                    if (bar?.isVisible == true) {
+                        attachFindBar(currentFile, bar)
+                        bar.onActiveEditorChanged()
+                    }
                 }
             }
         }
@@ -2477,14 +3530,18 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
     private fun scheduleSmaliConversion(
         file: File,
         expectedTabIndex: Int,
-        fallbackTextArea: TextArea
+        fallbackTextArea: TextArea,
+        smaliTextSnapshot: String,
     ) {
         smaliConversionTasks.remove(file)?.cancel(true)
 
         val future = smaliExecutor.submit {
             try {
-                val javaContent = getJavaCodeForSmali(file)
+                val javaContent = getJavaCodeForSmali(file, smaliTextSnapshot)
                 runOnEdt {
+                    // 检查任务是否还在 smaliConversionTasks 中（可能已被取消）
+                    // 如果任务被取消，cancelSmaliConversion 会将其从 smaliConversionTasks 中移除
+                    val taskStillActive = smaliConversionTasks.containsKey(file)
                     smaliConversionTasks.remove(file)
                     hideSmaliLoadingOverlay(file)
                     val stillCurrentFile = smaliFile == file
@@ -2495,17 +3552,38 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                             currentTabs.getTitleAt(expectedTabIndex) == CODE_TAB_TITLE
 
                     if (shouldUpdateTextArea) {
-                        val idx = fileToTab[file]
-                        val activeTextArea = idx?.let { tabTextAreas[it] } ?: fallbackTextArea
-                        activeTextArea.putClientProperty("suppressDirty", true)
-                        activeTextArea.text = javaContent
-                        activeTextArea.syntaxEditingStyle =
+                        val scroll = smaliCodeScrollPanes[file]
+                        val stateBefore = if (scroll != null) captureCodeViewState(fallbackTextArea, scroll) else null
+                        fallbackTextArea.putClientProperty("suppressDirty", true)
+                        fallbackTextArea.text = javaContent
+                        fallbackTextArea.syntaxEditingStyle =
                             org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_JAVA
-                        activeTextArea.isEditable = false
-                        activeTextArea.putClientProperty("suppressDirty", false)
-                        SwingUtilities.invokeLater {
-                            activeTextArea.caretPosition = 0
-                            activeTextArea.scrollRectToVisible(Rectangle(0, 0, 1, 1))
+                        fallbackTextArea.isEditable = false
+                        fallbackTextArea.discardAllEdits()
+                        fallbackTextArea.putClientProperty("suppressDirty", false)
+                        if (scroll != null && stateBefore != null) {
+                            SwingUtilities.invokeLater { restoreCodeViewState(fallbackTextArea, scroll, stateBefore) }
+                        }
+                        // 查找条：Code 文本刷新后同步高亮/计数
+                        val bar = findReplaceBars[file]
+                        if (bar?.isVisible == true) {
+                            attachFindBar(file, bar)
+                            bar.onActiveEditorChanged()
+                        }
+                    }
+                    // 只有当任务仍然活跃且成功获取到内容时，才写入缓存
+                    // 如果内容是错误消息，不写入缓存，避免任务被取消后缓存错误消息
+                    // 注意：成功的内容已经在 getJavaCodeForSmali 中写入缓存了
+                    // 这里主要是为了确保错误消息不会被缓存
+                    if (!taskStillActive) {
+                        // 任务已被取消，清除可能被写入的错误缓存
+                        val cached = smaliJavaContentCache[file]
+                        if (cached != null) {
+                            val content = cached.javaContent
+                            if (content.startsWith("// 未找到对应的 Java 源码文件") ||
+                                content.startsWith("// 获取 Java 代码时出错")) {
+                                smaliJavaContentCache.remove(file)
+                            }
                         }
                     }
                     hideSmaliLoadingIndicatorIfIdle()
@@ -2534,6 +3612,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                         fallbackTextArea.syntaxEditingStyle =
                             org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_NONE
                         fallbackTextArea.isEditable = false
+                        fallbackTextArea.discardAllEdits()
                         fallbackTextArea.putClientProperty("suppressDirty", false)
                     }
                     hideSmaliLoadingIndicatorIfIdle()
@@ -2545,22 +3624,45 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
     }
 
     // 获取 Smali 文件对应的 Java 代码
-    private fun getJavaCodeForSmali(smaliFile: File): String {
+    private fun getJavaCodeForSmali(smaliFile: File, smaliTextSnapshot: String): String {
         logger.info("开始获取 Java 代码，smali 文件: ${smaliFile.absolutePath}")
 
-        // 如果已经缓存了 Java 内容且源文件未变化，直接返回（文件级缓存）
+        val smaliLastModified = runCatching { smaliFile.lastModified() }.getOrDefault(0L)
+        val smaliLength = runCatching { smaliFile.length() }.getOrDefault(-1L)
+        val smaliTextHash = smaliTextSnapshot.hashCode()
+        val smaliTextLen = smaliTextSnapshot.length
+
+        // 如果已经缓存了 Java 内容且源文本未变化，直接返回
         val cached = smaliJavaContentCache[smaliFile]
-        if (cached != null) {
-            val lm = runCatching { smaliFile.lastModified() }.getOrDefault(0L)
-            val len = runCatching { smaliFile.length() }.getOrDefault(-1L)
-            if (cached.sourceLastModified == lm && cached.sourceLength == len) {
-                logger.info("使用缓存的 Java 内容（文件: ${smaliFile.name}）")
-                return cached.javaContent
-            }
+        if (cached != null && cached.sourceTextHash == smaliTextHash && cached.sourceTextLength == smaliTextLen) {
+            logger.info("使用缓存的 Java 内容（文件: ${smaliFile.name}）")
+            return cached.javaContent
         }
 
         try {
-            // 策略1: 查找对应的 Java 文件（如果是从 JADX 反编译的 APK）
+            // 策略1: 优先实时反编译（不依赖 .jadx 快照文件）
+            if (Thread.currentThread().isInterrupted) {
+                throw CancellationException("任务被取消")
+            }
+            logger.info("策略1: 尝试使用实时反编译")
+            val decompiledJava = tryDecompileWithJadx(smaliFile, smaliTextSnapshot)
+            if (decompiledJava != null) {
+                logger.info("实时反编译成功")
+                if (Thread.currentThread().isInterrupted) {
+                    throw CancellationException("任务被取消")
+                }
+                smaliJavaContentCache[smaliFile] = SmaliJavaCacheEntry(
+                    sourceLastModified = smaliLastModified,
+                    sourceLength = smaliLength,
+                    javaContent = decompiledJava,
+                    sourceTextHash = smaliTextHash,
+                    sourceTextLength = smaliTextLen,
+                )
+                return decompiledJava
+            }
+            logger.warn("实时反编译失败，回退到查找已有 Java 源码文件")
+
+            // 策略2: 查找对应的 Java 文件（例如 java_src/sources 等）
             // smali 文件路径通常类似: .../smali/com/example/MyClass.smali
             // Java 文件路径通常类似: .../java_src/com/example/MyClass.java 或 .../sources/com/example/MyClass.java
             val smaliPath = smaliFile.absolutePath
@@ -2571,13 +3673,23 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             )
 
             for (javaPath in javaPaths) {
+                // 检查线程是否被中断（任务被取消）
+                if (Thread.currentThread().isInterrupted) {
+                    throw CancellationException("任务被取消")
+                }
                 val javaFile = File(javaPath)
                 if (javaFile.exists() && javaFile.canRead()) {
                     val content = Files.readString(javaFile.toPath())
+                    // 再次检查是否被中断，避免在写入缓存时被取消
+                    if (Thread.currentThread().isInterrupted) {
+                        throw CancellationException("任务被取消")
+                    }
                     smaliJavaContentCache[smaliFile] = SmaliJavaCacheEntry(
-                        sourceLastModified = smaliFile.lastModified(),
-                        sourceLength = smaliFile.length(),
-                        javaContent = content
+                        sourceLastModified = smaliLastModified,
+                        sourceLength = smaliLength,
+                        javaContent = content,
+                        sourceTextHash = smaliTextHash,
+                        sourceTextLength = smaliTextLen,
                     )
                     return content
                 }
@@ -2586,13 +3698,23 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             // 策略2: 查找同一目录下的同名 .java 文件（向上查找）
             var currentDir = smaliFile.parentFile
             while (currentDir != null) {
+                // 检查线程是否被中断（任务被取消）
+                if (Thread.currentThread().isInterrupted) {
+                    throw CancellationException("任务被取消")
+                }
                 val javaFile = File(currentDir, smaliFile.nameWithoutExtension + ".java")
                 if (javaFile.exists() && javaFile.canRead()) {
                     val content = Files.readString(javaFile.toPath())
+                    // 再次检查是否被中断，避免在写入缓存时被取消
+                    if (Thread.currentThread().isInterrupted) {
+                        throw CancellationException("任务被取消")
+                    }
                     smaliJavaContentCache[smaliFile] = SmaliJavaCacheEntry(
-                        sourceLastModified = smaliFile.lastModified(),
-                        sourceLength = smaliFile.length(),
-                        javaContent = content
+                        sourceLastModified = smaliLastModified,
+                        sourceLength = smaliLength,
+                        javaContent = content,
+                        sourceTextHash = smaliTextHash,
+                        sourceTextLength = smaliTextLen,
                     )
                     return content
                 }
@@ -2604,10 +3726,16 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                     val javaFile2 = File(sourcesDir, relativePath)
                     if (javaFile2.exists() && javaFile2.canRead()) {
                         val content = Files.readString(javaFile2.toPath())
+                        // 再次检查是否被中断，避免在写入缓存时被取消
+                        if (Thread.currentThread().isInterrupted) {
+                            throw CancellationException("任务被取消")
+                        }
                         smaliJavaContentCache[smaliFile] = SmaliJavaCacheEntry(
-                            sourceLastModified = smaliFile.lastModified(),
-                            sourceLength = smaliFile.length(),
-                            javaContent = content
+                            sourceLastModified = smaliLastModified,
+                            sourceLength = smaliLength,
+                            javaContent = content,
+                            sourceTextHash = smaliTextHash,
+                            sourceTextLength = smaliTextLen,
                         )
                         return content
                     }
@@ -2619,10 +3747,16 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                     val javaFile2 = File(javaSrcDir, relativePath)
                     if (javaFile2.exists() && javaFile2.canRead()) {
                         val content = Files.readString(javaFile2.toPath())
+                        // 再次检查是否被中断，避免在写入缓存时被取消
+                        if (Thread.currentThread().isInterrupted) {
+                            throw CancellationException("任务被取消")
+                        }
                         smaliJavaContentCache[smaliFile] = SmaliJavaCacheEntry(
-                            sourceLastModified = smaliFile.lastModified(),
-                            sourceLength = smaliFile.length(),
-                            javaContent = content
+                            sourceLastModified = smaliLastModified,
+                            sourceLength = smaliLength,
+                            javaContent = content,
+                            sourceTextHash = smaliTextHash,
+                            sourceTextLength = smaliTextLen,
                         )
                         return content
                     }
@@ -2630,56 +3764,41 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                 currentDir = currentDir.parentFile
             }
 
-            // 策略3: 尝试使用 JADX 实时反编译（类似 MT 管理器）
-            logger.info("策略3: 尝试使用 JADX 实时反编译")
-            val decompiledJava = tryDecompileWithJadx(smaliFile)
-            if (decompiledJava != null) {
-                logger.info("实时反编译成功")
-                smaliJavaContentCache[smaliFile] = SmaliJavaCacheEntry(
-                    sourceLastModified = smaliFile.lastModified(),
-                    sourceLength = smaliFile.length(),
-                    javaContent = decompiledJava
-                )
-                return decompiledJava
+            // 策略3: 如果找不到，返回提示信息（不写入缓存，避免任务被取消后缓存错误消息）
+            // 检查线程是否被中断（任务被取消）
+            if (Thread.currentThread().isInterrupted) {
+                throw CancellationException("任务被取消")
             }
-            logger.warn("实时反编译失败")
-
-            // 策略4: 如果找不到，显示提示信息
             val failureMessage = """
                 // 未找到对应的 Java 源码文件
                 // 
                 // 提示：
-                // 1. 如果这是从 APK 反编译的 smali 文件，请确保已使用 JADX 反编译生成 Java 源码
-                // 2. Java 源码通常位于以下目录之一：
-                //    - java_src/
-                //    - sources/
-                //    - 与 smali 文件同目录
-                // 3. 或者确保已安装 jadx 工具，可以实时反编译
+                // 1. 可尝试确认已安装 jadx + smali（用于实时反编译）
+                // 2. 或检查是否存在 java_src/、sources/ 等 Java 源码目录
                 //
                 // 当前 smali 文件路径: ${smaliFile.absolutePath}
             """.trimIndent()
-            smaliJavaContentCache[smaliFile] = SmaliJavaCacheEntry(
-                sourceLastModified = smaliFile.lastModified(),
-                sourceLength = smaliFile.length(),
-                javaContent = failureMessage
-            )
+            // 不写入错误缓存，让 scheduleSmaliConversion 决定是否缓存
             return failureMessage
 
+        } catch (e: CancellationException) {
+            // 重新抛出取消异常，让上层处理
+            throw e
         } catch (e: Exception) {
+            // 检查线程是否被中断
+            if (Thread.currentThread().isInterrupted) {
+                throw CancellationException("任务被取消").apply { initCause(e) }
+            }
             logger.warn("获取 Java 代码失败", e)
             val errorMessage = "// 获取 Java 代码时出错: ${e.message}"
-            smaliJavaContentCache[smaliFile] = SmaliJavaCacheEntry(
-                sourceLastModified = smaliFile.lastModified(),
-                sourceLength = smaliFile.length(),
-                javaContent = errorMessage
-            )
+            // 不写入错误缓存，让 scheduleSmaliConversion 决定是否缓存
             return errorMessage
         }
     }
 
     // 尝试使用 JADX 实时反编译 smali 文件（类似 MT 管理器）
     // 策略：先将单个 smali 文件编译成 DEX，然后用 jadx 反编译
-    private fun tryDecompileWithJadx(smaliFile: File): String? {
+    private fun tryDecompileWithJadx(smaliFile: File, smaliTextSnapshot: String?): String? {
         try {
             logger.info("开始实时反编译 smali 文件: ${smaliFile.absolutePath}")
 
@@ -2720,7 +3839,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             System.out.println("输入文件: ${smaliFile.absolutePath}")
             System.out.println("输出文件: ${tempDexFile.absolutePath}")
 
-            val assembleResult = Smali.assemble(smaliFile, tempDexFile)
+            val assembleResult = Smali.assemble(smaliFile, tempDexFile, smaliText = smaliTextSnapshot)
 
             if (assembleResult.status != Smali.Status.SUCCESS) {
                 logger.error("smali 编译失败 (status=${assembleResult.status}, exitCode=${assembleResult.exitCode})")
@@ -2887,7 +4006,6 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             smaliViewTabs = null
             isSmaliMode = false
             smaliFile = null
-            smaliOriginalContent = null
             revalidate()
             repaint()
         }

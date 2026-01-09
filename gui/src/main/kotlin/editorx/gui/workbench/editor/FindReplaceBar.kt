@@ -56,6 +56,11 @@ class FindReplaceBar(
     private var lastCriteriaKey: String = ""
     private var totalMatches: Int = 0
     private var currentMatchIndex: Int = 0
+    private var replaceSupported: Boolean = true
+
+    private val expandButtonPreferredSize = Dimension()
+    private val expandButtonMinimumSize = Dimension()
+    private val expandButtonMaximumSize = Dimension()
 
     private data class Match(val start: Int, val end: Int)
 
@@ -222,6 +227,11 @@ class FindReplaceBar(
         installKeyBindings()
         setMode(Mode.FIND)
 
+        // 记录展开按钮尺寸（必须尽早记录，避免在只读视图隐藏后丢失原尺寸）
+        expandButtonPreferredSize.setSize(expandButton.preferredSize)
+        expandButtonMinimumSize.setSize(expandButton.minimumSize)
+        expandButtonMaximumSize.setSize(expandButton.maximumSize)
+
         // 计算替换行的对齐缩进：与展开按钮对齐
         SwingUtilities.invokeLater {
             val w = expandButton.preferredSize.width
@@ -231,7 +241,8 @@ class FindReplaceBar(
     }
 
     fun open(mode: Mode, initialQuery: String? = null) {
-        setMode(mode)
+        // 只读视图下仅支持查找：强制 FIND 模式
+        setMode(if (replaceSupported) mode else Mode.FIND)
         isVisible = true
 
         if (!initialQuery.isNullOrBlank()) {
@@ -294,8 +305,8 @@ class FindReplaceBar(
     }
 
     private fun setMode(mode: Mode) {
-        this.mode = mode
-        val replaceVisible = mode == Mode.REPLACE
+        this.mode = if (replaceSupported) mode else Mode.FIND
+        val replaceVisible = this.mode == Mode.REPLACE
         replaceIndent.isVisible = replaceVisible
         replaceField.isVisible = replaceVisible
         replaceControls.isVisible = replaceVisible
@@ -312,6 +323,7 @@ class FindReplaceBar(
     }
 
     private fun toggleReplaceRow() {
+        if (!replaceSupported) return
         setMode(if (mode == Mode.REPLACE) Mode.FIND else Mode.REPLACE)
         SwingUtilities.invokeLater {
             if (mode == Mode.REPLACE) replaceField.requestFocusInWindow() else findField.requestFocusInWindow()
@@ -428,6 +440,7 @@ class FindReplaceBar(
             lastTextArea?.clearMarkAllHighlights()
             lastTextArea = textArea
         }
+        updateReplaceControls(textArea)
 
         val query = findField.text ?: ""
         if (textArea == null || query.isBlank()) {
@@ -495,6 +508,7 @@ class FindReplaceBar(
             statusLabel.text = I18n.translate(I18nKeys.FindReplace.NO_RESULTS)
             return
         }
+        updateReplaceControls(textArea)
         if (query.isBlank()) {
             return
         }
@@ -534,6 +548,8 @@ class FindReplaceBar(
             statusLabel.text = I18n.translate(I18nKeys.FindReplace.NO_RESULTS)
             return
         }
+        updateReplaceControls(textArea)
+        if (!textArea.isEditable) return
         if (query.isBlank()) {
             return
         }
@@ -574,6 +590,8 @@ class FindReplaceBar(
             statusLabel.text = I18n.translate(I18nKeys.FindReplace.NO_RESULTS)
             return
         }
+        updateReplaceControls(textArea)
+        if (!textArea.isEditable) return
         if (query.isBlank()) {
             return
         }
@@ -607,6 +625,55 @@ class FindReplaceBar(
             setRegularExpression(this@FindReplaceBar.regex.isSelected)
             setSearchForward(searchForward)
         }
+    }
+
+    private fun updateReplaceControls(textArea: TextArea?) {
+        val editable = textArea?.isEditable == true
+        updateReplaceSupported(editable)
+
+        // 只读视图：隐藏替换能力（不只是禁用）
+        if (!replaceSupported) {
+            // 强制折叠为 FIND，并确保替换行不可见
+            if (mode != Mode.FIND) setMode(Mode.FIND)
+            replaceField.isEnabled = false
+            replaceButton.isEnabled = false
+            replaceAllButton.isEnabled = false
+            return
+        }
+
+        replaceField.isEnabled = editable
+        replaceButton.isEnabled = editable
+        replaceAllButton.isEnabled = editable
+    }
+
+    private fun updateReplaceSupported(supported: Boolean) {
+        if (replaceSupported == supported) return
+        replaceSupported = supported
+
+        // 只读视图：不展示折叠入口（也不占位）
+        if (!replaceSupported) {
+            expandButton.isVisible = false
+            expandButton.preferredSize = Dimension(0, 0)
+            expandButton.minimumSize = Dimension(0, 0)
+            expandButton.maximumSize = Dimension(0, 0)
+            replaceIndent.preferredSize = Dimension(0, 0)
+            replaceIndent.minimumSize = Dimension(0, 0)
+            replaceIndent.maximumSize = Dimension(0, 0)
+        } else {
+            expandButton.isVisible = true
+            // 恢复之前记录的尺寸，避免重新布局抖动
+            if (expandButtonPreferredSize.width > 0 || expandButtonPreferredSize.height > 0) {
+                expandButton.preferredSize = Dimension(expandButtonPreferredSize)
+                expandButton.minimumSize = Dimension(expandButtonMinimumSize)
+                expandButton.maximumSize = Dimension(expandButtonMaximumSize)
+                replaceIndent.preferredSize = Dimension(expandButtonPreferredSize.width, 1)
+                replaceIndent.minimumSize = Dimension(expandButtonPreferredSize.width, 1)
+            }
+            replaceIndent.maximumSize = Dimension(Int.MAX_VALUE, 1)
+        }
+
+        revalidate()
+        repaint()
     }
 
     private fun updateStatus(result: SearchResult, searching: Boolean) = Unit

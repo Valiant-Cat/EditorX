@@ -13,8 +13,12 @@ class SvgIcon(
     private val height: Int = 16
 ) : Icon {
     private val pathData: List<SvgPath> = parseSvgPaths()
+    private val viewBoxWidth: Double = parseViewBoxWidth()
+    private val viewBoxHeight: Double = parseViewBoxHeight()
+    
     override fun getIconWidth(): Int = width
     override fun getIconHeight(): Int = height
+    
     override fun paintIcon(c: Component?, g: Graphics, x: Int, y: Int) {
         val g2d = g.create() as Graphics2D
         try {
@@ -26,8 +30,12 @@ class SvgIcon(
 
             g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
             g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY)
-            val scaleX = width.toDouble() / 16.0
-            val scaleY = height.toDouble() / 16.0
+            g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON)
+            g2d.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON)
+            
+            // 根据实际的 viewBox 尺寸计算缩放比例，而不是硬编码 16x16
+            val scaleX = width.toDouble() / viewBoxWidth
+            val scaleY = height.toDouble() / viewBoxHeight
             g2d.translate(x.toDouble(), y.toDouble())
             g2d.scale(scaleX, scaleY)
             for (path in pathData) path.draw(g2d)
@@ -40,6 +48,46 @@ class SvgIcon(
         } finally {
             g2d.dispose()
         }
+    }
+    
+    /**
+     * 解析 SVG 的 viewBox 宽度
+     * 如果找不到 viewBox，默认使用 16
+     */
+    private fun parseViewBoxWidth(): Double {
+        val viewBoxPattern = Pattern.compile("viewBox\\s*=\\s*[\"']?([^\"'\\s]+)\\s+([^\"'\\s]+)\\s+([^\"'\\s]+)\\s+([^\"'\\s]+)[\"']?")
+        val matcher = viewBoxPattern.matcher(svgContent)
+        if (matcher.find()) {
+            matcher.group(3)?.toDoubleOrNull()?.let { return it }
+        }
+        // 如果没有 viewBox，尝试从 width 属性获取
+        val widthPattern = Pattern.compile("width\\s*=\\s*[\"']?(\\d+)[\"']?")
+        val widthMatcher = widthPattern.matcher(svgContent)
+        if (widthMatcher.find()) {
+            widthMatcher.group(1)?.toDoubleOrNull()?.let { return it }
+        }
+        // 默认值
+        return 16.0
+    }
+    
+    /**
+     * 解析 SVG 的 viewBox 高度
+     * 如果找不到 viewBox，默认使用 16
+     */
+    private fun parseViewBoxHeight(): Double {
+        val viewBoxPattern = Pattern.compile("viewBox\\s*=\\s*[\"']?([^\"'\\s]+)\\s+([^\"'\\s]+)\\s+([^\"'\\s]+)\\s+([^\"'\\s]+)[\"']?")
+        val matcher = viewBoxPattern.matcher(svgContent)
+        if (matcher.find()) {
+            matcher.group(4)?.toDoubleOrNull()?.let { return it }
+        }
+        // 如果没有 viewBox，尝试从 height 属性获取
+        val heightPattern = Pattern.compile("height\\s*=\\s*[\"']?(\\d+)[\"']?")
+        val heightMatcher = heightPattern.matcher(svgContent)
+        if (heightMatcher.find()) {
+            heightMatcher.group(1)?.toDoubleOrNull()?.let { return it }
+        }
+        // 默认值
+        return 16.0
     }
 
     private fun parseSvgPaths(): List<SvgPath> {

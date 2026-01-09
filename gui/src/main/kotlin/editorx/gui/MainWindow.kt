@@ -2,6 +2,8 @@ package editorx.gui
 
 import editorx.core.gui.GuiContext
 import editorx.core.util.SystemUtils
+import editorx.gui.widget.NoLineSplitPaneUI
+import editorx.gui.workbench.activitybar.ActivityBar
 import editorx.gui.workbench.editor.Editor
 import editorx.gui.workbench.explorer.Explorer
 import editorx.gui.workbench.menubar.MenuBar
@@ -10,7 +12,6 @@ import editorx.gui.workbench.sidebar.SideBar
 import editorx.gui.workbench.statusbar.StatusBar
 import editorx.gui.workbench.titlebar.TitleBar
 import editorx.gui.workbench.toolbar.ToolBar
-import editorx.gui.widget.NoLineSplitPaneUI
 import java.awt.BorderLayout
 import java.awt.Dimension
 import java.awt.event.MouseAdapter
@@ -26,16 +27,29 @@ class MainWindow(val guiContext: GuiContext) : JFrame() {
     private val _menuBar by lazy { MenuBar(this) }
     val titleBar by lazy { TitleBar(this) }
     val toolBar by lazy { ToolBar(this) }
+    val activityBar by lazy { ActivityBar(this) }
     val sideBar by lazy { SideBar(this) }
     val editor by lazy { Editor(this) }
     val statusBar by lazy { StatusBar(this) }
     val navigationBar by lazy { NavigationBar(this) }
 
+    // SideBar 和 Editor 的水平分割（ActivityBar 独立在外层）
     private val horizontalSplit by lazy {
         JSplitPane(JSplitPane.HORIZONTAL_SPLIT, sideBar, editor).apply {
-            dividerLocation = 0  // 初始时隐藏SideBar
+            dividerLocation = 0  // 初始时 SideBar 隐藏
             isOneTouchExpandable = false
             dividerSize = 0  // 初始时 SideBar 关闭，隐藏拖拽条
+        }
+    }
+
+    // 主容器：ActivityBar（固定） + horizontalSplit（SideBar + Editor）
+    private val mainContentContainer by lazy {
+        JPanel(BorderLayout()).apply {
+            isOpaque = false
+            // ActivityBar 固定在左侧，宽度固定为 38，不受 SideBar 拖动影响
+            add(activityBar, BorderLayout.WEST)
+            // horizontalSplit 在右侧，包含 SideBar 和 Editor
+            add(horizontalSplit, BorderLayout.CENTER)
         }
     }
 
@@ -78,11 +92,11 @@ class MainWindow(val guiContext: GuiContext) : JFrame() {
         }
         add(topContainer, BorderLayout.NORTH)
 
-        // 将 navigationBar 和 horizontalSplit 放在一个容器中
+        // 将 navigationBar 和 mainContentContainer 放在一个容器中
         val centerContainer = JPanel(BorderLayout()).apply {
             isOpaque = false
             add(navigationBar, BorderLayout.NORTH)
-            add(horizontalSplit, BorderLayout.CENTER)
+            add(mainContentContainer, BorderLayout.CENTER)
         }
         add(centerContainer, BorderLayout.CENTER)
         add(statusBar, BorderLayout.SOUTH)
@@ -94,22 +108,57 @@ class MainWindow(val guiContext: GuiContext) : JFrame() {
 
         // 当用户手动拖动分割条时，同步 SideBar 状态
         horizontalSplit.addPropertyChangeListener(JSplitPane.DIVIDER_LOCATION_PROPERTY) { _ ->
-            val visible = horizontalSplit.dividerLocation > 0
+            val sidebarVisible = horizontalSplit.dividerLocation > 0
             // 同步SideBar内部状态与分割条位置
-            sideBar.syncVisibilityWithDivider()
-
-            // 根据 SideBar 可见性调整拖拽条大小
-            horizontalSplit.dividerSize = if (visible) 4 else 0
+            syncVisibilityWithDivider()
 
             // 同步更新ToolBar中的侧边栏toggle按钮
-            titleBar.updateSideBarIcon(visible)
+            titleBar.updateSideBarIcon(sidebarVisible)
         }
 
-        // 注册 Explorer，但不自动打开 SideBar（保持默认关闭状态）
-        sideBar.showView("explorer", Explorer(this), autoShow = false)
+        // 初始化时同步 ActivityBar 的状态（确保高亮状态与实际显示状态一致）
+        // 由于 SideBar 初始是隐藏的，所以不应该有任何按钮高亮
+        syncVisibilityWithDivider()
 
         // 添加自定义拖拽功能：在 SideBar 右边缘和 Editor 左边缘检测拖拽
         addDragListeners()
+    }
+
+    /**
+     * 同步 SideBar 内部状态与分割条位置
+     * 当用户手动拖拽分割条时调用此方法来同步内部状态
+     */
+    private fun syncVisibilityWithDivider() {
+        val dividerLocation = horizontalSplit.dividerLocation
+        // SideBar 可见的条件是 dividerLocation > 0
+        val shouldBeVisible = dividerLocation > 0
+
+        if (shouldBeVisible != sideBar.isVisible) {
+            sideBar.isVisible = shouldBeVisible
+            // 同步 ActivityBar 的状态
+            if (shouldBeVisible) {
+                // 如果 SideBar 变为可见，同步 ActivityBar 的高亮状态
+                val currentViewId = sideBar.getCurrentViewId()
+                if (currentViewId != null) {
+                    activityBar.highlightOnly(currentViewId)
+                }
+            } else {
+                // 如果 SideBar 变为隐藏，清除 ActivityBar 的激活状态
+                activityBar.clearActive()
+            }
+        } else {
+            // 即使可见性没有变化，也要同步高亮状态（确保一致性）
+            if (shouldBeVisible) {
+                val currentViewId = sideBar.getCurrentViewId()
+                if (currentViewId != null) {
+                    activityBar.highlightOnly(currentViewId)
+                } else {
+                    activityBar.clearActive()
+                }
+            } else {
+                activityBar.clearActive()
+            }
+        }
     }
 
     private var isDragging = false
@@ -135,7 +184,6 @@ class MainWindow(val guiContext: GuiContext) : JFrame() {
                 if (isDragging) {
                     isDragging = false
                     sideBar.cursor = java.awt.Cursor(java.awt.Cursor.DEFAULT_CURSOR)
-                    editor.cursor = java.awt.Cursor(java.awt.Cursor.DEFAULT_CURSOR)
                 }
             }
         })
@@ -160,48 +208,6 @@ class MainWindow(val guiContext: GuiContext) : JFrame() {
                 }
             }
         })
-
-        // 在 Editor 左边缘添加鼠标监听器
-        editor.addMouseListener(object : MouseAdapter() {
-            override fun mousePressed(e: java.awt.event.MouseEvent) {
-                val mouseX = e.x
-                // 检测是否在左边缘 5 像素范围内
-                if (mouseX in 0..5 && horizontalSplit.dividerLocation > 0) {
-                    isDragging = true
-                    dragStartX = e.xOnScreen
-                    dragStartLocation = horizontalSplit.dividerLocation
-                    editor.cursor = java.awt.Cursor(java.awt.Cursor.E_RESIZE_CURSOR)
-                }
-            }
-
-            override fun mouseReleased(e: java.awt.event.MouseEvent) {
-                if (isDragging) {
-                    isDragging = false
-                    sideBar.cursor = java.awt.Cursor(java.awt.Cursor.DEFAULT_CURSOR)
-                    editor.cursor = java.awt.Cursor(java.awt.Cursor.DEFAULT_CURSOR)
-                }
-            }
-        })
-
-        editor.addMouseMotionListener(object : MouseMotionAdapter() {
-            override fun mouseDragged(e: java.awt.event.MouseEvent) {
-                if (isDragging) {
-                    val deltaX = e.xOnScreen - dragStartX
-                    val newLocation = (dragStartLocation + deltaX).coerceAtLeast(0)
-                        .coerceAtMost(horizontalSplit.width)
-                    horizontalSplit.dividerLocation = newLocation
-                }
-            }
-
-            override fun mouseMoved(e: java.awt.event.MouseEvent) {
-                val mouseX = e.x
-                if (mouseX in 0..5 && horizontalSplit.dividerLocation > 0) {
-                    editor.cursor = java.awt.Cursor(java.awt.Cursor.E_RESIZE_CURSOR)
-                } else {
-                    editor.cursor = java.awt.Cursor(java.awt.Cursor.DEFAULT_CURSOR)
-                }
-            }
-        })
     }
 
     /**
@@ -209,5 +215,89 @@ class MainWindow(val guiContext: GuiContext) : JFrame() {
      */
     fun updateNavigation(currentFile: File?) {
         navigationBar.update(currentFile)
+    }
+
+    /**
+     * 统一处理打开文件的逻辑
+     * 所有打开文件的操作都应该调用此方法
+     */
+    fun openFile(file: File) {
+        if (!file.isFile || !file.canRead()) {
+            return
+        }
+        editor.openFile(file)
+        guiContext.getWorkspace().addRecentFile(file)
+        editor.showEditorContent()
+    }
+
+    /**
+     * 统一处理打开工作区的逻辑
+     * 所有打开目录/工作区的操作都应该调用此方法
+     */
+    fun openWorkspace(workspace: File) {
+        if (!workspace.isDirectory) {
+            return
+        }
+        guiContext.getWorkspace().openWorkspace(workspace)
+        guiContext.getWorkspace().addRecentWorkspace(workspace)
+        // 通过 ActivityBar 显示 Explorer（会自动更新高亮状态）
+        activityBar.activateItem("explorer", userInitiated = false)
+        (sideBar.getView("explorer") as? Explorer)?.refreshRoot()
+        titleBar.updateVcsDisplay()
+        editor.showEditorContent()
+        // 检查并提示创建 Git 仓库
+        (sideBar.getView("explorer") as? Explorer)?.checkAndPromptCreateGitRepository(workspace)
+    }
+
+    /**
+     * 显示文件选择对话框并打开选中的文件
+     * 返回选中的文件，如果用户取消则返回 null
+     */
+    fun showFileChooser(callback: (File?) -> Unit) {
+        val fileDialog = java.awt.FileDialog(this, "选择文件", java.awt.FileDialog.LOAD).apply {
+            isMultipleMode = false
+        }
+        fileDialog.isVisible = true
+
+        val fileName = fileDialog.file
+        val dir = fileDialog.directory
+
+        if (fileName != null && dir != null) {
+            val selectedFile = File(dir, fileName)
+            callback.invoke(selectedFile)
+        } else {
+            callback.invoke(null)
+        }
+    }
+
+    /**
+     * 显示文件夹选择对话框并打开选中的工作区
+     * 返回选中的文件夹，如果用户取消则返回 null
+     */
+    fun showFolderChooser(callback: (File?) -> Unit) {
+        val fileDialog = java.awt.FileDialog(this, "选择项目文件夹", java.awt.FileDialog.LOAD).apply {
+            isMultipleMode = false
+            // 在 macOS 上，设置系统属性以使用文件夹选择模式
+            if (System.getProperty("os.name").lowercase().contains("mac")) {
+                System.setProperty("apple.awt.fileDialogForDirectories", "true")
+            }
+        }
+        fileDialog.isVisible = true
+
+        val selectedDir = fileDialog.directory?.let { dir ->
+            val fileName = fileDialog.file
+            if (fileName != null) {
+                File(dir, fileName)
+            } else {
+                File(dir)
+            }
+        }
+
+        // 恢复系统属性
+        if (System.getProperty("os.name").lowercase().contains("mac")) {
+            System.setProperty("apple.awt.fileDialogForDirectories", "false")
+        }
+
+        callback.invoke(selectedDir)
     }
 }

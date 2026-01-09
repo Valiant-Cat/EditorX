@@ -70,6 +70,16 @@ class AndroidPlugin : Plugin {
             }
         )
 
+        // 注册 App 信息快捷修改入口
+        gui.addToolBarItem(
+            id = "android.appinfo",
+            iconRef = IconRef("icons/android-app-info.svg", AndroidPlugin::class.java.classLoader),
+            text = I18n.translate(I18nKeys.Toolbar.EDIT_APP_INFO),
+            action = {
+                AppInfoDialog.show(gui)
+            }
+        )
+
         // 初始时禁用所有按钮（因为没有打开工作区）
         updateToolBarButtonsState(gui, enabled = false)
 
@@ -119,6 +129,7 @@ class AndroidPlugin : Plugin {
         gui.setToolBarItemEnabled("android.manifest", enabled)
         gui.setToolBarItemEnabled("android.mainactivity", enabled)
         gui.setToolBarItemEnabled("android.application", enabled)
+        gui.setToolBarItemEnabled("android.appinfo", enabled)
     }
 
     /**
@@ -542,5 +553,3 @@ class AndroidPlugin : Plugin {
     }
 
 }
-
-

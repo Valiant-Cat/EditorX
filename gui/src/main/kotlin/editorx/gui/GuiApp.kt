@@ -11,6 +11,7 @@ import editorx.core.util.StartupTimer
 import editorx.core.util.SystemUtils
 import editorx.core.workspace.DefaultWorkspace
 import editorx.gui.core.GuiContextImpl
+import editorx.gui.core.EditorContextMenuManager
 import editorx.gui.core.GuiExtensionImpl
 import editorx.gui.search.SearchDialog
 import editorx.gui.settings.SettingsDialog
@@ -175,8 +176,14 @@ private fun initializeMainWindow(startupTimer: StartupTimer) {
                     if (state != PluginState.STARTED) {
                         // 插件被停用/失败：移除可能残留的入口与视图
                         sideBar.removeView(pluginId)
+                        // 移除 ActivityBar items
+                        activityBar.removeItems(pluginId)
                         // 移除 ToolBar items
                         toolBar.removeItems(pluginId)
+                        // 关闭该插件打开的自定义编辑器标签页（例如 Diff 视图）
+                        editor.closeCustomTabs(pluginId)
+                        // 移除编辑器右键菜单项
+                        EditorContextMenuManager.unregisterByOwner(pluginId)
                     }
                     editor.refreshSyntaxForOpenTabs()
                 }

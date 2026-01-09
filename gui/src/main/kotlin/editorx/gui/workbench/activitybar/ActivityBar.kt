@@ -1,10 +1,12 @@
 package editorx.gui.workbench.activitybar
 
 import editorx.core.util.IconRef
+import editorx.core.gui.CachedGuiViewProvider
 import editorx.core.gui.GuiViewProvider
 import editorx.gui.Constants
 import editorx.gui.theme.ThemeManager
 import editorx.gui.MainWindow
+import editorx.gui.workbench.explorer.Explorer
 import editorx.core.util.IconLoader
 import java.awt.*
 import java.awt.geom.RoundRectangle2D
@@ -13,11 +15,13 @@ import javax.swing.*
 class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
     companion object {
         private const val ICON_SIZE = 20
+        private const val OWNER_SYSTEM = "_system_"
     }
 
     private val buttonGroup = ButtonGroup()
     private val buttonMap = mutableMapOf<String, JButton>()
     private val guiViewProviderMap = mutableMapOf<String, GuiViewProvider>()
+    private val ownerById = mutableMapOf<String, String>()
     private var activeId: String? = null
     private var autoSelected: Boolean = false
 
@@ -28,12 +32,13 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
 
     init {
         setupActivityBar()
+        setupDefaultActivityBarItems()
     }
 
     private fun setupActivityBar() {
         layout = BoxLayout(this, BoxLayout.Y_AXIS)
         preferredSize = Dimension(38, 0)
-        minimumSize = Dimension(38, 0)
+        minimumSize = Dimension(38, 38)  // 确保最小宽度和高度
         maximumSize = Dimension(38, Int.MAX_VALUE)
         // 在靠近可拖拽区域一侧增加一条细分割线以增强层次
         val separator = ThemeManager.separator
@@ -44,16 +49,19 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
         background = backgroundColor
     }
 
-    fun addItem(id: String, tooltip: String, iconPath: String, viewProvider: GuiViewProvider) {
+    fun addItem(ownerId: String, id: String, tooltip: String, iconRef: IconRef?, viewProvider: GuiViewProvider) {
         // 若重复注册同一 id（例如插件启停/重载），先清理旧项，避免 ButtonGroup 持有多余引用
         removeViewProvider(id)
 
-        val icon = IconLoader.getIcon(IconRef(iconPath), ICON_SIZE) ?: createDefaultIcon()
+        val icon =
+            iconRef?.let { ref -> IconLoader.getIcon(ref, ICON_SIZE) }
+                ?: createDefaultIcon()
         val btn = createActivityButton(icon, tooltip, id)
         val wasEmpty = buttonMap.isEmpty()
         buttonGroup.add(btn)
         buttonMap[id] = btn
         guiViewProviderMap[id] = viewProvider
+        ownerById[id] = ownerId
 
         // 按照排序顺序重新排列所有按钮
         reorderButtons()
@@ -61,30 +69,9 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
         revalidate(); repaint()
 
         // 默认选中逻辑（无持久化）：
-        // 1) 若注册的是配置中的默认插件，则默认选中它
-        // 2) 否则在第一个条目注册完成时，默认激活第一个
-        // 3) 若之前是自动选中的非默认，后续默认插件注册时，切换到默认插件
-        val isPreferred = id == Constants.ACTIVITY_BAR_DEFAULT_ID
-        when {
-            // 尚未有任何选中：优先选择首选，否则选择第一个
-            activeId == null && isPreferred -> {
-                handleButtonClick(id, userInitiated = false)
-                autoSelected = true
-                updateAllButtonStates()
-            }
-
-            activeId == null && wasEmpty -> {
-                handleButtonClick(id, userInitiated = false)
-                autoSelected = true
-                updateAllButtonStates()
-            }
-            // 若当前是自动选中的非首选，而新来的正好是首选，则切换到首选
-            isPreferred && autoSelected && activeId != id -> {
-                handleButtonClick(id, userInitiated = false)
-                autoSelected = true
-                updateAllButtonStates()
-            }
-        }
+        // 不自动展开 SideBar，也不自动高亮
+        // 高亮状态应该与 SideBar 的实际显示状态同步
+        // 用户需要点击按钮才会展开对应的视图并高亮
     }
 
     private fun createDefaultIcon(): Icon {
@@ -156,7 +143,7 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
         val viewProvider = guiViewProviderMap[id] ?: return
         // VSCode 模式：ActivityBar 仅控制 SideBar
         val isCurrentlyDisplayed =
-            mainWindow.sideBar.getCurrentViewId() == id && mainWindow.sideBar.isActuallyVisible() == true
+            mainWindow.sideBar.getCurrentViewId() == id && mainWindow.sideBar.isActuallyVisible()
         if (isCurrentlyDisplayed) {
             mainWindow.sideBar.hideSideBar(); activeId = null
             // 用户触发隐藏时，视为用户决定
@@ -216,11 +203,18 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
         val button = buttonMap.remove(id) ?: return
         buttonGroup.remove(button)
         guiViewProviderMap.remove(id)
+        ownerById.remove(id)
+        mainWindow.sideBar.removeView(id)
         if (activeId == id) activeId = null
         reorderButtons()
         updateAllButtonStates()
         revalidate()
         repaint()
+    }
+
+    fun removeItems(ownerId: String) {
+        val ids = ownerById.filterValues { it == ownerId }.keys.toList()
+        ids.forEach { id -> removeViewProvider(id) }
     }
 
     fun clearviewProviders() {
@@ -259,5 +253,21 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
                 add(Box.createVerticalStrut(5))
             }
         }
+    }
+
+    /**
+     * 设置默认的 ActivityBar 项
+     */
+    private fun setupDefaultActivityBarItems() {
+        // 注册 Explorer 到 ActivityBar
+        addItem(
+            OWNER_SYSTEM,
+            Constants.ACTIVITY_BAR_DEFAULT_ID,
+            "Explorer",
+            iconRef = IconRef("icons/filetype/folder.svg"),
+            object : CachedGuiViewProvider() {
+                override fun createView() = Explorer(mainWindow)
+            }
+        )
     }
 }

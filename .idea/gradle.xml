@@ -32,6 +32,7 @@
             <option value="$PROJECT_DIR$/plugins/i18n-zh" />
             <option value="$PROJECT_DIR$/plugins/json" />
             <option value="$PROJECT_DIR$/plugins/smali" />
+            <option value="$PROJECT_DIR$/plugins/stringfog" />
             <option value="$PROJECT_DIR$/plugins/xml" />
             <option value="$PROJECT_DIR$/plugins/yaml" />
           </set>

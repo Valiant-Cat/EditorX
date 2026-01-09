@@ -12,7 +12,15 @@ import java.io.File
 object Jadx {
     enum class Status { SUCCESS, FAILED, NOT_FOUND, CANCELLED }
 
-    data class RunResult(val status: Status, val exitCode: Int, val output: String)
+    data class RunResult(
+        val status: Status,
+        val exitCode: Int,
+        val output: String,
+        /** Jadx 输出中的错误数量（若可解析）。 */
+        val errorCount: Int? = null,
+    )
+
+    private val errorCountRegex = Regex("""finished\s+with\s+errors,\s*count:\s*(\d+)""", RegexOption.IGNORE_CASE)
 
     @Volatile
     private var cachedPath: String? = null
@@ -36,7 +44,25 @@ object Jadx {
             outputDir.absolutePath,
             inputFile.absolutePath,
         )
-        return run(command, inputFile.parentFile, cancelSignal)
+        val raw = run(command, inputFile.parentFile, cancelSignal)
+        val errorCount = parseErrorCount(raw.output)
+        val hasUsableOutput = hasUsableOutput(outputDir)
+        val finalStatus =
+            when (raw.status) {
+                Status.FAILED -> if (hasUsableOutput) Status.SUCCESS else Status.FAILED
+                else -> raw.status
+            }
+
+        val finalResult = RunResult(
+            status = finalStatus,
+            exitCode = raw.exitCode,
+            output = raw.output,
+            errorCount = errorCount,
+        )
+
+        // 将 jadx 输出写入到输出目录，便于排查（仅当目录已存在）。
+        writeLogIfPossible(outputDir, finalResult.output)
+        return finalResult
     }
 
     private fun run(command: List<String>, workingDir: File?, cancelSignal: (() -> Boolean)?): RunResult {
@@ -119,5 +145,25 @@ object Jadx {
         if (file.canExecute()) return true
         return file.setExecutable(true)
     }
-}
 
+    private fun parseErrorCount(output: String): Int? {
+        val m = errorCountRegex.find(output) ?: return null
+        return m.groupValues.getOrNull(1)?.toIntOrNull()
+    }
+
+    private fun hasUsableOutput(outputDir: File): Boolean {
+        if (!outputDir.exists() || !outputDir.isDirectory) return false
+        val sources = File(outputDir, "sources")
+        val resources = File(outputDir, "resources")
+        if (sources.isDirectory || resources.isDirectory) return true
+        return runCatching { outputDir.listFiles()?.isNotEmpty() == true }.getOrDefault(false)
+    }
+
+    private fun writeLogIfPossible(outputDir: File, output: String) {
+        if (!outputDir.exists() || !outputDir.isDirectory) return
+        if (output.isBlank()) return
+        runCatching {
+            File(outputDir, "jadx.log").writeText(output)
+        }
+    }
+}

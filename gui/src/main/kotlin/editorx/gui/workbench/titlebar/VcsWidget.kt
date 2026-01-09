@@ -13,6 +13,7 @@ import java.awt.Font
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.io.File
+import java.util.concurrent.TimeUnit
 import javax.swing.*
 
 /**
@@ -223,6 +224,24 @@ class VcsWidget(private val workspace: Workspace) : JPanel() {
                 logger.debug("git branch --show-current 命令失败", e)
             }
 
+            // 方法3：使用 git symbolic-ref --short HEAD（可处理 unborn branch，例如刚 git init 但尚未提交）
+            try {
+                val process3 = ProcessBuilder("git", "symbolic-ref", "--short", "HEAD")
+                    .directory(workspaceRoot)
+                    .redirectErrorStream(true)
+                    .start()
+
+                val output3 = process3.inputStream.bufferedReader().use { it.readText() }.trim()
+                val exitCode3 = process3.waitFor()
+
+                if (exitCode3 == 0 && output3.isNotBlank()) {
+                    logger.debug("获取 git 分支成功 (symbolic-ref): {}", output3)
+                    return output3
+                }
+            } catch (e: Exception) {
+                logger.debug("git symbolic-ref 命令失败", e)
+            }
+
             logger.debug("无法获取 git 分支名称，但工作区是 git 仓库")
         } catch (e: Exception) {
             logger.warn("执行 git 命令时发生异常", e)
@@ -234,7 +253,480 @@ class VcsWidget(private val workspace: Workspace) : JPanel() {
      * 显示 VCS 弹出菜单（点击 VCS Widget 时）
      */
     private fun showVcsPopupMenu(invoker: Component) {
-        // TODO
+        val workspaceRoot = workspace.getWorkspaceRoot()
+        val parent = SwingUtilities.getWindowAncestor(invoker) ?: SwingUtilities.getWindowAncestor(this) ?: this
+
+        if (workspaceRoot == null || !workspaceRoot.exists()) {
+            JOptionPane.showMessageDialog(
+                parent,
+                I18n.translate(I18nKeys.Dialog.WORKSPACE_NOT_OPENED),
+                I18n.translate(I18nKeys.Dialog.TIP),
+                JOptionPane.INFORMATION_MESSAGE
+            )
+            return
+        }
+
+        if (!isGitAvailable()) {
+            JOptionPane.showMessageDialog(
+                parent,
+                "未找到 git 命令，请确保 git 已安装并在 PATH 中",
+                I18n.translate(I18nKeys.Dialog.ERROR),
+                JOptionPane.ERROR_MESSAGE
+            )
+            return
+        }
+
+        if (!isGitRepository(workspaceRoot)) {
+            promptCreateGitRepository(workspaceRoot, parent)
+            return
+        }
+
+        val menu = JPopupMenu()
+
+        menu.add(JMenuItem("更新项目").apply {
+            icon = IconLoader.getIcon(
+                IconRef("icons/vcs/update.svg"),
+                16,
+                adaptToTheme = true,
+                getThemeColor = { ThemeManager.currentTheme.onSurface },
+                getDisabledColor = { ThemeManager.currentTheme.onSurfaceVariant }
+            )
+            addActionListener { updateProject(workspaceRoot, parent) }
+        })
+
+        menu.add(JMenuItem("推送").apply {
+            icon = IconLoader.getIcon(
+                IconRef("icons/vcs/push.svg"),
+                16,
+                adaptToTheme = true,
+                getThemeColor = { ThemeManager.currentTheme.onSurface },
+                getDisabledColor = { ThemeManager.currentTheme.onSurfaceVariant }
+            )
+            addActionListener { pushProject(workspaceRoot, parent) }
+        })
+
+        menu.add(JMenuItem("新建分支…").apply {
+            addActionListener { createBranch(workspaceRoot, parent) }
+        })
+
+        menu.addSeparator()
+
+        val currentBranch = getCurrentGitBranch(workspaceRoot)
+        val localBranches = listLocalBranches(workspaceRoot)
+        menu.add(buildLocalBranchesMenu(workspaceRoot, parent, localBranches, currentBranch))
+
+        val remoteBranches = listRemoteBranches(workspaceRoot)
+        if (remoteBranches.isNotEmpty()) {
+            menu.add(buildRemoteBranchesMenu(workspaceRoot, parent, remoteBranches, localBranches, currentBranch))
+        }
+
+        val tags = listTags(workspaceRoot)
+        if (tags.isNotEmpty()) {
+            menu.add(buildTagsMenu(workspaceRoot, parent, tags))
+        }
+
+        menu.show(invoker, 0, invoker.height)
+    }
+
+    private fun isGitRepository(workspaceRoot: File): Boolean {
+        // .git 可能是目录或文件（worktree），只要存在即可视为仓库
+        return File(workspaceRoot, ".git").exists()
+    }
+
+    private fun isGitAvailable(): Boolean {
+        return try {
+            val process = ProcessBuilder("git", "--version").start()
+            val finished = process.waitFor(3000, TimeUnit.MILLISECONDS)
+            finished && process.exitValue() == 0
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private data class GitCommandResult(val exitCode: Int, val output: String)
+
+    private fun runGitCommand(command: List<String>, workingDir: File, timeoutMs: Long): GitCommandResult {
+        val pb = ProcessBuilder(command)
+        pb.directory(workingDir)
+        pb.redirectErrorStream(true)
+
+        val process = try {
+            pb.start()
+        } catch (e: Exception) {
+            return GitCommandResult(-1, "无法启动进程: ${e.message}")
+        }
+
+        val outputBuffer = StringBuilder()
+        val outputReader = Thread {
+            try {
+                process.inputStream.bufferedReader().use { reader ->
+                    reader.lineSequence().forEach { line ->
+                        outputBuffer.append(line).append("\n")
+                    }
+                }
+            } catch (_: Exception) {
+                // 忽略读取错误
+            }
+        }.apply {
+            isDaemon = true
+            start()
+        }
+
+        val finished = process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
+        if (!finished) {
+            process.destroy()
+            if (process.isAlive) process.destroyForcibly()
+            outputReader.join(500)
+            return GitCommandResult(-1, "命令执行超时（超过 ${timeoutMs}ms）")
+        }
+
+        outputReader.join(1000)
+        val exitCode = process.exitValue()
+        return GitCommandResult(exitCode, outputBuffer.toString().trim())
+    }
+
+    private fun promptCreateGitRepository(workspaceRoot: File, parent: Component) {
+        val options = arrayOf("创建", I18n.translate(I18nKeys.Action.CANCEL))
+        val choice = JOptionPane.showOptionDialog(
+            parent,
+            "当前工作区不是 Git 仓库，是否创建一个新的 Git 仓库？",
+            "创建 Git 仓库",
+            JOptionPane.YES_NO_OPTION,
+            JOptionPane.QUESTION_MESSAGE,
+            null,
+            options,
+            options[0]
+        )
+        if (choice == JOptionPane.YES_OPTION) {
+            createGitRepository(workspaceRoot, parent)
+        }
+    }
+
+    private fun createGitRepository(workspaceRoot: File, parent: Component) {
+        Thread {
+            val result = runGitCommand(listOf("git", "init"), workspaceRoot, 10_000)
+            SwingUtilities.invokeLater {
+                if (result.exitCode == 0) {
+                    JOptionPane.showMessageDialog(
+                        parent,
+                        "Git 仓库创建成功",
+                        I18n.translate(I18nKeys.Dialog.INFO),
+                        JOptionPane.INFORMATION_MESSAGE
+                    )
+                    updateDisplay()
+                } else {
+                    JOptionPane.showMessageDialog(
+                        parent,
+                        "Git 仓库创建失败：\n${result.output}",
+                        I18n.translate(I18nKeys.Dialog.ERROR),
+                        JOptionPane.ERROR_MESSAGE
+                    )
+                }
+            }
+        }.apply {
+            isDaemon = true
+            start()
+        }
+    }
+
+    private fun updateProject(workspaceRoot: File, parent: Component) {
+        Thread {
+            val remotes = listRemotes(workspaceRoot)
+            if (remotes.isEmpty()) {
+                SwingUtilities.invokeLater {
+                    JOptionPane.showMessageDialog(
+                        parent,
+                        "未配置远程仓库，无法更新项目",
+                        I18n.translate(I18nKeys.Dialog.TIP),
+                        JOptionPane.INFORMATION_MESSAGE
+                    )
+                }
+                return@Thread
+            }
+
+            val result = runGitCommand(listOf("git", "pull", "--ff-only"), workspaceRoot, 5 * 60_000L)
+            SwingUtilities.invokeLater {
+                if (result.exitCode == 0) {
+                    JOptionPane.showMessageDialog(
+                        parent,
+                        if (result.output.isBlank()) "更新完成" else result.output,
+                        I18n.translate(I18nKeys.Dialog.INFO),
+                        JOptionPane.INFORMATION_MESSAGE
+                    )
+                } else {
+                    JOptionPane.showMessageDialog(
+                        parent,
+                        "更新失败：\n${result.output}",
+                        I18n.translate(I18nKeys.Dialog.ERROR),
+                        JOptionPane.ERROR_MESSAGE
+                    )
+                }
+                updateDisplay()
+            }
+        }.apply {
+            isDaemon = true
+            start()
+        }
+    }
+
+    private fun pushProject(workspaceRoot: File, parent: Component) {
+        Thread {
+            val remotes = listRemotes(workspaceRoot)
+            if (remotes.isEmpty()) {
+                SwingUtilities.invokeLater {
+                    JOptionPane.showMessageDialog(
+                        parent,
+                        "未配置远程仓库，无法推送",
+                        I18n.translate(I18nKeys.Dialog.TIP),
+                        JOptionPane.INFORMATION_MESSAGE
+                    )
+                }
+                return@Thread
+            }
+
+            val result = runGitCommand(listOf("git", "push"), workspaceRoot, 5 * 60_000L)
+            SwingUtilities.invokeLater {
+                if (result.exitCode == 0) {
+                    JOptionPane.showMessageDialog(
+                        parent,
+                        if (result.output.isBlank()) "推送完成" else result.output,
+                        I18n.translate(I18nKeys.Dialog.INFO),
+                        JOptionPane.INFORMATION_MESSAGE
+                    )
+                } else {
+                    JOptionPane.showMessageDialog(
+                        parent,
+                        "推送失败：\n${result.output}",
+                        I18n.translate(I18nKeys.Dialog.ERROR),
+                        JOptionPane.ERROR_MESSAGE
+                    )
+                }
+                updateDisplay()
+            }
+        }.apply {
+            isDaemon = true
+            start()
+        }
+    }
+
+    private fun createBranch(workspaceRoot: File, parent: Component) {
+        val branchName = JOptionPane.showInputDialog(parent, "请输入新分支名称：", "新建分支", JOptionPane.PLAIN_MESSAGE)
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?: return
+
+        Thread {
+            val result = runGitCommand(listOf("git", "checkout", "-b", branchName), workspaceRoot, 10_000)
+            SwingUtilities.invokeLater {
+                if (result.exitCode == 0) {
+                    JOptionPane.showMessageDialog(
+                        parent,
+                        "已创建并切换到分支：$branchName",
+                        I18n.translate(I18nKeys.Dialog.INFO),
+                        JOptionPane.INFORMATION_MESSAGE
+                    )
+                    updateDisplay()
+                } else {
+                    JOptionPane.showMessageDialog(
+                        parent,
+                        "创建分支失败：\n${result.output}",
+                        I18n.translate(I18nKeys.Dialog.ERROR),
+                        JOptionPane.ERROR_MESSAGE
+                    )
+                }
+            }
+        }.apply {
+            isDaemon = true
+            start()
+        }
+    }
+
+    private fun buildLocalBranchesMenu(
+        workspaceRoot: File,
+        parent: Component,
+        branches: List<String>,
+        currentBranch: String?
+    ): JMenu {
+        val menu = JMenu("本地分支")
+        if (branches.isEmpty()) {
+            menu.add(JMenuItem("暂无本地分支").apply { isEnabled = false })
+            return menu
+        }
+
+        branches.forEach { branch ->
+            val item = JMenuItem(branch).apply {
+                if (branch == currentBranch) {
+                    font = font.deriveFont(Font.BOLD)
+                    isEnabled = false
+                }
+                addActionListener { checkoutLocalBranch(workspaceRoot, parent, branch) }
+            }
+            menu.add(item)
+        }
+        return menu
+    }
+
+    private fun buildRemoteBranchesMenu(
+        workspaceRoot: File,
+        parent: Component,
+        remoteBranches: List<String>,
+        localBranches: List<String>,
+        currentBranch: String?
+    ): JMenu {
+        val menu = JMenu("远程分支")
+        remoteBranches.forEach { remoteBranch ->
+            val item = JMenuItem(remoteBranch).apply {
+                addActionListener {
+                    checkoutRemoteBranch(workspaceRoot, parent, remoteBranch, localBranches, currentBranch)
+                }
+            }
+            menu.add(item)
+        }
+        return menu
+    }
+
+    private fun buildTagsMenu(workspaceRoot: File, parent: Component, tags: List<String>): JMenu {
+        val menu = JMenu("标签")
+        tags.forEach { tag ->
+            menu.add(JMenuItem(tag).apply {
+                addActionListener { checkoutTag(workspaceRoot, parent, tag) }
+            })
+        }
+        return menu
+    }
+
+    private fun checkoutLocalBranch(workspaceRoot: File, parent: Component, branch: String) {
+        Thread {
+            val result = runGitCommand(listOf("git", "checkout", branch), workspaceRoot, 10_000)
+            SwingUtilities.invokeLater {
+                if (result.exitCode == 0) {
+                    updateDisplay()
+                } else {
+                    JOptionPane.showMessageDialog(
+                        parent,
+                        "切换分支失败：\n${result.output}",
+                        I18n.translate(I18nKeys.Dialog.ERROR),
+                        JOptionPane.ERROR_MESSAGE
+                    )
+                }
+            }
+        }.apply {
+            isDaemon = true
+            start()
+        }
+    }
+
+    private fun checkoutRemoteBranch(
+        workspaceRoot: File,
+        parent: Component,
+        remoteBranch: String,
+        localBranches: List<String>,
+        currentBranch: String?
+    ) {
+        val candidateLocal = remoteBranch.substringAfter('/')
+        val command = if (candidateLocal.isNotBlank() && localBranches.contains(candidateLocal)) {
+            if (candidateLocal == currentBranch) return
+            listOf("git", "checkout", candidateLocal)
+        } else {
+            listOf("git", "checkout", "--track", remoteBranch)
+        }
+
+        Thread {
+            val result = runGitCommand(command, workspaceRoot, 20_000)
+            SwingUtilities.invokeLater {
+                if (result.exitCode == 0) {
+                    updateDisplay()
+                } else {
+                    JOptionPane.showMessageDialog(
+                        parent,
+                        "切换远程分支失败：\n${result.output}",
+                        I18n.translate(I18nKeys.Dialog.ERROR),
+                        JOptionPane.ERROR_MESSAGE
+                    )
+                }
+            }
+        }.apply {
+            isDaemon = true
+            start()
+        }
+    }
+
+    private fun checkoutTag(workspaceRoot: File, parent: Component, tag: String) {
+        val choice = JOptionPane.showConfirmDialog(
+            parent,
+            "检出标签会进入 detached HEAD 状态，是否继续？",
+            "检出标签",
+            JOptionPane.YES_NO_OPTION,
+            JOptionPane.WARNING_MESSAGE
+        )
+        if (choice != JOptionPane.YES_OPTION) return
+
+        Thread {
+            val result = runGitCommand(listOf("git", "checkout", tag), workspaceRoot, 10_000)
+            SwingUtilities.invokeLater {
+                if (result.exitCode == 0) {
+                    updateDisplay()
+                } else {
+                    JOptionPane.showMessageDialog(
+                        parent,
+                        "检出标签失败：\n${result.output}",
+                        I18n.translate(I18nKeys.Dialog.ERROR),
+                        JOptionPane.ERROR_MESSAGE
+                    )
+                }
+            }
+        }.apply {
+            isDaemon = true
+            start()
+        }
+    }
+
+    private fun listRemotes(workspaceRoot: File): List<String> {
+        val result = runGitCommand(listOf("git", "remote"), workspaceRoot, 3_000)
+        if (result.exitCode != 0) return emptyList()
+        return result.output
+            .lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .toList()
+    }
+
+    private fun listLocalBranches(workspaceRoot: File): List<String> {
+        val result = runGitCommand(listOf("git", "branch"), workspaceRoot, 3_000)
+        if (result.exitCode != 0) return emptyList()
+        return result.output
+            .lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .map { line ->
+                // * main /   dev
+                line.removePrefix("*").trim()
+            }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .toList()
+    }
+
+    private fun listRemoteBranches(workspaceRoot: File): List<String> {
+        val result = runGitCommand(listOf("git", "branch", "-r"), workspaceRoot, 3_000)
+        if (result.exitCode != 0) return emptyList()
+        return result.output
+            .lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .filterNot { it.contains("->") } // origin/HEAD -> origin/main
+            .distinct()
+            .toList()
+    }
+
+    private fun listTags(workspaceRoot: File): List<String> {
+        val result = runGitCommand(listOf("git", "tag", "--list"), workspaceRoot, 3_000)
+        if (result.exitCode != 0) return emptyList()
+        return result.output
+            .lineSequence()
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+            .toList()
     }
 }
-

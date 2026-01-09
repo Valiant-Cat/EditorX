@@ -237,6 +237,7 @@ override fun deactivate() {
 - 注册语法高亮（`registerSyntaxHighlighter`）
 - 注册格式化器（`registerFormatter`）
 - 注册文件处理器（`registerFileHandler`）
+- 注册编辑器右键菜单项（`registerEditorContextMenuItem`）
 - 添加工具栏按钮（`addToolBarItem`）
 - 打开文件和工作区（`openFile`, `openWorkspace`）
 

@@ -6,13 +6,12 @@ import editorx.core.service.BuildStatus
 import editorx.core.util.IconLoader
 import editorx.core.util.IconRef
 import editorx.core.util.SystemUtils
-import editorx.gui.theme.ThemeManager
 import editorx.gui.MainWindow
-import editorx.gui.workbench.explorer.Explorer
 import editorx.gui.search.SearchDialog
 import editorx.gui.settings.SettingsDialog
-import org.slf4j.LoggerFactory
-import java.awt.*
+import editorx.gui.theme.ThemeManager
+import java.awt.Font
+import java.awt.Insets
 import java.awt.event.ActionListener
 import javax.swing.*
 
@@ -22,7 +21,6 @@ import javax.swing.*
  */
 class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
     companion object {
-        private val logger = LoggerFactory.getLogger(TitleBar::class.java)
         private const val ICON_SIZE = 18
     }
 
@@ -34,7 +32,7 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
     private var titleLabel: JLabel? = null
 
     // VCS Widget
-    val vcsWidget = VcsWidget(mainWindow.guiContext.getWorkspace())
+    private val vcsWidget = VcsWidget(mainWindow.guiContext.getWorkspace())
 
     init {
         isFloatable = false
@@ -73,7 +71,7 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
             BorderFactory.createMatteBorder(0, 0, 1, 0, theme.statusBarSeparator),
             BorderFactory.createEmptyBorder(2, 5, 2, 5),
         )
-        
+
         // 更新所有按钮的图标
         buildButton?.icon = IconLoader.getIcon(
             IconRef("icons/common/build.svg"),
@@ -94,7 +92,7 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
             getThemeColor = { theme.onSurface }
         )
         toggleSideBarButton?.icon = getSideBarIcon()
-        
+
         revalidate()
         repaint()
     }
@@ -105,6 +103,28 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
      */
     fun updateVcsDisplay() {
         vcsWidget.updateDisplay()
+        // 同时更新标题（工作区可能已变化）
+        updateTitle()
+    }
+
+    /**
+     * 更新标题栏显示的项目名称和未保存文件提示
+     * 参考 jadx：如果有未保存的文件，在标题前显示 *
+     */
+    fun updateTitle() {
+        val workspaceRoot = mainWindow.guiContext.getWorkspace().getWorkspaceRoot()
+        val hasUnsavedChanges = mainWindow.editor.hasUnsavedChanges()
+
+        val title = when {
+            workspaceRoot != null -> {
+                val projectName = workspaceRoot.name
+                if (hasUnsavedChanges) "* $projectName" else projectName
+            }
+
+            else -> "EditorX"
+        }
+
+        titleLabel?.text = title
     }
 
     /**
@@ -159,6 +179,8 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
             isOpaque = false
         }
         add(titleLabel)
+        // 初始化标题
+        updateTitle()
     }
 
     private fun setupRightActions() {
@@ -216,30 +238,16 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
         add(Box.createHorizontalStrut(12))
     }
 
-    private fun openFolder() {
-        val chooser = JFileChooser().apply {
-            fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
-            dialogTitle = I18n.translate(I18nKeys.Dialog.SELECT_FOLDER)
-        }
-        if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
-            val selected = chooser.selectedFile
-            mainWindow.guiContext.getWorkspace().openWorkspace(selected)
-            mainWindow.guiContext.getWorkspace().addRecentWorkspace(selected)
-            (mainWindow.sideBar.getView("explorer") as? Explorer)?.refreshRoot()
-            mainWindow.titleBar.updateVcsDisplay()
-            mainWindow.editor.showEditorContent()
-        }
-    }
-
     fun updateSideBarIcon(sideBarVisible: Boolean) {
         toggleSideBarButton?.icon = getSideBarIcon()
     }
 
     private fun getSideBarIcon(): Icon? {
         val isVisible = mainWindow.sideBar.isSideBarVisible()
-        val iconName = if (isVisible) "icons/common/layout-sidebar-left.svg" else "icons/common/layout-sidebar-left-off.svg"
+        val iconName =
+            if (isVisible) "icons/common/layout-sidebar-left.svg" else "icons/common/layout-sidebar-left-off.svg"
         return IconLoader.getIcon(
-            IconRef(iconName), 
+            IconRef(iconName),
             ICON_SIZE,
             adaptToTheme = true,
             getThemeColor = { ThemeManager.currentTheme.onSurface }
@@ -251,14 +259,6 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
         if (sidebar.isSideBarVisible()) sidebar.hideSideBar() else sidebar.getCurrentViewId()
             ?.let { sidebar.showView(it) }
         toggleSideBarButton?.icon = getSideBarIcon()
-    }
-
-    private fun showFindDialog() {
-        mainWindow.editor.showFindBar()
-    }
-
-    private fun showReplaceDialog() {
-        mainWindow.editor.showReplaceBar()
     }
 
     private fun showSettings() {
@@ -351,7 +351,8 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
                         }
 
                         BuildStatus.NOT_FOUND -> {
-                            val msg = buildResult.errorMessage ?: I18n.translate(I18nKeys.ToolbarMessage.BUILD_TOOL_NOT_FOUND)
+                            val msg =
+                                buildResult.errorMessage ?: I18n.translate(I18nKeys.ToolbarMessage.BUILD_TOOL_NOT_FOUND)
                             mainWindow.statusBar.showError(msg)
                             JOptionPane.showMessageDialog(
                                 mainWindow,
@@ -366,7 +367,8 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
                         }
 
                         BuildStatus.FAILED -> {
-                            val msg = buildResult.errorMessage ?: I18n.translate(I18nKeys.ToolbarMessage.COMPILE_FAILED).format("")
+                            val msg = buildResult.errorMessage ?: I18n.translate(I18nKeys.ToolbarMessage.COMPILE_FAILED)
+                                .format("")
                             mainWindow.statusBar.showError(msg)
                             JOptionPane.showMessageDialog(
                                 mainWindow,

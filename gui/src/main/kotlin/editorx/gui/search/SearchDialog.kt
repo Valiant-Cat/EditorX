@@ -66,9 +66,9 @@ class SearchDialog(
     private val resultModel = DefaultListModel<SearchMatch>()
     private val resultList = JList(resultModel).apply {
         selectionMode = ListSelectionModel.SINGLE_SELECTION
-        val rootPath = workspaceRoot()?.toPath()
-        cellRenderer = ResultRenderer(rootPath)
-        fixedCellHeight = 0
+        cellRenderer = ResultRenderer { workspaceRoot()?.toPath() }
+        // 固定行高，避免不同平台/HTML 渲染导致的行高计算异常（结果“存在但不可见”）
+        fixedCellHeight = 28
     }
 
     private val statusLabel = JLabel(" ").apply {
@@ -386,10 +386,6 @@ class SearchDialog(
             return if (hitLimit) "$base（结果已达上限 ${MAX_RESULTS}）" else base
         }
 
-        override fun process(chunks: MutableList<SearchMatch>) {
-            chunks.forEach(onMatch)
-        }
-
         override fun done() {
             if (isCancelled) {
                 onDone("已停止：扫描 $filesScanned 个文件，找到 $matches 条结果")
@@ -404,9 +400,12 @@ class SearchDialog(
             SwingUtilities.invokeLater { onProgress(filesScanned, matches) }
         }
 
+        private fun publishMatch(match: SearchMatch) {
+            SwingUtilities.invokeLater { onMatch(match) }
+        }
+
         private fun searchFile(file: File, queryLower: String) {
             val fileExt = file.extension.lowercase()
-            val fileName = file.name.lowercase()
 
             // 根据文件类型和搜索选项决定是否搜索
             val isJavaFile = fileExt in setOf("java", "kt", "kts")
@@ -450,7 +449,8 @@ class SearchDialog(
 
                     val col = lineLower.indexOf(queryLower)
                     if (col >= 0 && matches < MAX_RESULTS) {
-                        publish(
+                        matches++
+                        publishMatch(
                             SearchMatch(
                                 file = file,
                                 line = lineNo,
@@ -459,7 +459,8 @@ class SearchDialog(
                                 preview = line.take(200),
                             )
                         )
-                        matches++
+                        // 命中后立刻刷新一次进度，让用户感知“边搜边出结果”
+                        publishProgress()
                     }
                     true
                 }
@@ -515,18 +516,41 @@ class SearchDialog(
         }
 
         private fun shouldSkip(path: Path): Boolean {
-            val name = path.fileName.toString()
-            return SKIP_DIR_NAMES.contains(name) || name.startsWith(".")
+            val rel = try {
+                rootPath.relativize(path).toString().replace('\\', '/')
+            } catch (_: Exception) {
+                path.toString()
+            }
+            val parts = rel.split('/')
+            if (parts.any { it in SKIP_DIR_NAMES }) return true
+
+            val name = path.fileName?.toString()?.lowercase().orEmpty()
+            // 跳过隐藏目录（以点开头的目录）
+            if (name.startsWith(".")) return true
+
+            val ext = name.substringAfterLast('.', "")
+            if (ext in BINARY_EXTS) return true
+
+            return false
         }
 
         private fun isLikelyBinary(file: File): Boolean {
-            val ext = file.extension.lowercase()
-            return BINARY_EXTS.contains(ext)
+            return runCatching {
+                FileInputStream(file).use { input ->
+                    val buf = ByteArray(4096)
+                    val n = input.read(buf)
+                    if (n <= 0) return@runCatching false
+                    for (i in 0 until n) {
+                        if (buf[i].toInt() == 0) return@runCatching true
+                    }
+                    false
+                }
+            }.getOrDefault(true)
         }
     }
 
     private class ResultRenderer(
-        private val workspaceRoot: Path?
+        private val workspaceRootProvider: () -> Path?
     ) : DefaultListCellRenderer() {
         override fun getListCellRendererComponent(
             list: javax.swing.JList<*>,
@@ -539,7 +563,7 @@ class SearchDialog(
             val match = value as? SearchMatch ?: return comp
 
             val theme = ThemeManager.currentTheme
-            val root = workspaceRoot
+            val root = workspaceRootProvider()
             val relPath = if (root != null) {
                 try {
                     root.relativize(match.file.toPath()).toString()
@@ -560,7 +584,7 @@ class SearchDialog(
             }
             comp.isOpaque = true
 
-            comp.text = "<html><b>$relPath</b>:${match.line}:${match.column + 1} - ${match.preview}</html>"
+            comp.text = "$relPath:${match.line}:${match.column + 1}  ${match.preview.trim()}"
             comp.border = BorderFactory.createEmptyBorder(4, 8, 4, 8)
             return comp
         }
@@ -571,10 +595,10 @@ class SearchDialog(
 private fun java.io.BufferedReader.readLinesWithLineNumber(
     action: (Int, String) -> Boolean
 ) {
-    var lineNo = 1
-    forEachLine { line ->
-        if (!action(lineNo, line)) return@forEachLine
+    var lineNo = 0
+    while (true) {
+        val line = readLine() ?: break
         lineNo++
+        if (!action(lineNo, line)) break
     }
 }
-

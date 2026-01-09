@@ -3,11 +3,13 @@ package editorx.gui.workbench.menubar
 import editorx.core.i18n.I18n
 import editorx.core.i18n.I18nKeys
 import editorx.gui.MainWindow
-import editorx.gui.workbench.explorer.Explorer
+import editorx.gui.core.FileHandlerManager
 import java.awt.event.InputEvent
 import java.awt.event.KeyEvent
 import java.io.File
 import javax.swing.*
+import javax.swing.event.MenuEvent
+import javax.swing.event.MenuListener
 
 class MenuBar(private val mainWindow: MainWindow) : JMenuBar() {
     private val i18nListener: () -> Unit = {
@@ -49,9 +51,7 @@ class MenuBar(private val mainWindow: MainWindow) : JMenuBar() {
                 addActionListener { openFolder() }
             })
 
-            add(JMenu(I18n.translate(I18nKeys.Action.RECENT)).apply {
-                addMenuListener(RecentFilesMenuListener(this, mainWindow))
-            })
+            add(createRecentProjectsMenu())
 
             addSeparator()
 
@@ -72,6 +72,45 @@ class MenuBar(private val mainWindow: MainWindow) : JMenuBar() {
                 accelerator = KeyStroke.getKeyStroke(KeyEvent.VK_Q, shortcut)
                 addActionListener { System.exit(0) }
             })
+        }
+    }
+
+    private fun createRecentProjectsMenu(): JMenu {
+        return JMenu(I18n.translate(I18nKeys.Welcome.RECENT_PROJECTS)).apply {
+            mnemonic = KeyEvent.VK_R
+            addMenuListener(
+                object : MenuListener {
+                    override fun menuSelected(e: MenuEvent?) {
+                        populateRecentProjectsMenu(this@apply)
+                    }
+
+                    override fun menuDeselected(e: MenuEvent?) {
+                        // nop
+                    }
+
+                    override fun menuCanceled(e: MenuEvent?) {
+                        // nop
+                    }
+                }
+            )
+            populateRecentProjectsMenu(this)
+        }
+    }
+
+    private fun populateRecentProjectsMenu(menu: JMenu) {
+        menu.removeAll()
+        val recentWorkspaces: List<File> = mainWindow.guiContext.getWorkspace().recentWorkspaces()
+        if (recentWorkspaces.isEmpty()) {
+            menu.add(JMenuItem(I18n.translate(I18nKeys.Welcome.NO_RECENT_PROJECTS)).apply { isEnabled = false })
+            return
+        }
+
+        recentWorkspaces.take(20).forEachIndexed { idx, workspace ->
+            val item = JMenuItem("${idx + 1}. ${workspace.name}").apply {
+                toolTipText = workspace.absolutePath
+                addActionListener { mainWindow.openWorkspace(workspace) }
+            }
+            menu.add(item)
         }
     }
 
@@ -123,29 +162,18 @@ class MenuBar(private val mainWindow: MainWindow) : JMenuBar() {
     }
 
     private fun openFileChooserAndOpen() {
-        val chooser = JFileChooser().apply { fileSelectionMode = JFileChooser.FILES_ONLY; dialogTitle = "选择文件" }
-        if (chooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
-            val file: File = chooser.selectedFile
-            mainWindow.editor.openFile(file)
-            mainWindow.guiContext.getWorkspace().addRecentFile(file)
+        mainWindow.showFileChooser { selectedFile ->
+            if (selectedFile != null) {
+                FileHandlerManager.handleOpenFile(selectedFile)
+            }
         }
     }
 
     private fun openFolder() {
-        val fileChooser =
-            JFileChooser().apply {
-                fileSelectionMode = JFileChooser.DIRECTORIES_ONLY
-                dialogTitle = I18n.translate(I18nKeys.Dialog.SELECT_FOLDER)
+        mainWindow.showFolderChooser { selectedDir ->
+            if (selectedDir != null && selectedDir.isDirectory) {
+                mainWindow.openWorkspace(selectedDir)
             }
-        if (fileChooser.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
-            val selectedFolder = fileChooser.selectedFile
-            // 更新工作区并刷新 Explorer
-            mainWindow.guiContext.getWorkspace().openWorkspace(selectedFolder)
-            mainWindow.guiContext.getWorkspace().addRecentWorkspace(selectedFolder)
-//            mainWindow.statusBar.setMessage("已打开文件夹: ${selectedFolder.name}")
-            (mainWindow.sideBar.getView("explorer") as? Explorer)?.refreshRoot()
-            mainWindow.titleBar.updateVcsDisplay()
-            mainWindow.editor.showEditorContent()
         }
     }
 
@@ -187,27 +215,4 @@ class MenuBar(private val mainWindow: MainWindow) : JMenuBar() {
             JOptionPane.INFORMATION_MESSAGE
         )
     }
-}
-
-private class RecentFilesMenuListener(
-    private val menu: JMenu,
-    private val mainWindow: MainWindow
-) : javax.swing.event.MenuListener {
-    override fun menuSelected(e: javax.swing.event.MenuEvent) {
-        menu.removeAll()
-        val recents = mainWindow.guiContext.getWorkspace().recentFiles()
-        if (recents.isEmpty()) {
-            menu.add(JMenuItem(I18n.translate(I18nKeys.Dialog.NO_RECENT_FILES)))
-        } else {
-            recents.forEach { file ->
-                val item = JMenuItem(file.name)
-                item.toolTipText = file.absolutePath
-                item.addActionListener { mainWindow.editor.openFile(file) }
-                menu.add(item)
-            }
-        }
-    }
-
-    override fun menuDeselected(e: javax.swing.event.MenuEvent) {}
-    override fun menuCanceled(e: javax.swing.event.MenuEvent) {}
 }

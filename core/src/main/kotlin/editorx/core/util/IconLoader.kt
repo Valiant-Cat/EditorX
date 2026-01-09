@@ -98,10 +98,28 @@ object IconLoader {
             )
 
         // Prefer FlatLaf's robust SVG renderer if available
+        // FlatSVGIcon 支持通过 derive 方法设置尺寸，避免双重缩放
         runCatching {
             val clazz = Class.forName("com.formdev.flatlaf.extras.FlatSVGIcon")
             val ctor = clazz.getConstructor(URL::class.java)
             val icon = ctor.newInstance(url) as Icon
+            
+            // 尝试使用 derive 方法直接设置尺寸（避免双重缩放）
+            runCatching {
+                val deriveMethod = clazz.getMethod("derive", Float::class.java, Float::class.java)
+                val derivedIcon = deriveMethod.invoke(icon, size.toFloat(), size.toFloat()) as? Icon
+                if (derivedIcon != null && derivedIcon.iconWidth == size && derivedIcon.iconHeight == size) {
+                    return derivedIcon
+                }
+            }
+            
+            // 如果 derive 失败或尺寸不匹配，检查原始图标尺寸
+            // 如果已经是目标尺寸，直接返回，避免不必要的缩放
+            if (icon.iconWidth == size && icon.iconHeight == size) {
+                return icon
+            }
+            
+            // 否则才进行缩放
             return IconUtils.resizeIcon(icon, size, size)
         }
 
@@ -110,6 +128,12 @@ object IconLoader {
             val clazz = Class.forName("com.formdev.svg.SVGIcon")
             val ctor = clazz.getConstructor(URL::class.java)
             val icon = ctor.newInstance(url) as Icon
+            
+            // 检查是否已经是目标尺寸
+            if (icon.iconWidth == size && icon.iconHeight == size) {
+                return icon
+            }
+            
             return IconUtils.resizeIcon(icon, size, size)
         }
 

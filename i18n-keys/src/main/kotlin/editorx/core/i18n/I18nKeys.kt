@@ -230,6 +230,8 @@ object I18nKeys {
         const val DELETE = "explorer.delete"
         const val REFRESH = "explorer.refresh"
         const val REVEAL_IN_SYSTEM = "explorer.revealInSystem"
+        const val VIEW_MODE_PROJECT = "explorer.viewMode.project"
+        const val WORKSPACE_NOT_OPENED = "explorer.workspaceNotOpened"
     }
 
     /**
@@ -255,6 +257,9 @@ object I18nKeys {
         const val GOTO_MANIFEST = "toolbar.gotoManifest"
         const val GOTO_MAIN_ACTIVITY = "toolbar.gotoMainActivity"
         const val GOTO_APPLICATION = "toolbar.gotoApplication"
+        const val EDIT_APP_INFO = "toolbar.editAppInfo"
+        const val EDIT_APP_LOCALES = "toolbar.editAppLocales"
+        const val EDIT_APP_ICONS = "toolbar.editAppIcons"
         const val BUILD = "toolbar.build"
         const val TOGGLE_SIDEBAR = "toolbar.toggleSidebar"
         const val GLOBAL_SEARCH = "toolbar.globalSearch"
@@ -392,4 +397,3 @@ object I18nKeys {
         const val CANNOT_DELETE = "cache.cannotDelete"
     }
 }
-

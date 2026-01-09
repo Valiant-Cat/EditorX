@@ -147,6 +147,8 @@ Developed by: XiaMao Tools""")
     put(I18nKeys.Explorer.DELETE, "Delete")
     put(I18nKeys.Explorer.REFRESH, "Refresh")
     put(I18nKeys.Explorer.REVEAL_IN_SYSTEM, "Reveal in System")
+    put(I18nKeys.Explorer.VIEW_MODE_PROJECT, "Project")
+    put(I18nKeys.Explorer.WORKSPACE_NOT_OPENED, "Workspace not opened")
 
     put(I18nKeys.Editor.CLOSE, "Close")
     put(I18nKeys.Editor.CLOSE_OTHERS, "Close Others")
@@ -162,6 +164,9 @@ Developed by: XiaMao Tools""")
     put(I18nKeys.Toolbar.GOTO_MANIFEST, "Open AndroidManifest.xml")
     put(I18nKeys.Toolbar.GOTO_MAIN_ACTIVITY, "Open MainActivity")
     put(I18nKeys.Toolbar.GOTO_APPLICATION, "Open Application")
+    put(I18nKeys.Toolbar.EDIT_APP_INFO, "Edit App Info")
+    put(I18nKeys.Toolbar.EDIT_APP_LOCALES, "App Name Locales")
+    put(I18nKeys.Toolbar.EDIT_APP_ICONS, "Icon Densities")
     put(I18nKeys.Toolbar.BUILD, "Build")
     put(I18nKeys.Toolbar.TOGGLE_SIDEBAR, "Toggle Sidebar")
     put(I18nKeys.Toolbar.GLOBAL_SEARCH, "Global Search")
@@ -299,4 +304,3 @@ class EnglishI18nPlugin : I18nPlugin(Locale.ENGLISH) {
 
     override fun translate(key: String): String? = dictionary[key]
 }
-

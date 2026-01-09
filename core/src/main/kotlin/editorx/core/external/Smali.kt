@@ -2,6 +2,7 @@ package editorx.core.external
 
 import java.io.File
 import java.nio.file.Files
+import java.nio.charset.StandardCharsets
 
 /**
  * 对 smali 工具的封装：负责定位可执行文件并提供 smali 文件编译能力。
@@ -32,6 +33,7 @@ object Smali {
     fun assemble(
         smaliFile: File,
         outputDexFile: File,
+        smaliText: String? = null,
         cancelSignal: (() -> Boolean)? = null
     ): RunResult {
         val smaliPath = locate() ?: return RunResult(Status.NOT_FOUND, -1, "smali not found")
@@ -53,8 +55,12 @@ object Smali {
             val targetFile = File(tempInputDir, relativePath.path)
             targetFile.parentFile.mkdirs()
 
-            // 复制 smali 文件到临时目录
-            Files.copy(smaliFile.toPath(), targetFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            // 将 smali 文件复制/写入到临时目录（支持未保存的编辑内容）
+            if (smaliText != null) {
+                Files.writeString(targetFile.toPath(), smaliText, StandardCharsets.UTF_8)
+            } else {
+                Files.copy(smaliFile.toPath(), targetFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            }
 
             // 构建命令：smali assemble -o output.dex inputDir
             // smali.jar 没有主清单属性，需要使用主类运行
@@ -222,4 +228,3 @@ object Smali {
         return file.setExecutable(true)
     }
 }
-

@@ -6,6 +6,7 @@ import editorx.core.util.IconLoader
 import editorx.core.util.IconRef
 import editorx.gui.theme.ThemeManager
 import editorx.gui.MainWindow
+import editorx.gui.core.FileHandlerManager
 import java.awt.BorderLayout
 import java.awt.Color
 import java.awt.Dimension
@@ -137,7 +138,7 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
         // 新建文件 按钮
         val newFileBtn = createActionButton(
             icon = IconLoader.getIcon(
-                IconRef("icons/common/addFile.svg"), 
+                IconRef("icons/common/addFile.svg"),
                 24,
                 adaptToTheme = true,
                 getThemeColor = { ThemeManager.currentTheme.onSurface }
@@ -449,18 +450,9 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
     }
 
     private fun openFile() {
-        val fileDialog = java.awt.FileDialog(mainWindow, "选择文件", java.awt.FileDialog.LOAD).apply {
-            isMultipleMode = false
-        }
-        fileDialog.isVisible = true
-
-        val fileName = fileDialog.file
-        val dir = fileDialog.directory
-
-        if (fileName != null && dir != null) {
-            val selectedFile = File(dir, fileName)
-            if (selectedFile.isFile && selectedFile.canRead()) {
-                handleOpenFile(selectedFile)
+        mainWindow.showFileChooser { selectedFile ->
+            if (selectedFile != null) {
+                FileHandlerManager.handleOpenFile(selectedFile)
             }
         }
     }
@@ -469,43 +461,14 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
      * 处理打开文件的逻辑（可被 openFile 和拖拽使用）
      */
     private fun handleOpenFile(selectedFile: File) {
-        if (!selectedFile.isFile || !selectedFile.canRead()) {
-            return
-        }
-
-        // 直接调用 editor.openFile，让它统一处理文件处理器检查
-        // 这样可以避免重复调用文件处理器
-        mainWindow.editor.openFile(selectedFile)
-        mainWindow.guiContext.getWorkspace().addRecentFile(selectedFile)
-        mainWindow.editor.showEditorContent()
+        mainWindow.openFile(selectedFile)
     }
 
     private fun openProject() {
-        val fileDialog = java.awt.FileDialog(mainWindow, "选择项目文件夹", java.awt.FileDialog.LOAD).apply {
-            isMultipleMode = false
-            // 在 macOS 上，设置系统属性以使用文件夹选择模式
-            if (System.getProperty("os.name").lowercase().contains("mac")) {
-                System.setProperty("apple.awt.fileDialogForDirectories", "true")
+        mainWindow.showFolderChooser { selectedDir ->
+            if (selectedDir != null && selectedDir.isDirectory) {
+                openWorkspace(selectedDir)
             }
-        }
-        fileDialog.isVisible = true
-
-        val selectedDir = fileDialog.directory?.let { dir ->
-            val fileName = fileDialog.file
-            if (fileName != null) {
-                File(dir, fileName)
-            } else {
-                File(dir)
-            }
-        }
-
-        // 恢复系统属性
-        if (System.getProperty("os.name").lowercase().contains("mac")) {
-            System.setProperty("apple.awt.fileDialogForDirectories", "false")
-        }
-
-        if (selectedDir != null && selectedDir.isDirectory) {
-            openWorkspace(selectedDir)
         }
     }
 
@@ -515,13 +478,7 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
     }
 
     private fun openWorkspace(workspace: File) {
-        mainWindow.guiContext.getWorkspace().openWorkspace(workspace)
-        mainWindow.guiContext.getWorkspace().addRecentWorkspace(workspace)
-        (mainWindow.sideBar.getView("explorer") as? editorx.gui.workbench.explorer.Explorer)?.refreshRoot()
-        mainWindow.titleBar.updateVcsDisplay()
-        // 自动打开资源管理器
-        mainWindow.sideBar.showView("explorer")
-        mainWindow.editor.showEditorContent()
+        mainWindow.openWorkspace(workspace)
     }
 
     // DnD: 支持拖放目录到欢迎界面打开工作区
@@ -644,4 +601,3 @@ class WelcomeView(private val mainWindow: MainWindow) : JPanel() {
         return true
     }
 }
-

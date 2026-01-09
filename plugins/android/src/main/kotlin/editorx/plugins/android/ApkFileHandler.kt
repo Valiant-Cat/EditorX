@@ -114,7 +114,7 @@ class ApkFileHandler(private val gui: GuiExtension) : FileHandler {
 
                 // 显示进度
                 SwingUtilities.invokeLater {
-                    gui.showProgress("正在反编译APK...")
+                    gui.showProgress("正在反编译 APK（apktool）…", indeterminate = true)
                 }
 
                 // 删除已存在的输出目录
@@ -122,14 +122,12 @@ class ApkFileHandler(private val gui: GuiExtension) : FileHandler {
                     deleteRecursively(outputDir)
                 }
 
-                // 执行反编译
-                val result = ApkTool.decompile(apkFile, outputDir, force = true) {
-                    false // 暂时不支持取消
-                }
+                // 执行 apktool 反编译
+                val result = ApkTool.decompile(apkFile, outputDir, force = true) { false }
 
                 when (result.status) {
                     ApkTool.Status.SUCCESS -> {
-                        // 从 APK 中提取 DEX 文件到输出目录
+                        // 从 APK 中提取 DEX 文件到输出目录（用于实时 smali to java 反编译）
                         val originalDir = File(outputDir, "original")
                         extractDexFilesFromApk(apkFile, originalDir)
 
@@ -239,4 +237,3 @@ class ApkFileHandler(private val gui: GuiExtension) : FileHandler {
         file.delete()
     }
 }
-

@@ -62,7 +62,7 @@ class SearchView(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
     private val resultList = JList(resultModel).apply {
         selectionMode = ListSelectionModel.SINGLE_SELECTION
         cellRenderer = ResultRenderer { workspaceRoot()?.toPath() }
-        fixedCellHeight = 0
+        fixedCellHeight = -1
     }
 
     private val statusLabel = JLabel(" ").apply {

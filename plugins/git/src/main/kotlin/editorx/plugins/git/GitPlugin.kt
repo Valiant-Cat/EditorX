@@ -1,8 +1,11 @@
 package editorx.plugins.git
 
+import editorx.core.gui.CachedGuiViewProvider
 import editorx.core.plugin.Plugin
 import editorx.core.plugin.PluginContext
 import editorx.core.plugin.PluginInfo
+import editorx.core.util.IconRef
+import javax.swing.JComponent
 
 class GitPlugin : Plugin {
     override fun getInfo() = PluginInfo(
@@ -12,8 +15,16 @@ class GitPlugin : Plugin {
     )
 
     override fun activate(pluginContext: PluginContext) {
-        // 注意：addActivityBarItem 已不再支持
-        // 插件不再支持在 SideBar 中注册视图
+        pluginContext.gui()?.addActivityBarItem(
+            id = "git",
+            iconRef = IconRef("icons/vcs.svg"),
+            tooltip = "Source Control",
+            viewProvider = object : CachedGuiViewProvider() {
+                override fun createView(): JComponent {
+                    return GitView(pluginContext.gui()!!)
+                }
+            },
+        )
     }
 }
 

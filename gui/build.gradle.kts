@@ -10,6 +10,7 @@ dependencies {
     implementation(project(":plugins:i18n-zh"))
     implementation(project(":plugins:i18n-en"))
     runtimeOnly(project(":plugins:android"))
+    runtimeOnly(project(":plugins:stringfog"))
     implementation(project(":plugins:smali"))
     implementation(project(":plugins:json"))
     implementation(project(":plugins:yaml"))

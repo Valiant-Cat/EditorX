@@ -1,25 +1,26 @@
 package editorx.gui.workbench.explorer
 
-import editorx.core.external.ApkTool
-import editorx.gui.core.FileTypeManager
-import editorx.gui.core.FileHandlerManager
+import editorx.core.i18n.I18n
+import editorx.core.i18n.I18nKeys
 import editorx.core.util.IconLoader
 import editorx.core.util.IconRef
 import editorx.core.util.IconUtils
-import editorx.gui.theme.ThemeManager
 import editorx.gui.MainWindow
+import editorx.gui.core.FileHandlerManager
+import editorx.gui.core.FileTypeManager
+import editorx.gui.theme.ThemeManager
+import editorx.gui.widget.NoBorderScrollPane
 import java.awt.*
 import java.awt.datatransfer.DataFlavor
+import java.awt.datatransfer.Transferable
 import java.awt.dnd.*
 import java.awt.event.KeyAdapter
 import java.awt.event.KeyEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
 import java.io.File
-import java.io.FileOutputStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
-import java.util.zip.ZipFile
 import javax.swing.*
 import javax.swing.border.EmptyBorder
 import javax.swing.event.TreeExpansionEvent
@@ -31,6 +32,15 @@ import javax.swing.tree.TreePath
 class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
     companion object {
         private const val TOP_BAR_ICON_SIZE = 16
+        private const val SETTINGS_KEY_VIEW_MODE = "explorer.viewMode"
+    }
+
+    private enum class ExplorerViewMode(val nameKey: String) {
+        PROJECT(I18nKeys.Explorer.VIEW_MODE_PROJECT);
+
+        fun displayName(): String = I18n.translate(nameKey)
+
+        override fun toString(): String = displayName()
     }
 
     private val searchField = JTextField()
@@ -38,16 +48,19 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
     private val treeRoot = DefaultMutableTreeNode()
     private val treeModel = DefaultTreeModel(treeRoot)
     private val tree = JTree(treeModel)
+    private var scrollPane: NoBorderScrollPane? = null
     private var locateButton: JButton? = null
     private var refreshButton: JButton? = null
     private var collapseButton: JButton? = null
+    private var viewModeWidget: JPanel? = null
+    private var viewModeTextLabel: JLabel? = null
+    private var viewMode: ExplorerViewMode = loadSavedViewMode()
     private var lastKnownFile: File? = null
+    private val i18nListener: () -> Unit = { SwingUtilities.invokeLater { updateI18n() } }
 
     // 任务取消机制
     private var currentTask: Thread? = null
     private var isTaskCancelled = false
-
-    private var titleLabel: JLabel? = null
 
     init {
         isOpaque = false  // 使 Explorer 透明，显示 SideBar 的背景色
@@ -55,18 +68,18 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         installListeners()
         installFileDropTarget()
         showEmptyRoot()
-        
+
         // 监听主题变更
         ThemeManager.addThemeChangeListener { updateTheme() }
+
+        // 监听语言变更
+        I18n.addListener(i18nListener)
     }
-    
+
     private fun updateTheme() {
         val theme = ThemeManager.currentTheme
-        // 更新标题标签颜色
-        titleLabel?.apply {
-            foreground = theme.onSurface
-            repaint()
-        }
+        // 更新显示模式 Widget 的主题
+        viewModeTextLabel?.foreground = theme.onSurface
         // 更新按钮图标以适配主题
         refreshButton?.icon = IconLoader.getIcon(
             IconRef("icons/common/refresh.svg"),
@@ -82,6 +95,151 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         )
         // 刷新文件树以更新文本颜色
         tree.updateUI()
+    }
+
+    private fun updateI18n() {
+        updateViewModeDisplay()
+        val rootDir = mainWindow.guiContext.getWorkspace().getWorkspaceRoot()
+        if (rootDir == null || !rootDir.exists()) showEmptyRoot()
+    }
+
+    override fun removeNotify() {
+        super.removeNotify()
+        I18n.removeListener(i18nListener)
+    }
+
+    private fun loadSavedViewMode(): ExplorerViewMode {
+        val raw = mainWindow.guiContext.getSettings().get(SETTINGS_KEY_VIEW_MODE, ExplorerViewMode.PROJECT.name)
+        // 如果保存的模式是 JADX（旧版本），回退到 PROJECT 模式
+        return if (raw == "JADX") {
+            ExplorerViewMode.PROJECT
+        } else {
+            runCatching { ExplorerViewMode.valueOf(raw ?: ExplorerViewMode.PROJECT.name) }
+                .getOrDefault(ExplorerViewMode.PROJECT)
+        }
+    }
+
+    private fun persistViewMode(mode: ExplorerViewMode) {
+        runCatching {
+            mainWindow.guiContext.getSettings().put(SETTINGS_KEY_VIEW_MODE, mode.name)
+            mainWindow.guiContext.getSettings().sync()
+        }
+    }
+
+    /**
+     * 创建工作区显示模式 Widget（样式参考 VCSWidget，但不包含左侧图标）
+     */
+    private fun createViewModeWidget(): JPanel {
+        val widget = JPanel().apply {
+            layout = BoxLayout(this, BoxLayout.X_AXIS)
+            maximumSize = Dimension(200, 24)
+            minimumSize = Dimension(80, 24)
+            isOpaque = false  // 透明背景（幽灵按钮样式）
+            toolTipText = "切换工作区显示模式"
+            border = EmptyBorder(0, 8, 0, 0)  // 添加内边距
+        }
+
+        // 文字标签
+        viewModeTextLabel = JLabel().apply {
+            font = font.deriveFont(Font.PLAIN, 14f)
+            horizontalAlignment = SwingConstants.LEFT
+            foreground = ThemeManager.currentTheme.onSurface
+        }
+        widget.add(viewModeTextLabel)
+
+        // 文字和箭头之间的间距
+        widget.add(Box.createHorizontalStrut(4))
+
+        // 下拉箭头图标（右侧）
+        val arrowLabel = JLabel().apply {
+            horizontalAlignment = SwingConstants.CENTER
+            verticalAlignment = SwingConstants.CENTER
+            preferredSize = Dimension(14, 14)
+            icon = IconLoader.getIcon(
+                IconRef("icons/common/chevron-down.svg"),
+                14,
+                adaptToTheme = true,
+                getThemeColor = { ThemeManager.currentTheme.onSurface }
+            )
+        }
+        widget.add(arrowLabel)
+
+        // 创建鼠标监听器（用于显示下拉菜单和悬停效果）
+        val mouseListener = object : MouseAdapter() {
+            override fun mousePressed(e: MouseEvent) {
+                if (SwingUtilities.isLeftMouseButton(e)) {
+                    showViewModePopupMenu(widget)
+                }
+            }
+
+            override fun mouseEntered(e: MouseEvent) {
+                // 悬停时保持透明
+                widget.isOpaque = false
+                widget.repaint()
+            }
+
+            override fun mouseExited(e: MouseEvent) {
+                // 保持透明背景
+                widget.isOpaque = false
+                widget.repaint()
+            }
+        }
+
+        widget.addMouseListener(mouseListener)
+        viewModeTextLabel?.addMouseListener(mouseListener)
+        arrowLabel.addMouseListener(mouseListener)
+
+        // 监听主题变更
+        ThemeManager.addThemeChangeListener {
+            arrowLabel.icon = IconLoader.getIcon(
+                IconRef("icons/common/chevron-down.svg"),
+                14,
+                adaptToTheme = true,
+                getThemeColor = { ThemeManager.currentTheme.onSurface }
+            )
+            viewModeTextLabel?.foreground = ThemeManager.currentTheme.onSurface
+            widget.repaint()
+        }
+
+        // 初始更新显示
+        updateViewModeDisplay()
+
+        viewModeWidget = widget
+        return widget
+    }
+
+    /**
+     * 更新显示模式 Widget 的显示内容
+     */
+    private fun updateViewModeDisplay() {
+        viewModeTextLabel?.text = viewMode.displayName()
+    }
+
+    /**
+     * 显示显示模式弹出菜单
+     */
+    private fun showViewModePopupMenu(invoker: Component) {
+        val menu = JPopupMenu()
+
+        ExplorerViewMode.entries.forEach { mode ->
+            val item = JMenuItem(mode.displayName()).apply {
+                // 当前选中的模式使用粗体
+                if (mode == viewMode) {
+                    font = font.deriveFont(Font.BOLD)
+                }
+                addActionListener {
+                    if (mode != viewMode) {
+                        viewMode = mode
+                        persistViewMode(mode)
+                        updateViewModeDisplay()
+                        refreshRootPreserveSelection()
+                    }
+                }
+            }
+            menu.add(item)
+        }
+
+        menu.show(invoker, 0, invoker.height)
     }
 
     /**
@@ -112,11 +270,11 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         // 监听编辑器标签页变化
         setupEditorTabChangeListener()
 
-        val scrollPane = JScrollPane(tree)
-        scrollPane.border = null
-        scrollPane.isOpaque = false  // 使滚动面板透明，显示 SideBar 背景色
-        scrollPane.viewport.isOpaque = false  // 使视口透明
-        add(scrollPane, BorderLayout.CENTER)
+        scrollPane = NoBorderScrollPane(tree).apply {
+            isOpaque = false  // 使滚动面板透明，显示 SideBar 背景色
+            viewport.isOpaque = false  // 使视口透明
+        }
+        add(scrollPane!!, BorderLayout.CENTER)
     }
 
     private fun buildToolBar(): JToolBar {
@@ -129,16 +287,11 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
             }
 
         /*
-        Left - 可收缩部分
+        Left - 显示模式切换（样式参考 VCSWidget，但不包含左侧图标）
         */
-        titleLabel = JLabel("资源管理器").apply {
-            font = font.deriveFont(Font.BOLD, 12f)
-            foreground = ThemeManager.currentTheme.onSurface
-            border = EmptyBorder(0, 8, 0, 8)
-            // 允许标签收缩，但设置最小宽度为0
-            minimumSize = Dimension(0, preferredSize.height)
-        }
-        toolBar.add(titleLabel!!)
+        val viewModeWidget = createViewModeWidget()
+        toolBar.add(viewModeWidget)
+        toolBar.add(Box.createHorizontalStrut(6))
 
         /*
         Expanded - 可伸缩空间
@@ -155,30 +308,34 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
             addActionListener { locateCurrentFile() }
         }
         toolBar.add(locateButton!!)
-        refreshButton = JButton(IconLoader.getIcon(
-            IconRef("icons/common/refresh.svg"),
-            TOP_BAR_ICON_SIZE,
-            adaptToTheme = true,
-            getThemeColor = { ThemeManager.currentTheme.onSurface }
-        )).apply {
-            toolTipText = "刷新文件树..."
-            isFocusable = false
-            margin = Insets(4, 4, 4, 4)
-            addActionListener { refreshRootPreserveSelection() }
-        }
-        toolBar.add(refreshButton!!)
-        collapseButton = JButton(IconLoader.getIcon(
-            IconRef("icons/common/collapseAll.svg"),
-            TOP_BAR_ICON_SIZE,
-            adaptToTheme = true,
-            getThemeColor = { ThemeManager.currentTheme.onSurface }
-        )).apply {
+
+        collapseButton = JButton(
+            IconLoader.getIcon(
+                IconRef("icons/common/collapseAll.svg"),
+                TOP_BAR_ICON_SIZE,
+                adaptToTheme = true,
+                getThemeColor = { ThemeManager.currentTheme.onSurface }
+            )).apply {
             toolTipText = "全部收起..."
             isFocusable = false
             margin = Insets(4, 4, 4, 4)
             addActionListener { collapseAll() }
         }
         toolBar.add(collapseButton!!)
+
+        refreshButton = JButton(
+            IconLoader.getIcon(
+                IconRef("icons/common/refresh.svg"),
+                TOP_BAR_ICON_SIZE,
+                adaptToTheme = true,
+                getThemeColor = { ThemeManager.currentTheme.onSurface }
+            )).apply {
+            toolTipText = "刷新文件树..."
+            isFocusable = false
+            margin = Insets(4, 4, 4, 4)
+            addActionListener { refreshRootPreserveSelection() }
+        }
+        toolBar.add(refreshButton!!)
 
         return toolBar
     }
@@ -275,15 +432,6 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         timer.start()
     }
 
-    private fun createNewFile() {
-        val targetDir = getCurrentSelectedDirectory()
-        if (targetDir == null) {
-            JOptionPane.showMessageDialog(this, "请先选择一个目录", "提示", JOptionPane.INFORMATION_MESSAGE)
-            return
-        }
-        createNewFileInDirectory(targetDir)
-    }
-
     private fun createNewFileInDirectory(targetDir: File) {
         if (!targetDir.exists() || !targetDir.isDirectory) {
             JOptionPane.showMessageDialog(this, "目标目录不存在或不是目录", "错误", JOptionPane.ERROR_MESSAGE)
@@ -305,15 +453,6 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                 JOptionPane.showMessageDialog(this, "创建文件失败: ${e.message}", "错误", JOptionPane.ERROR_MESSAGE)
             }
         }
-    }
-
-    private fun createNewFolder() {
-        val targetDir = getCurrentSelectedDirectory()
-        if (targetDir == null) {
-            JOptionPane.showMessageDialog(this, "请先选择一个目录", "提示", JOptionPane.INFORMATION_MESSAGE)
-            return
-        }
-        createNewFolderInDirectory(targetDir)
     }
 
     private fun createNewFolderInDirectory(targetDir: File) {
@@ -338,19 +477,6 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                 JOptionPane.showMessageDialog(this, "创建文件夹失败: ${e.message}", "错误", JOptionPane.ERROR_MESSAGE)
             }
         }
-    }
-
-    private fun getCurrentSelectedDirectory(): File? {
-        val selectedPath = tree.selectionPath
-        if (selectedPath != null) {
-            val selectedNode = selectedPath.lastPathComponent as? DefaultMutableTreeNode
-            if (selectedNode?.userObject is File) {
-                val selectedFile = selectedNode.userObject as File
-                return if (selectedFile.isDirectory) selectedFile else selectedFile.parentFile
-            }
-        }
-        // 如果没有选中任何节点，使用工作区根目录
-        return mainWindow.guiContext.getWorkspace().getWorkspaceRoot()
     }
 
     private fun selectFileInTree(file: File) {
@@ -462,72 +588,29 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
     }
 
     fun refreshRoot() {
-        // 取消之前的任务
-        currentTask?.interrupt()
-        isTaskCancelled = false
-
-        val previousState = captureTreeState()
-
-        showProgress(message = "正在刷新文件树...", indeterminate = true)
-
-        currentTask = Thread {
-            try {
-                val rootDir = mainWindow.guiContext.getWorkspace().getWorkspaceRoot()
-                if (rootDir == null || !rootDir.exists()) {
-                    SwingUtilities.invokeLater { showEmptyRoot() }
-                    return@Thread
-                }
-
-                val newRoot = FileNode(rootDir)
-                newRoot.loadChildrenIfNeeded(true)
-
-                // 检查是否被取消
-                if (isTaskCancelled) return@Thread
-
-                // 在EDT中更新UI
-                SwingUtilities.invokeLater {
-                    if (!isTaskCancelled) {
-                        treeModel.setRoot(newRoot)
-                        tree.isEnabled = true
-                        tree.updateUI()
-                        applyTreeState(previousState, newRoot)
-                    }
-                }
-            } catch (e: InterruptedException) {
-                // 任务被取消，正常退出
-            } catch (e: Exception) {
-                SwingUtilities.invokeLater {
-                    JOptionPane.showMessageDialog(
-                        this,
-                        "刷新文件树时出错: ${e.message}",
-                        "错误",
-                        JOptionPane.ERROR_MESSAGE
-                    )
-                }
-            } finally {
-                SwingUtilities.invokeLater { hideProgress() }
-            }
-        }.apply {
-            isDaemon = true
-            start()
-        }
+        refreshRootInternal(preserveSelection = false)
     }
 
     private fun showEmptyRoot() {
-        val placeholder = DefaultMutableTreeNode("未打开工作区")
+        val placeholder = DefaultMutableTreeNode(I18n.translate(I18nKeys.Explorer.WORKSPACE_NOT_OPENED))
         treeModel.setRoot(placeholder)
         tree.isEnabled = true
         tree.updateUI()
     }
 
+
     private fun refreshRootPreserveSelection() {
+        refreshRootInternal(preserveSelection = true)
+    }
+
+    private fun refreshRootInternal(preserveSelection: Boolean) {
         // 取消之前的任务
         currentTask?.interrupt()
         isTaskCancelled = false
 
         showProgress(message = "正在刷新文件树...", indeterminate = true)
 
-        val previousState = captureTreeState()
+        val previousState = if (preserveSelection) captureTreeState() else null
 
         currentTask = Thread {
             try {
@@ -537,8 +620,9 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                     return@Thread
                 }
 
-                val newRoot = FileNode(rootDir)
-                newRoot.loadChildrenIfNeeded(true)
+                val newRoot = FileNode(
+                    rootDir,
+                ).apply { loadChildrenIfNeeded(true) }
 
                 // 检查是否被取消
                 if (isTaskCancelled) return@Thread
@@ -572,14 +656,10 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         }
     }
 
-    private fun togglePath(path: TreePath) {
-        if (tree.isExpanded(path)) tree.collapsePath(path) else tree.expandPath(path)
-    }
-
     private fun selectFirstMatch(q: String) {
         if (q.isEmpty()) return
-        val root = treeModel.root as? FileNode ?: return
-        val node = depthFirstSearch(root) { it.displayName.contains(q, ignoreCase = true) }
+        val root = treeModel.root as? DefaultMutableTreeNode ?: return
+        val node = depthFirstSearchFileNode(root) { it.displayName.contains(q, ignoreCase = true) }
         if (node != null) {
             val tp = TreePath(node.path)
             expandTo(tp)
@@ -593,14 +673,12 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
     }
 
     private fun selectFile(target: File) {
-        val root = treeModel.root as? FileNode ?: return
-        val node = depthFirstSearch(root) { it.represents(target) }
-        if (node != null) {
-            val tp = TreePath(node.path)
-            expandTo(tp)
-            tree.selectionPath = tp
-            tree.scrollPathToVisible(tp)
-        }
+        val root = treeModel.root as? DefaultMutableTreeNode ?: return
+        val targetPath = findNodeForFile(root, target) ?: return
+        val tp = TreePath(targetPath)
+        expandTo(tp)
+        tree.selectionPath = tp
+        tree.scrollPathToVisible(tp)
     }
 
     private fun expandTo(path: TreePath) {
@@ -613,16 +691,19 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
 
     private fun getExpandedPaths(): Set<String> {
         val expandedPaths = mutableSetOf<String>()
-        val root = treeModel.root as? FileNode ?: return expandedPaths
+        val root = treeModel.root as? DefaultMutableTreeNode ?: return expandedPaths
 
-        fun collectExpandedPaths(node: FileNode) {
-            val nodePath = node.file.absolutePath
-            if (tree.isExpanded(TreePath(node.path))) {
-                expandedPaths.add(nodePath)
+        fun collectExpandedPaths(node: DefaultMutableTreeNode) {
+            val fileNode = node as? FileNode
+            if (fileNode != null) {
+                val nodePath = fileNode.file.absolutePath
+                if (tree.isExpanded(TreePath(fileNode.path))) {
+                    expandedPaths.add(nodePath)
+                }
+                fileNode.loadChildrenIfNeeded(true)
             }
-            node.loadChildrenIfNeeded(true)
             for (i in 0 until node.childCount) {
-                val child = node.getChildAt(i) as FileNode
+                val child = node.getChildAt(i) as? DefaultMutableTreeNode ?: continue
                 collectExpandedPaths(child)
             }
         }
@@ -632,16 +713,19 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
     }
 
     private fun restoreExpandedPaths(expandedPaths: Set<String>) {
-        val root = treeModel.root as? FileNode ?: return
+        val root = treeModel.root as? DefaultMutableTreeNode ?: return
 
-        fun expandMatchingPaths(node: FileNode) {
-            val nodePath = node.file.absolutePath
-            if (expandedPaths.contains(nodePath)) {
-                tree.expandPath(TreePath(node.path))
+        fun expandMatchingPaths(node: DefaultMutableTreeNode) {
+            val fileNode = node as? FileNode
+            if (fileNode != null) {
+                val nodePath = fileNode.file.absolutePath
+                if (expandedPaths.contains(nodePath)) {
+                    tree.expandPath(TreePath(fileNode.path))
+                }
+                fileNode.loadChildrenIfNeeded(true)
             }
-            node.loadChildrenIfNeeded(true)
             for (i in 0 until node.childCount) {
-                val child = node.getChildAt(i) as FileNode
+                val child = node.getChildAt(i) as? DefaultMutableTreeNode ?: continue
                 expandMatchingPaths(child)
             }
         }
@@ -649,13 +733,16 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         expandMatchingPaths(root)
     }
 
-    private fun depthFirstSearch(n: FileNode, pred: (FileNode) -> Boolean): FileNode? {
-        if (pred(n)) return n
-        n.loadChildrenIfNeeded(true)
+    private fun depthFirstSearchFileNode(n: DefaultMutableTreeNode, pred: (FileNode) -> Boolean): FileNode? {
+        val fileNode = n as? FileNode
+        if (fileNode != null) {
+            if (pred(fileNode)) return fileNode
+            fileNode.loadChildrenIfNeeded(true)
+        }
         for (i in 0 until n.childCount) {
-            val c = n.getChildAt(i) as FileNode
-            val r = depthFirstSearch(c, pred)
-            if (r != null) return r
+            val child = n.getChildAt(i) as? DefaultMutableTreeNode ?: continue
+            val result = depthFirstSearchFileNode(child, pred)
+            if (result != null) return result
         }
         return null
     }
@@ -666,26 +753,24 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
     )
 
     private fun captureTreeState(): TreeState? {
-        val root = treeModel.root as? FileNode ?: return null
+        if (treeModel.root !is DefaultMutableTreeNode) return null
         val expanded = getExpandedPaths()
         val selected = (tree.lastSelectedPathComponent as? FileNode)?.file?.absolutePath
         return TreeState(expanded, selected)
     }
 
-    private fun applyTreeState(state: TreeState?, newRoot: FileNode) {
+    private fun applyTreeState(state: TreeState?, newRoot: DefaultMutableTreeNode) {
+        val rootPath = TreePath(newRoot.path)
         if (state == null) {
-            SwingUtilities.invokeLater {
-                val rootPath = TreePath(newRoot.path)
-                tree.expandPath(rootPath)
-                tree.selectionPath = rootPath
-            }
+            tree.expandPath(rootPath)
+            tree.selectionPath = rootPath
             return
         }
 
         restoreExpandedPaths(state.expandedPaths)
         state.selectedFilePath?.let { path ->
             val target = File(path)
-            SwingUtilities.invokeLater { selectFile(target) }
+            selectFile(target)
         }
     }
 
@@ -855,6 +940,27 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
     }
 
     /**
+     * 检查并提示创建 Git 仓库（公开方法，供外部调用）
+     * 用于打开目录时检查并提示创建 Git 仓库
+     */
+    fun checkAndPromptCreateGitRepository(workspaceRoot: File) {
+        val gitDir = File(workspaceRoot, ".git")
+        if (gitDir.exists()) {
+            // 已经存在 Git 仓库，不需要提示
+            return
+        }
+
+        // 检查 git 是否可用
+        if (!isGitAvailable()) {
+            // git 不可用，不提示
+            return
+        }
+
+        // 提示用户是否创建 Git 仓库
+        promptCreateGitRepository(workspaceRoot)
+    }
+
+    /**
      * 提示用户是否创建 Git 仓库
      */
     private fun promptCreateGitRepository(outputDir: File) {
@@ -880,7 +986,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
             val gitDir = File(outputDir, ".git")
             if (gitDir.exists()) {
                 JOptionPane.showMessageDialog(
-                    this,
+                    mainWindow,
                     "该目录已经存在 Git 仓库",
                     "提示",
                     JOptionPane.INFORMATION_MESSAGE
@@ -902,7 +1008,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                             hideProgress()
                             setWait(false)
                             JOptionPane.showMessageDialog(
-                                this,
+                                mainWindow,
                                 "未找到 git 命令，请确保 git 已安装并在 PATH 中",
                                 "错误",
                                 JOptionPane.ERROR_MESSAGE
@@ -932,12 +1038,20 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                                 hideProgress()
                                 setWait(false)
                                 JOptionPane.showMessageDialog(
-                                    this,
+                                    mainWindow,
                                     "Git 仓库创建成功！\n\n已自动添加 .gitignore 文件并执行初始提交。",
                                     "成功",
                                     JOptionPane.INFORMATION_MESSAGE
                                 )
                                 mainWindow.statusBar.setMessage("Git 仓库创建完成")
+
+                                // 延迟更新 VcsWidget 显示，确保 Git 仓库已完全初始化
+                                javax.swing.Timer(500) { // 延迟 500ms
+                                    mainWindow.titleBar.updateVcsDisplay()
+                                }.apply {
+                                    isRepeats = false
+                                    start()
+                                }
                             }
                         }
                     } else {
@@ -945,7 +1059,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                             hideProgress()
                             setWait(false)
                             JOptionPane.showMessageDialog(
-                                this,
+                                mainWindow,
                                 "Git 仓库创建失败：\n${initResult.output}",
                                 "错误",
                                 JOptionPane.ERROR_MESSAGE
@@ -959,7 +1073,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                         hideProgress()
                         setWait(false)
                         JOptionPane.showMessageDialog(
-                            this,
+                            mainWindow,
                             "创建 Git 仓库时出错：${e.message}",
                             "错误",
                             JOptionPane.ERROR_MESSAGE
@@ -974,7 +1088,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
             }
         } catch (e: Exception) {
             JOptionPane.showMessageDialog(
-                this,
+                mainWindow,
                 "无法创建 Git 仓库：${e.message}",
                 "错误",
                 JOptionPane.ERROR_MESSAGE
@@ -993,6 +1107,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
             *.odex
             *.vdex
             *.art
+            .jadx/
             
             # 构建输出
             build/
@@ -1134,173 +1249,13 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         }
     }
 
-    /**
-     * 处理 APK 文件转换为项目
-     * 这是一个公共方法，可以从其他组件（如 WelcomeView）调用
-     */
-    fun handleApkFileConversion(apkFile: File) {
-        // 重置取消状态
-        isTaskCancelled = false
-
-        // 在后台线程中处理APK反编译
-        currentTask = Thread {
-            try {
-                if (!Thread.currentThread().isInterrupted) {
-                    setWait(true)
-                    decompileApk(apkFile)
-                    setWait(false)
-                    SwingUtilities.invokeLater {
-                        hideProgress()
-                        refreshRoot()
-                    }
-                }
-            } catch (e: Exception) {
-                SwingUtilities.invokeLater {
-                    hideProgress()
-                    JOptionPane.showMessageDialog(
-                        this,
-                        "反编译失败: ${e.message}",
-                        "错误",
-                        JOptionPane.ERROR_MESSAGE
-                    )
-                }
-            }
-        }
-        currentTask?.start()
-    }
-
-    private fun decompileApk(apkFile: File) {
-        try {
-            if (isTaskCancelled || Thread.currentThread().isInterrupted) return
-
-            val outputDir = File(apkFile.parentFile, apkFile.nameWithoutExtension + "_decompiled")
-            if (outputDir.exists()) {
-                val options = arrayOf("打开已存在的项目", "重新反编译")
-                val choice = JOptionPane.showOptionDialog(
-                    mainWindow,
-                    "此Apk对应的反编译目录 \"${outputDir.name}\" 已存在。\n\n请选择操作：",
-                    "目录已存在",
-                    JOptionPane.YES_NO_OPTION,
-                    JOptionPane.QUESTION_MESSAGE,
-                    null,
-                    options,
-                    options[0] // 默认选择"打开已存在的项目"
-                )
-
-                when (choice) {
-                    JOptionPane.YES_OPTION -> {
-                        // 直接打开已存在的项目
-                        SwingUtilities.invokeLater {
-                            mainWindow.guiContext.getWorkspace().openWorkspace(outputDir)
-                            mainWindow.editor.updateNavigation(null)
-                            refreshRoot()
-                            mainWindow.titleBar.updateVcsDisplay()
-                            mainWindow.statusBar.setMessage("已打开项目: ${outputDir.name}")
-                        }
-                        return
-                    }
-
-                    JOptionPane.NO_OPTION -> {
-                        // 重新反编译，继续执行后续逻辑
-                    }
-
-                    else -> {
-                        // 用户取消或关闭对话框
-                        return
-                    }
-                }
-            }
-
-            if (isTaskCancelled || Thread.currentThread().isInterrupted) return
-
-            showProgress(message = "正在反编译APK...", indeterminate = true, cancellable = false)
-            if (outputDir.exists()) deleteRecursively(outputDir)
-
-            val result =
-                ApkTool.decompile(apkFile, outputDir, force = true) {
-                    isTaskCancelled || Thread.currentThread().isInterrupted
-                }
-
-            when (result.status) {
-                ApkTool.Status.SUCCESS -> {
-                    // 从 APK 中提取 DEX 文件到输出目录
-                    val originalDir = File(outputDir, "original")
-                    extractDexFilesFromApk(apkFile, originalDir)
-
-                    if (!isTaskCancelled && !Thread.currentThread().isInterrupted) {
-                        SwingUtilities.invokeLater {
-                            mainWindow.guiContext.getWorkspace().openWorkspace(outputDir)
-                            mainWindow.editor.updateNavigation(null)
-                            refreshRoot()
-                            mainWindow.titleBar.updateVcsDisplay()
-                            mainWindow.statusBar.setMessage("APK反编译完成: ${outputDir.name}")
-
-                            // 提示是否创建 Git 仓库
-                            promptCreateGitRepository(outputDir)
-                        }
-                    }
-                }
-
-                ApkTool.Status.CANCELLED -> return
-                ApkTool.Status.NOT_FOUND -> throw Exception("未找到apktool，请确保apktool已安装并在PATH中")
-                ApkTool.Status.FAILED -> throw Exception("apktool执行失败: ${result.output}")
-            }
-        } catch (e: Exception) {
-            if (!isTaskCancelled) {
-                throw Exception("反编译APK失败: ${e.message}")
-            }
-        }
-    }
-
-    // 从 APK 文件中提取 DEX 文件到输出目录（用于实时 smali to java 反编译）
-    private fun extractDexFilesFromApk(apkFile: File, outputDir: File) {
-        try {
-            val logger = org.slf4j.LoggerFactory.getLogger(Explorer::class.java)
-            logger.debug("开始从 APK 提取 DEX 文件: ${apkFile.absolutePath} -> ${outputDir.absolutePath}")
-
-            val zipFile = ZipFile(apkFile)
-            val dexPattern = """^classes\d*\.dex$""".toRegex()
-            var extractedCount = 0
-            val extractedFiles = mutableListOf<String>()
-
-            zipFile.entries().asSequence().forEach { entry ->
-                if (dexPattern.matches(entry.name)) {
-                    val outputDexFile = File(outputDir, entry.name)
-                    try {
-                        zipFile.getInputStream(entry).use { input ->
-                            FileOutputStream(outputDexFile).use { output ->
-                                input.copyTo(output)
-                            }
-                        }
-                        extractedCount++
-                        extractedFiles.add(entry.name)
-                        logger.debug("提取 DEX 文件: ${entry.name} -> ${outputDexFile.absolutePath}")
-                    } catch (e: Exception) {
-                        logger.warn("提取 DEX 文件失败: ${entry.name}", e)
-                    }
-                }
-            }
-
-            zipFile.close()
-
-            if (extractedCount > 0) {
-                logger.info("从 APK 成功提取了 $extractedCount 个 DEX 文件到: ${outputDir.absolutePath}")
-                logger.debug("提取的文件: ${extractedFiles.joinToString(", ")}")
-            } else {
-                logger.warn("未找到任何 DEX 文件在 APK 中: ${apkFile.absolutePath}")
-            }
-        } catch (e: Exception) {
-            val logger = org.slf4j.LoggerFactory.getLogger(Explorer::class.java)
-            logger.error("提取 DEX 文件失败: ${e.message}", e)
-            // 不抛出异常，因为反编译本身已经成功
-        }
-    }
-
     // Node representing a File with lazy children loading
     private class FileNode(
         val file: File,
         val displayName: String = file.name.ifEmpty { file.absolutePath },
-        representedFiles: List<File> = listOf(file)
+        representedFiles: List<File> = listOf(file),
+        private val chainSeparator: String = "/",
+        private val childFilter: ((File) -> Boolean)? = null,
     ) : DefaultMutableTreeNode(file) {
         private var loaded = false
         private val representedPaths = representedFiles.map { it.absolutePath }.toSet()
@@ -1321,11 +1276,19 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                         FileNode(
                             compressed.finalDir,
                             compressed.displayName,
-                            compressed.representedFiles
+                            compressed.representedFiles,
+                            chainSeparator = chainSeparator,
+                            childFilter = childFilter,
                         )
                     )
                 } else {
-                    add(FileNode(child))
+                    add(
+                        FileNode(
+                            child,
+                            chainSeparator = chainSeparator,
+                            childFilter = childFilter,
+                        )
+                    )
                 }
             }
         }
@@ -1348,6 +1311,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                         !file.name.startsWith(".") && !file.isHidden
                     }
                 }
+                ?.filter { f -> childFilter?.invoke(f) ?: true }
                 ?.sortedWith(
                     compareBy<File> { !it.isDirectory }.thenBy { it.name.lowercase() }
                 )
@@ -1366,7 +1330,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                 if (chainFiles.any { it.absolutePath == onlyChild.absolutePath }) break
                 current = onlyChild
             }
-            val display = chainFiles.joinToString("/") { it.name.ifEmpty { it.absolutePath } }
+            val display = chainFiles.joinToString(chainSeparator) { it.name.ifEmpty { it.absolutePath } }
             return CompressedDirectory(current, display, chainFiles)
         }
 
@@ -1416,6 +1380,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
 
         private fun getIconForFile(file: File): Icon? {
             if (file.isDirectory) {
+
                 // 检查是否是根目录（assets、res、smali）
                 val workspaceRoot = mainWindow.guiContext.getWorkspace().getWorkspaceRoot()
                 if (workspaceRoot != null && file.parentFile?.absolutePath == workspaceRoot.absolutePath) {
@@ -1489,23 +1454,23 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
             val listener =
                 object : DropTargetListener {
                     override fun dragEnter(dtde: DropTargetDragEvent) {
-                        if (isDragAcceptable(dtde)) dtde.acceptDrag(DnDConstants.ACTION_COPY)
+                        if (isDragAcceptable(dtde.transferable)) dtde.acceptDrag(DnDConstants.ACTION_COPY)
                         else dtde.rejectDrag()
                     }
 
                     override fun dragOver(dtde: DropTargetDragEvent) {
-                        if (isDragAcceptable(dtde)) dtde.acceptDrag(DnDConstants.ACTION_COPY)
+                        if (isDragAcceptable(dtde.transferable)) dtde.acceptDrag(DnDConstants.ACTION_COPY)
                         else dtde.rejectDrag()
                     }
 
                     override fun dropActionChanged(dtde: DropTargetDragEvent) {
-                        if (isDragAcceptable(dtde)) dtde.acceptDrag(DnDConstants.ACTION_COPY)
+                        if (isDragAcceptable(dtde.transferable)) dtde.acceptDrag(DnDConstants.ACTION_COPY)
                         else dtde.rejectDrag()
                     }
 
                     override fun dragExit(dtde: DropTargetEvent) {}
                     override fun drop(dtde: DropTargetDropEvent) {
-                        if (!isDropAcceptable(dtde)) {
+                        if (!isDragAcceptable(dtde.transferable)) {
                             dtde.rejectDrop()
                             return
                         }
@@ -1532,6 +1497,8 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                             val dir = files.firstOrNull { it.isDirectory }
                             if (dir != null) {
                                 mainWindow.guiContext.getWorkspace().openWorkspace(dir)
+                                // 通过 ActivityBar 显示 Explorer（会自动更新高亮状态）
+                                mainWindow.activityBar.activateItem("explorer", userInitiated = false)
                                 mainWindow.editor.updateNavigation(null)
                                 refreshRoot()
                                 mainWindow.titleBar.updateVcsDisplay()
@@ -1557,34 +1524,14 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         }
     }
 
-    private fun isDragAcceptable(e: DropTargetDragEvent): Boolean {
-        val flavors = e.transferable.transferDataFlavors
+    private fun isDragAcceptable(transferable: Transferable): Boolean {
+        val flavors = transferable.transferDataFlavors
         val hasList = flavors.any { it.isFlavorJavaFileListType }
         if (!hasList) return false
 
         // 检查是否包含APK文件或文件夹
         try {
-            val files = e.transferable.getTransferData(DataFlavor.javaFileListFlavor) as? List<File>
-            if (files != null) {
-                val hasApk = files.any { it.isFile && it.extension.lowercase() == "apk" }
-                val hasDir = files.any { it.isDirectory }
-                return hasApk || hasDir
-            }
-        } catch (e: Exception) {
-            // 忽略异常，继续检查
-        }
-
-        return true
-    }
-
-    private fun isDropAcceptable(e: DropTargetDropEvent): Boolean {
-        val flavors = e.transferable.transferDataFlavors
-        val hasList = flavors.any { it.isFlavorJavaFileListType }
-        if (!hasList) return false
-
-        // 检查是否包含APK文件或文件夹
-        try {
-            val files = e.transferable.getTransferData(DataFlavor.javaFileListFlavor) as? List<File>
+            val files = transferable.getTransferData(DataFlavor.javaFileListFlavor) as? List<File>
             if (files != null) {
                 val hasApk = files.any { it.isFile && it.extension.lowercase() == "apk" }
                 val hasDir = files.any { it.isDirectory }

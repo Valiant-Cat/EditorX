@@ -258,6 +258,7 @@ interface ServiceRegistry {
 6. **工作区操作**：`openWorkspace`, `openFile`
 7. **进度显示**：`showProgress`, `hideProgress`
 8. **主题颜色**：`getThemeTextColor`, `getThemeDisabledTextColor`
+9. **编辑器右键菜单项**：`registerEditorContextMenuItem`, `unregisterAllEditorContextMenuItems`
 
 ### GuiExtensionImpl
 
@@ -275,6 +276,7 @@ GUI 模块维护多个资源注册表：
 - `SyntaxHighlighterRegistry` - 语法高亮注册表
 - `FormatterRegistry` - 格式化器注册表
 - `FileHandlerRegistry` - 文件处理器注册表
+- `EditorContextMenuManager` - 编辑器右键菜单项注册表
 
 每个注册表都支持按 `ownerId` 批量卸载资源。
 

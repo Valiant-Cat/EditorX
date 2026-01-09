@@ -147,6 +147,8 @@ private val dictionary = buildMap {
     put(I18nKeys.Explorer.DELETE, "删除")
     put(I18nKeys.Explorer.REFRESH, "刷新")
     put(I18nKeys.Explorer.REVEAL_IN_SYSTEM, "在系统中显示")
+    put(I18nKeys.Explorer.VIEW_MODE_PROJECT, "项目")
+    put(I18nKeys.Explorer.WORKSPACE_NOT_OPENED, "未打开工作区")
 
     put(I18nKeys.Editor.CLOSE, "关闭")
     put(I18nKeys.Editor.CLOSE_OTHERS, "关闭其他标签")
@@ -162,6 +164,9 @@ private val dictionary = buildMap {
     put(I18nKeys.Toolbar.GOTO_MANIFEST, "打开 AndroidManifest.xml")
     put(I18nKeys.Toolbar.GOTO_MAIN_ACTIVITY, "打开 MainActivity")
     put(I18nKeys.Toolbar.GOTO_APPLICATION, "打开 Application")
+    put(I18nKeys.Toolbar.EDIT_APP_INFO, "修改 App 信息")
+    put(I18nKeys.Toolbar.EDIT_APP_LOCALES, "应用名称多语言")
+    put(I18nKeys.Toolbar.EDIT_APP_ICONS, "图标多尺寸")
     put(I18nKeys.Toolbar.BUILD, "构建")
     put(I18nKeys.Toolbar.TOGGLE_SIDEBAR, "切换侧边栏")
     put(I18nKeys.Toolbar.GLOBAL_SEARCH, "全局搜索")
@@ -299,4 +304,3 @@ class ChineseI18nPlugin : I18nPlugin(Locale.SIMPLIFIED_CHINESE) {
 
     override fun translate(key: String): String? = dictionary[key]
 }
-
