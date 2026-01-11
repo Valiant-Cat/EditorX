@@ -11,6 +11,7 @@ import editorx.gui.search.SearchDialog
 import editorx.gui.settings.SettingsDialog
 import editorx.gui.theme.ThemeManager
 import editorx.gui.workbench.explorer.Explorer
+import java.io.File
 import java.awt.Font
 import java.awt.Insets
 import java.awt.event.ActionListener
@@ -339,13 +340,7 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
                                     I18n.translate(I18nKeys.ToolbarMessage.COMPILE_SUCCESS)
                                         .format(outputFile.name)
                                 )
-                                JOptionPane.showMessageDialog(
-                                    mainWindow,
-                                    I18n.translate(I18nKeys.ToolbarMessage.BUILD_GENERATED)
-                                        .format(outputFile.absolutePath),
-                                    I18n.translate(I18nKeys.ToolbarMessage.COMPILE_COMPLETE),
-                                    JOptionPane.INFORMATION_MESSAGE
-                                )
+                                showBuildCompleteDialog(outputFile)
                             } else {
                                 mainWindow.statusBar.showSuccess(
                                     I18n.translate(I18nKeys.ToolbarMessage.COMPILE_SUCCESS).format("")
@@ -402,6 +397,40 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
             isDaemon = true
             start()
         }
+    }
+
+    private fun showBuildCompleteDialog(outputFile: File) {
+        val result = JOptionPane.showOptionDialog(
+            mainWindow,
+            I18n.translate(I18nKeys.ToolbarMessage.BUILD_GENERATED).format(outputFile.absolutePath),
+            I18n.translate(I18nKeys.ToolbarMessage.COMPILE_COMPLETE),
+            JOptionPane.DEFAULT_OPTION,
+            JOptionPane.INFORMATION_MESSAGE,
+            null,
+            arrayOf("定位", "关闭"),
+            "关闭"
+        )
+        if (result == 0) {
+            revealInExplorer(outputFile)
+        }
+    }
+
+    private fun revealInExplorer(file: File) {
+        mainWindow.activityBar.activateItem("explorer")
+        val explorer = mainWindow.sideBar.getView("explorer") as? Explorer ?: return
+
+        // 触发一次刷新，避免目录已加载但未 reload 导致找不到新文件。
+        explorer.refreshRootPreserveSelection()
+
+        var attempts = 0
+        val timer = Timer(150, null)
+        timer.addActionListener {
+            attempts++
+            explorer.focusFileInTree(file)
+            if (attempts >= 10) timer.stop()
+        }
+        timer.initialDelay = 0
+        timer.start()
     }
 
 }

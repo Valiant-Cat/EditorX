@@ -136,13 +136,7 @@ object AppInfoDialog {
                         gui.hideProgress()
                         if (result.status == editorx.core.service.BuildStatus.SUCCESS) {
                             gui.refreshExplorer(preserveSelection = true)
-                            JOptionPane.showMessageDialog(
-                                null,
-                                I18n.translate(I18nKeys.ToolbarMessage.BUILD_GENERATED)
-                                    .format(output.absolutePath),
-                                I18n.translate(I18nKeys.ToolbarMessage.COMPILE_COMPLETE),
-                                JOptionPane.INFORMATION_MESSAGE
-                            )
+                            showBuildCompleteDialog(gui, output)
                         } else {
                             JOptionPane.showMessageDialog(
                                 null,
@@ -372,6 +366,23 @@ object AppInfoDialog {
 
         dialog.isVisible = true
         return result
+    }
+
+    private fun showBuildCompleteDialog(gui: GuiExtension, outputFile: File) {
+        val owner = KeyboardFocusManager.getCurrentKeyboardFocusManager().activeWindow
+        val result = JOptionPane.showOptionDialog(
+            owner,
+            I18n.translate(I18nKeys.ToolbarMessage.BUILD_GENERATED).format(outputFile.absolutePath),
+            I18n.translate(I18nKeys.ToolbarMessage.COMPILE_COMPLETE),
+            JOptionPane.DEFAULT_OPTION,
+            JOptionPane.INFORMATION_MESSAGE,
+            null,
+            arrayOf("定位", "关闭"),
+            "关闭"
+        )
+        if (result == 0) {
+            gui.revealInExplorer(outputFile)
+        }
     }
 
 }

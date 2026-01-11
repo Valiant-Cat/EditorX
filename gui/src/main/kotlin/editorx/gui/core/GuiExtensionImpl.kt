@@ -16,6 +16,8 @@ import editorx.gui.theme.ThemeManager
 import editorx.gui.workbench.explorer.Explorer
 import java.awt.Component
 import java.io.File
+import javax.swing.SwingUtilities
+import javax.swing.Timer
 
 class GuiExtensionImpl(
     private val pluginId: String,
@@ -123,6 +125,28 @@ class GuiExtensionImpl(
     override fun refreshExplorer(preserveSelection: Boolean) {
         val explorer = mainWindow?.sideBar?.getView("explorer") as? Explorer ?: return
         if (preserveSelection) explorer.refreshRootPreserveSelection() else explorer.refreshRoot()
+    }
+
+    override fun revealInExplorer(file: File) {
+        val window = mainWindow ?: return
+        SwingUtilities.invokeLater {
+            window.activityBar.activateItem("explorer")
+            val explorer = window.sideBar.getView("explorer") as? Explorer ?: return@invokeLater
+
+            // 触发一次刷新，确保新生成的文件能被树模型加载到（避免目录已 load 但未 reload 导致找不到新文件）。
+            explorer.refreshRootPreserveSelection()
+
+            // refreshRootPreserveSelection 是异步的，这里用短轮询在刷新完成后再定位文件。
+            var attempts = 0
+            val timer = Timer(150, null)
+            timer.addActionListener {
+                attempts++
+                explorer.focusFileInTree(file)
+                if (attempts >= 10) timer.stop()
+            }
+            timer.initialDelay = 0
+            timer.start()
+        }
     }
 
     override fun addToolBarItem(id: String, iconRef: IconRef?, text: String, action: () -> Unit) {

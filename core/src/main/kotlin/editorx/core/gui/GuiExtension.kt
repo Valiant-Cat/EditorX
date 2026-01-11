@@ -98,6 +98,14 @@ interface GuiExtension {
     fun refreshExplorer(preserveSelection: Boolean = true)
 
     /**
+     * 在 Explorer 中定位并选中指定文件（必要时会自动切换到 Explorer 视图）。
+     *
+     * 说明：
+     * - 主要用于构建产物生成后，点击“定位”快速在文件树中选中该文件。
+     */
+    fun revealInExplorer(file: File)
+
+    /**
      * 在 ToolBar 添加一个快捷按钮
      * @param id 按钮的唯一标识符
      * @param iconRef 图标引用（图标尺寸由 ToolBar 统一设置）
