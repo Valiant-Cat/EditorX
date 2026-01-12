@@ -8,8 +8,6 @@ body:
     id: details
     attributes:
       label: Feature request  / 功能建议
-      placeholder: |
-        A brief description of the functional proposal.
-        对功能建议的简述。
+      description: "A brief description of the functional proposal. /对功能建议的简述。"
     validations:
       required: true
