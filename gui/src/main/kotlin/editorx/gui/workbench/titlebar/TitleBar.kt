@@ -6,6 +6,7 @@ import editorx.core.service.BuildStatus
 import editorx.core.util.IconLoader
 import editorx.core.util.IconRef
 import editorx.core.util.SystemUtils
+import editorx.gui.Constants
 import editorx.gui.MainWindow
 import editorx.gui.search.SearchDialog
 import editorx.gui.settings.SettingsDialog
@@ -258,8 +259,25 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
 
     private fun toggleSideBar() {
         val sidebar = mainWindow.sideBar
-        if (sidebar.isSideBarVisible()) sidebar.hideSideBar() else sidebar.getCurrentViewId()
-            ?.let { sidebar.showView(it) }
+        if (sidebar.isSideBarVisible()) {
+            sidebar.hideSideBar()
+        } else {
+            val targetId = sidebar.getCurrentViewId()
+                ?: Constants.ACTIVITY_BAR_DEFAULT_ID.takeIf { it.isNotBlank() }
+                ?: sidebar.getRegisteredViewIds().firstOrNull()
+
+            if (targetId != null) {
+                when {
+                    sidebar.hasView(targetId) -> sidebar.showView(targetId)
+                    else -> {
+                        mainWindow.activityBar.activateItem(targetId, userInitiated = true)
+                        if (!sidebar.isSideBarVisible()) {
+                            sidebar.getRegisteredViewIds().firstOrNull()?.let { sidebar.showView(it) }
+                        }
+                    }
+                }
+            }
+        }
         toggleSideBarButton?.icon = getSideBarIcon()
     }
 

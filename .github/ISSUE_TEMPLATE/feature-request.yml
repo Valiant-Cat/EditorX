@@ -1,0 +1,15 @@
+name: "\U0001F680 Feature request"
+description: Submit a request for a new EditorX / 提交一个新的 EditorX 的功能建议
+title: '[feature] '
+labels:
+  - 'new feature'
+body:
+  - type: textarea
+    id: details
+    attributes:
+      label: Feature request  / 功能建议
+      placeholder: |
+        A brief description of the functional proposal.
+        对功能建议的简述。
+    validations:
+      required: true
