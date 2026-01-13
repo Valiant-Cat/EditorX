@@ -26,7 +26,7 @@ import javax.swing.SwingUtilities
 object UpdateManager {
     private val logger = LoggerFactory.getLogger(UpdateManager::class.java)
 
-    private const val REPO = "Valiant-Cat/EditorX"
+    private const val REPO = "liam798/EditorX"
     private const val MANIFEST_ASSET_NAME = "manifest.json"
 
     private val json = Json {
@@ -60,6 +60,33 @@ object UpdateManager {
 
     private fun checkUpdateInternal(mainWindow: MainWindow) {
         val current = VersionUtil.currentVersion()
+        val platform = currentPlatformKey()
+
+        // 优先读取 release 附带的 manifest.json，避免 GitHub REST API 的匿名请求限流（403 rate limit）
+        fetchLatestFromManifest(REPO, platform)?.let { latest ->
+            val latestVersion = VersionUtil.normalizeTag(latest.version)
+            val hasUpdate = VersionUtil.isNewer(current, latestVersion)
+            if (!hasUpdate) return
+
+            val info = UpdateAvailable(
+                currentVersion = current,
+                latestVersion = latestVersion,
+                releaseName = null,
+                releaseNotes = null,
+                releasePageUrl = latest.releasePageUrl,
+                assetName = latest.assetName,
+                downloadUrl = latest.downloadUrl,
+            )
+
+            SwingUtilities.invokeLater {
+                mainWindow.statusBar.setUpdateHint("有更新：$latestVersion") {
+                    onUpdateClicked(mainWindow, info)
+                }
+            }
+            return
+        }
+
+        // 兜底：使用 GitHub API（可能触发匿名限流）
         val latest = GitHubReleaseApi.fetchLatestRelease(REPO) ?: return
 
         val latestVersion = VersionUtil.normalizeTag(latest.tagName)
@@ -105,6 +132,62 @@ object UpdateManager {
             os.contains("win") -> "windows"
             else -> "linux"
         }
+    }
+
+    private data class LatestFromManifest(
+        val version: String,
+        val assetName: String,
+        val downloadUrl: String,
+        val releasePageUrl: String?,
+    )
+
+    private fun fetchLatestFromManifest(repo: String, platform: String): LatestFromManifest? {
+        val url = "https://github.com/$repo/releases/latest/download/$MANIFEST_ASSET_NAME"
+        val request = HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .header("Accept", "application/json")
+            .header("User-Agent", "EditorX")
+            .GET()
+            .build()
+
+        val resp = runCatching { http.send(request, HttpResponse.BodyHandlers.ofString()) }
+            .getOrNull()
+            ?: return null
+
+        if (resp.statusCode() !in 200..299) {
+            logger.debug("读取 manifest 失败：status={}, url={}", resp.statusCode(), url)
+            return null
+        }
+
+        val root = runCatching { json.parseToJsonElement(resp.body()) }
+            .getOrNull()
+            ?: return null
+
+        val obj = root.safeObj() ?: return null
+        val version = obj.str("version")?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        val tag = obj.str("tag")?.trim()?.takeIf { it.isNotEmpty() }
+
+        val platforms = obj.obj("platforms") ?: return null
+        val platformObj = platforms.obj(platform) ?: return null
+        val artifactName = platformObj.str("artifact")?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+
+        val downloadUrl = if (tag != null) {
+            "https://github.com/$repo/releases/download/$tag/$artifactName"
+        } else {
+            "https://github.com/$repo/releases/latest/download/$artifactName"
+        }
+        val releasePageUrl = if (tag != null) {
+            "https://github.com/$repo/releases/tag/$tag"
+        } else {
+            "https://github.com/$repo/releases/latest"
+        }
+
+        return LatestFromManifest(
+            version = version,
+            assetName = artifactName,
+            downloadUrl = downloadUrl,
+            releasePageUrl = releasePageUrl,
+        )
     }
 
     private fun selectAssetFromManifest(release: GitHubReleaseApi.Release, platform: String): GitHubReleaseApi.Asset? {
