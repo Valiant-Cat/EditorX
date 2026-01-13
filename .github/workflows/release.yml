@@ -359,9 +359,6 @@ jobs:
             dist/linux/EditorX-${{ needs.prepare.outputs.version }}-linux.zip
             dist/windows/EditorX-${{ needs.prepare.outputs.version }}-windows.exe
             dist/macos/EditorX-${{ needs.prepare.outputs.version }}-macOS.app.zip
-            dist/linux/metadata-linux.json
-            dist/windows/metadata-windows.json
-            dist/macos/metadata-macos.json
             dist/manifest.json
           draft: false
           prerelease: ${{ contains(needs.prepare.outputs.version, '-') }}
