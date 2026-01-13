@@ -327,33 +327,22 @@ jobs:
           {
             echo "## EditorX ${VERSION}"
             echo ""
-            echo "### 变更日志"
-            echo ""
-            cat dist/changelog/changelog.txt
-            echo ""
-            echo "### 下载"
-            echo ""
-            echo "- **Linux (ZIP)**: EditorX-${VERSION}-linux.zip"
-            echo "- **Windows (.exe)**: EditorX-${VERSION}-windows.exe"
-            echo "- **macOS (.app.zip)**: EditorX-${VERSION}-macOS.app.zip"
-            echo "- **Manifest**: manifest.json"
-            echo ""
-            echo "### 更新检查（按平台）"
-            echo ""
-            echo "客户端应读取 \`manifest.json\` 并根据当前平台选择对应 \`platforms.<platform>.artifact\`。"
-            echo ""
             echo "### 版本信息"
             echo ""
             echo "- Version: ${VERSION}"
             echo "- Tag: ${TAG}"
             echo "- Commit: ${GITHUB_SHA}"
+            echo ""
+            echo "### 变更日志"
+            echo ""
+            cat dist/changelog/changelog.txt
           } > "${BODY_FILE}"
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: ${{ needs.prepare.outputs.tag }}
-          name: Release ${{ needs.prepare.outputs.version }}
+          name: ${{ needs.prepare.outputs.version }}
           body_path: dist/release-body.md
           files: |
             dist/linux/EditorX-${{ needs.prepare.outputs.version }}-linux.zip
