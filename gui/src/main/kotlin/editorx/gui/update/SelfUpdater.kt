@@ -112,13 +112,12 @@ object SelfUpdater {
             done
             
             TS="$(date +%s)"
-            BACKUP="${'$'}{TARGET_APP}.bak.${'$'}{TS}"
+            TMP="${'$'}{TARGET_APP}.tmp.${'$'}{TS}"
             
-            # 尝试替换
-            if [ -e "${'$'}TARGET_APP" ]; then
-              mv "${'$'}TARGET_APP" "${'$'}BACKUP" || true
-            fi
-            /usr/bin/ditto "${'$'}NEW_APP" "${'$'}TARGET_APP"
+            # 不备份旧版本：先复制到临时目录，成功后再替换
+            /usr/bin/ditto "${'$'}NEW_APP" "${'$'}TMP"
+            rm -rf "${'$'}TARGET_APP" || true
+            mv "${'$'}TMP" "${'$'}TARGET_APP"
             
             # 清理解压产物（失败也无所谓）
             rm -rf "${'$'}NEW_APP" || true
