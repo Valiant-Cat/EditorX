@@ -26,7 +26,7 @@ import javax.swing.SwingUtilities
 object UpdateManager {
     private val logger = LoggerFactory.getLogger(UpdateManager::class.java)
 
-    private const val REPO = "liam798/EditorX"
+    private const val REPO = "Valiant-Cat/EditorX"
     private const val MANIFEST_ASSET_NAME = "manifest.json"
 
     private val json = Json {
