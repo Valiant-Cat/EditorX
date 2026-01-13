@@ -137,7 +137,7 @@ jobs:
             "${GITHUB_SHA}" \
             "${RUNNER_OS}" \
             "${JAVA_VERSION}" \
-            > artifacts/linux/metadata.json
+            > artifacts/linux/metadata-linux.json
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v4
@@ -206,7 +206,7 @@ jobs:
             runnerOs = $env:RUNNER_OS
             javaVersion = $env:JAVA_VERSION
           } | ConvertTo-Json -Depth 3
-          Set-Content -Path (Join-Path $targetDir "metadata.json") -Value $metadata -NoNewline
+          Set-Content -Path (Join-Path $targetDir "metadata-windows.json") -Value $metadata -NoNewline
 
       - name: Upload Windows artifacts
         uses: actions/upload-artifact@v4
@@ -264,7 +264,7 @@ jobs:
             "${GITHUB_SHA}" \
             "${RUNNER_OS}" \
             "${JAVA_VERSION}" \
-            > artifacts/macos/metadata.json
+            > artifacts/macos/metadata-macos.json
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v4
@@ -315,7 +315,7 @@ jobs:
             version: "${{ needs.prepare.outputs.version }}",
             tag: "${{ needs.prepare.outputs.tag }}",
             platforms: ( . | map({key: .platform, value: {artifact: .artifact, type: .artifactType, sha256: .sha256, buildDate: .buildDate, commit: .commit, runnerOs: .runnerOs, javaVersion: .javaVersion}}) | from_entries )
-          }' dist/linux/metadata.json dist/windows/metadata.json dist/macos/metadata.json > dist/manifest.json
+          }' dist/linux/metadata-linux.json dist/windows/metadata-windows.json dist/macos/metadata-macos.json > dist/manifest.json
 
       - name: Build release body
         run: |
@@ -359,9 +359,9 @@ jobs:
             dist/linux/EditorX-${{ needs.prepare.outputs.version }}-linux.zip
             dist/windows/EditorX-${{ needs.prepare.outputs.version }}-windows.exe
             dist/macos/EditorX-${{ needs.prepare.outputs.version }}-macOS.app.zip
-            dist/linux/metadata.json
-            dist/windows/metadata.json
-            dist/macos/metadata.json
+            dist/linux/metadata-linux.json
+            dist/windows/metadata-windows.json
+            dist/macos/metadata-macos.json
             dist/manifest.json
           draft: false
           prerelease: ${{ contains(needs.prepare.outputs.version, '-') }}
