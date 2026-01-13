@@ -1,14 +1,14 @@
 package editorx.core.external
 
 import editorx.core.util.AppPaths
+import jadx.api.JadxArgs
+import jadx.api.JadxDecompiler
 import java.io.File
 
 /**
- * 对 JADX CLI 的封装：负责定位可执行文件并提供 Java 源码反编译能力。
+ * 对 JADX 的封装：负责定位可用实现并提供 Java 源码反编译能力。
  *
- * 说明：
- * - 当前实现基于命令行工具（jadx），未嵌入 jadx-core。
- * - 若机器未安装 jadx，可将可执行文件放到项目 `toolchain/jadx/` 或 `tools/jadx` 下。
+ * 优先使用内置 `jadx-core`（开箱即用，不依赖外部 jadx 环境），仅在内置不可用时回退到外部命令行。
  */
 object Jadx {
     enum class Status { SUCCESS, FAILED, NOT_FOUND, CANCELLED }
@@ -21,15 +21,15 @@ object Jadx {
         val errorCount: Int? = null,
     )
 
-    private val errorCountRegex = Regex("""finished\s+with\s+errors,\s*count:\s*(\d+)""", RegexOption.IGNORE_CASE)
+    private val externalErrorCountRegex = Regex("""finished\s+with\s+errors,\s*count:\s*(\d+)""", RegexOption.IGNORE_CASE)
 
     @Volatile
-    private var cachedPath: String? = null
+    private var cachedLocate: String? = null
 
     fun locate(): String? {
-        cachedPath?.let { return it }
-        val resolved = computeJadxPath()
-        cachedPath = resolved
+        cachedLocate?.let { return it }
+        val resolved = if (isEmbeddedReady()) "embedded" else computeExternalJadxPath()
+        cachedLocate = resolved
         return resolved
     }
 
@@ -38,35 +38,125 @@ object Jadx {
         outputDir: File,
         cancelSignal: (() -> Boolean)? = null,
     ): RunResult {
-        val executable = locate() ?: return RunResult(Status.NOT_FOUND, -1, "jadx not found")
+        if (cancelSignal?.invoke() == true) return RunResult(Status.CANCELLED, -1, "cancelled")
+
+        val embedded = isEmbeddedReady()
+        val raw = if (embedded) {
+            decompileEmbedded(inputFile, outputDir, cancelSignal)
+        } else {
+            decompileExternal(inputFile, outputDir, cancelSignal)
+        }
+
+        // 将输出写入到输出目录，便于排查（仅当目录已存在）。
+        writeLogIfPossible(outputDir, raw.output)
+        return raw
+    }
+
+    private fun isEmbeddedReady(): Boolean {
+        // DexInputPlugin 由 `jadx-dex-input` 提供（运行时依赖）；若缺失则认为内置不可用。
+        return runCatching { Class.forName("jadx.plugins.input.dex.DexInputPlugin") }.isSuccess
+    }
+
+    private fun decompileEmbedded(
+        inputFile: File,
+        outputDir: File,
+        cancelSignal: (() -> Boolean)?,
+    ): RunResult {
+        if (cancelSignal?.invoke() == true) return RunResult(Status.CANCELLED, -1, "cancelled")
+        runCatching { outputDir.mkdirs() }
+
+        val srcDir = File(outputDir, "sources")
+        val resDir = File(outputDir, "resources")
+
+        val args = JadxArgs().apply {
+            setInputFile(inputFile)
+            setOutDir(outputDir)
+            setOutDirSrc(srcDir)
+            setOutDirRes(resDir)
+            setSkipResources(true) // EditorX 当前只读取 sources/ 下的 java
+            setThreadsCount(defaultThreadsCount())
+        }
+
+        return try {
+            JadxDecompiler(args).use { decompiler ->
+                decompiler.load()
+
+                if (cancelSignal?.invoke() == true) {
+                    return RunResult(Status.CANCELLED, -1, "cancelled")
+                }
+
+                val taskExecutor = decompiler.saveTaskExecutor
+                val listener = JadxDecompiler.ProgressListener { _, _ ->
+                    if (cancelSignal?.invoke() == true) {
+                        runCatching { taskExecutor.terminate() }
+                    }
+                }
+
+                decompiler.save(args.threadsCount, listener)
+
+                val errorCount = decompiler.errorsCount
+                val warnCount = decompiler.warnsCount
+                val hasUsableOutput = hasUsableOutput(outputDir)
+                val cancelled = cancelSignal?.invoke() == true
+                val status = when {
+                    cancelled -> Status.CANCELLED
+                    errorCount > 0 && !hasUsableOutput -> Status.FAILED
+                    else -> Status.SUCCESS
+                }
+                val exitCode = when (status) {
+                    Status.SUCCESS -> 0
+                    Status.CANCELLED -> -1
+                    else -> 1
+                }
+                RunResult(
+                    status = status,
+                    exitCode = exitCode,
+                    output = "jadx (embedded) finished. errors=$errorCount, warns=$warnCount",
+                    errorCount = errorCount,
+                )
+            }
+        } catch (e: Throwable) {
+            val cancelled = cancelSignal?.invoke() == true
+            val status = if (cancelled) Status.CANCELLED else Status.FAILED
+            RunResult(status, -1, e.message ?: "jadx (embedded) failed")
+        }
+    }
+
+    private fun defaultThreadsCount(): Int {
+        val cpu = Runtime.getRuntime().availableProcessors().coerceAtLeast(1)
+        // 反编译大多是 IO + CPU 混合任务，保守使用少量线程避免 UI 卡顿/线程过多。
+        return cpu.coerceAtMost(4)
+    }
+
+    private fun decompileExternal(
+        inputFile: File,
+        outputDir: File,
+        cancelSignal: (() -> Boolean)?,
+    ): RunResult {
+        val executable = computeExternalJadxPath() ?: return RunResult(Status.NOT_FOUND, -1, "jadx not found")
         val command = listOf(
             executable,
             "-d",
             outputDir.absolutePath,
             inputFile.absolutePath,
         )
-        val raw = run(command, inputFile.parentFile, cancelSignal)
-        val errorCount = parseErrorCount(raw.output)
+        val raw = runExternal(command, inputFile.parentFile, cancelSignal)
+        val errorCount = parseExternalErrorCount(raw.output)
         val hasUsableOutput = hasUsableOutput(outputDir)
         val finalStatus =
             when (raw.status) {
                 Status.FAILED -> if (hasUsableOutput) Status.SUCCESS else Status.FAILED
                 else -> raw.status
             }
-
-        val finalResult = RunResult(
+        return RunResult(
             status = finalStatus,
             exitCode = raw.exitCode,
             output = raw.output,
             errorCount = errorCount,
         )
-
-        // 将 jadx 输出写入到输出目录，便于排查（仅当目录已存在）。
-        writeLogIfPossible(outputDir, finalResult.output)
-        return finalResult
     }
 
-    private fun run(command: List<String>, workingDir: File?, cancelSignal: (() -> Boolean)?): RunResult {
+    private fun runExternal(command: List<String>, workingDir: File?, cancelSignal: (() -> Boolean)?): RunResult {
         val pb = ProcessBuilder(command)
         pb.redirectErrorStream(true)
         workingDir?.let { pb.directory(it) }
@@ -94,7 +184,7 @@ object Jadx {
         }
     }
 
-    private fun computeJadxPath(): String? {
+    private fun computeExternalJadxPath(): String? {
         val appHome = AppPaths.appHome().toFile()
 
         locateExecutable(File(appHome, "toolchain/jadx"), "jadx")?.let { return it }
@@ -147,8 +237,8 @@ object Jadx {
         return file.setExecutable(true)
     }
 
-    private fun parseErrorCount(output: String): Int? {
-        val m = errorCountRegex.find(output) ?: return null
+    private fun parseExternalErrorCount(output: String): Int? {
+        val m = externalErrorCountRegex.find(output) ?: return null
         return m.groupValues.getOrNull(1)?.toIntOrNull()
     }
 

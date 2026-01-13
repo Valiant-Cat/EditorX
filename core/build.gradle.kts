@@ -8,6 +8,10 @@ dependencies {
     implementation("com.fifesoft:rsyntaxtextarea:3.4.0")
     implementation("com.formdev:flatlaf:3.4")
     implementation("com.formdev:flatlaf-extras:3.4")
+
+    // 内置 JADX（反编译 DEX -> Java），避免依赖外部 jadx 环境
+    implementation("io.github.skylot:jadx-core:1.5.2")
+    runtimeOnly("io.github.skylot:jadx-dex-input:1.5.2")
     
     // SLF4J 日志框架
     api(libs.slf4j.api)

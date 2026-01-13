@@ -3780,7 +3780,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                 // 未找到对应的 Java 源码文件
                 // 
                 // 提示：
-                // 1. 可尝试确认已安装 jadx + smali（用于实时反编译）
+                // 1. EditorX 已内置 jadx + smali（用于实时反编译），若仍失败可尝试重新安装/更新 EditorX
                 // 2. 或检查是否存在 java_src/、sources/ 等 Java 源码目录
                 //
                 // 当前 smali 文件路径: ${smaliFile.absolutePath}
