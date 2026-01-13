@@ -34,13 +34,28 @@ object UpdateDialog {
             add(scroll, BorderLayout.CENTER)
         }
 
-        val options = arrayOf("取消", "更新")
+        val options = arrayOf("取消", "更新并重启")
         val result = JOptionPane.showOptionDialog(
             mainWindow,
             panel,
             "检查更新",
             JOptionPane.DEFAULT_OPTION,
             JOptionPane.PLAIN_MESSAGE,
+            null,
+            options,
+            options[1]
+        )
+        return result == 1
+    }
+
+    fun confirmRestart(mainWindow: MainWindow, message: String): Boolean {
+        val options = arrayOf("稍后", "立即重启")
+        val result = JOptionPane.showOptionDialog(
+            mainWindow,
+            message,
+            "更新准备完成",
+            JOptionPane.DEFAULT_OPTION,
+            JOptionPane.INFORMATION_MESSAGE,
             null,
             options,
             options[1]
@@ -103,4 +118,3 @@ object UpdateDialog {
         }
     }
 }
-

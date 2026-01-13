@@ -310,16 +310,44 @@ object UpdateManager {
                 return@Thread
             }
 
-            SwingUtilities.invokeLater {
-                JOptionPane.showMessageDialog(
-                    mainWindow,
-                    apply.message,
-                    "更新",
-                    JOptionPane.INFORMATION_MESSAGE
-                )
-                // 退出让外部脚本接管替换
-                System.exit(0)
+            val shouldRestart = runCatching {
+                val holder = BooleanArray(1)
+                SwingUtilities.invokeAndWait {
+                    holder[0] = UpdateDialog.confirmRestart(mainWindow, apply.message)
+                }
+                holder[0]
+            }.getOrDefault(false)
+
+            if (!shouldRestart) return@Thread
+
+            val script = apply.restartScript
+            if (script == null) {
+                SwingUtilities.invokeLater {
+                    JOptionPane.showMessageDialog(
+                        mainWindow,
+                        "更新脚本缺失，无法继续自动更新。",
+                        "更新失败",
+                        JOptionPane.ERROR_MESSAGE
+                    )
+                }
+                return@Thread
             }
+
+            val started = SelfUpdater.startPreparedUpdate(script)
+            if (!started.success) {
+                SwingUtilities.invokeLater {
+                    JOptionPane.showMessageDialog(
+                        mainWindow,
+                        started.message,
+                        "更新失败",
+                        JOptionPane.ERROR_MESSAGE
+                    )
+                }
+                return@Thread
+            }
+
+            // 退出让外部脚本接管替换与重启
+            System.exit(0)
         }.apply {
             isDaemon = true
             name = "Updater"

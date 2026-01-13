@@ -12,7 +12,11 @@ import kotlin.io.path.name
 object SelfUpdater {
     private val logger = LoggerFactory.getLogger(SelfUpdater::class.java)
 
-    data class ApplyResult(val success: Boolean, val message: String)
+    data class ApplyResult(
+        val success: Boolean,
+        val message: String,
+        val restartScript: Path? = null,
+    )
 
     fun applyDownloadedPackage(zipFile: Path, currentPid: Long): ApplyResult {
         if (!zipFile.exists()) return ApplyResult(false, "更新包不存在：${zipFile.absolutePathString()}")
@@ -66,21 +70,28 @@ object SelfUpdater {
         }
 
         val helper = writeHelperScript(extractDir, currentPid, targetApp, newApp)
+        val msg = if (targetApp == bundlePath) {
+            "更新包已准备完成。\n点击“立即重启”完成更新并启动新版本。"
+        } else {
+            "当前应用目录不可写，已将新版本安装到：${targetApp.absolutePathString()}\n点击“立即重启”打开新版本。"
+        }
+        return ApplyResult(true, msg, helper)
+    }
+
+    fun startPreparedUpdate(script: Path): ApplyResult {
+        if (!script.exists()) return ApplyResult(false, "更新脚本不存在：${script.absolutePathString()}")
+        val workDir = script.parent ?: return ApplyResult(false, "无法解析更新脚本目录：${script.absolutePathString()}")
+
         runCatching {
-            ProcessBuilder("/bin/bash", helper.absolutePathString())
-                .directory(extractDir.toFile())
+            ProcessBuilder("/bin/bash", script.absolutePathString())
+                .directory(workDir.toFile())
                 .start()
         }.onFailure { e ->
             logger.warn("启动更新脚本失败", e)
             return ApplyResult(false, "启动更新脚本失败：${e.message}")
         }
 
-        val msg = if (targetApp == bundlePath) {
-            "正在更新并重启…"
-        } else {
-            "应用目录不可写，已将新版本安装到：${targetApp.absolutePathString()}\n正在重启…"
-        }
-        return ApplyResult(true, msg)
+        return ApplyResult(true, "正在更新…")
     }
 
     private fun resolveTargetApp(currentApp: Path, currentParent: Path): Path? {
