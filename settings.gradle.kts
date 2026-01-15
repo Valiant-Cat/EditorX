@@ -14,6 +14,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // Compose Multiplatform / Desktop 依赖仓库
+        maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
     }
 }
 

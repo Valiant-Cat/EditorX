@@ -10,7 +10,7 @@ EditorX 是一个基于 Kotlin/JVM 的可扩展桌面编辑器，采用模块化
 
 - 🔌 **插件化架构**：支持源码插件和 JAR 插件，支持动态加载、卸载和热插拔
 - 🌍 **国际化支持**：基于插件的多语言系统，支持运行时切换语言
-- 🎨 **现代化 UI**：基于 Swing + FlatLaf，提供 Material3 主题支持
+- 🎨 **现代化 UI**：基于 Swing + FlatLaf，并已启用 Compose Desktop（可渐进式嵌入/迁移）
 - 📝 **多标签页编辑器**：支持多文件同时编辑，支持语法高亮和代码格式化
 - 🗂️ **工作区管理**：支持工作区级别的文件管理和项目上下文
 - 🔧 **服务注册机制**：插件可注册服务供其他组件使用（如构建服务、反编译服务等）
@@ -31,6 +31,9 @@ cd editorx
 
 # 运行应用
 ./gradlew :gui:run
+
+# 运行 Compose Desktop 示例入口（用于验证 Compose 支持）
+./gradlew :gui:runComposeDemo
 
 # 构建所有模块
 ./gradlew build

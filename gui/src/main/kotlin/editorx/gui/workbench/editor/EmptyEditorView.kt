@@ -163,13 +163,13 @@ class EmptyEditorView(private val mainWindow: MainWindow) : JPanel() {
         
         val isZh = I18n.locale().language == "zh"
         
-        // 全局搜索 - 双击 Shift
+        // 全局搜索 - Command+K
         val searchBinding = registeredShortcuts.find { it.id == ShortcutIds.Global.SEARCH }
         val searchName = if (isZh) "全局搜索" else "Global Search"
         shortcuts.add(
             ShortcutItem(
                 name = searchName,
-                keyStroke = null, // 双击 Shift，特殊处理
+                keyStroke = searchBinding?.keyStroke ?: javax.swing.KeyStroke.getKeyStroke(KeyEvent.VK_K, shortcutMask),
                 nameKey = searchBinding?.nameKey ?: I18nKeys.Action.GLOBAL_SEARCH,
                 descriptionKey = searchBinding?.descriptionKey
             )
@@ -234,7 +234,7 @@ class EmptyEditorView(private val mainWindow: MainWindow) : JPanel() {
         return listOf(
             ShortcutItem(
                 name = I18n.translate(I18nKeys.Action.GLOBAL_SEARCH),
-                keyStroke = null, // 双击 Shift，特殊处理
+                keyStroke = javax.swing.KeyStroke.getKeyStroke(KeyEvent.VK_K, shortcutMask),
                 nameKey = I18nKeys.Action.GLOBAL_SEARCH
             ),
             ShortcutItem(
@@ -255,4 +255,3 @@ class EmptyEditorView(private val mainWindow: MainWindow) : JPanel() {
         )
     }
 }
-

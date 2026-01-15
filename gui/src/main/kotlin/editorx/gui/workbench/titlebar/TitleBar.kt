@@ -210,8 +210,8 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
 
         add(Box.createHorizontalStrut(6))
 
-        // 全局搜索按钮（双击 Shift）
-        val doubleShiftText = I18n.translate(I18nKeys.Toolbar.DOUBLE_SHIFT)
+        // 全局搜索按钮（Command+K）
+        val globalSearchShortcutText = if (SystemUtils.isMacOS()) "⌘K" else "Ctrl+K"
         searchButton = JButton(
             IconLoader.getIcon(
                 IconRef("icons/common/search.svg"),
@@ -219,7 +219,7 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
                 adaptToTheme = true,
                 getThemeColor = { ThemeManager.currentTheme.onSurface }
             )
-        ).compactWithShortcut(I18n.translate(I18nKeys.Toolbar.GLOBAL_SEARCH), doubleShiftText) {
+        ).compactWithShortcut(I18n.translate(I18nKeys.Toolbar.GLOBAL_SEARCH), globalSearchShortcutText) {
             showGlobalSearch()
         }
         add(searchButton)

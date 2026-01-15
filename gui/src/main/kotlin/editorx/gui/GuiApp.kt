@@ -223,17 +223,18 @@ private fun loadDisabledSet(settings: Store): Set<String> {
  * 统一设置所有快捷键
  */
 private fun setupShortcuts(mainWindow: MainWindow) {
-    // 双击 Shift - 全局搜索
-    ShortcutManager.registerDoubleShortcut(
+    val shortcutMask = java.awt.Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx
+
+    // Command+K - 全局搜索
+    ShortcutManager.registerShortcut(
         id = ShortcutIds.Global.SEARCH,
-        keyCode = KeyEvent.VK_SHIFT,
+        keyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_K, shortcutMask),
         nameKey = I18nKeys.Action.GLOBAL_SEARCH,
         descriptionKey = I18nKeys.Shortcut.GLOBAL_SEARCH,
         action = { showSearchDialog(mainWindow) }
     )
 
     // Command+, - 打开设置
-    val shortcutMask = java.awt.Toolkit.getDefaultToolkit().menuShortcutKeyMaskEx
     ShortcutManager.registerShortcut(
         id = ShortcutIds.Global.SETTINGS,
         keyStroke = KeyStroke.getKeyStroke(KeyEvent.VK_COMMA, shortcutMask),
