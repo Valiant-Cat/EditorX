@@ -1,5 +1,6 @@
 package editorx.gui.theme
 
+import editorx.core.util.IconLoader
 import java.awt.Color
 import javax.swing.BorderFactory
 import javax.swing.SwingUtilities
@@ -11,6 +12,10 @@ object ThemeManager {
             field = value
             applyTheme()
         }
+
+    init {
+        IconLoader.setDarkThemeProvider { currentTheme is Theme.Dark }
+    }
 
     private var themeChangeListeners = mutableListOf<() -> Unit>()
 

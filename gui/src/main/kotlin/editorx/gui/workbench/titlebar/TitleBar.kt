@@ -35,7 +35,10 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
     private var titleLabel: JLabel? = null
 
     // VCS Widget
-    private val vcsWidget = VcsWidget(mainWindow.guiContext.getWorkspace())
+    private val vcsWidget = VcsWidget(
+        mainWindow.guiContext.getWorkspace(),
+        mainWindow.guiContext.getSettings()
+    )
 
     init {
         isFloatable = false

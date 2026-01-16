@@ -4,7 +4,9 @@ import editorx.core.i18n.I18n
 import editorx.core.i18n.I18nKeys
 import editorx.core.util.IconLoader
 import editorx.core.util.IconRef
+import editorx.core.util.Store
 import editorx.core.workspace.Workspace
+import editorx.gui.settings.SettingsStoreKeys
 import editorx.gui.theme.ThemeManager
 import org.slf4j.LoggerFactory
 import java.awt.Component
@@ -20,7 +22,10 @@ import javax.swing.*
  * VCS Widget - 显示版本控制信息（如 git 分支）
  * 参考 IDEA/Android Studio 的效果
  */
-class VcsWidget(private val workspace: Workspace) : JPanel() {
+class VcsWidget(
+    private val workspace: Workspace,
+    private val settings: Store
+) : JPanel() {
     companion object {
         private val logger = LoggerFactory.getLogger(VcsWidget::class.java)
         private const val ICON_SIZE = 14
@@ -343,6 +348,15 @@ class VcsWidget(private val workspace: Workspace) : JPanel() {
         }
     }
 
+    private fun isCreateGitPromptSuppressed(): Boolean {
+        return settings.get(SettingsStoreKeys.SUPPRESS_GIT_CREATE_PROMPT, "false") == "true"
+    }
+
+    private fun suppressCreateGitPrompt() {
+        settings.put(SettingsStoreKeys.SUPPRESS_GIT_CREATE_PROMPT, "true")
+        settings.sync()
+    }
+
     private data class GitCommandResult(val exitCode: Int, val output: String)
 
     private fun runGitCommand(command: List<String>, workingDir: File, timeoutMs: Long): GitCommandResult {
@@ -386,19 +400,21 @@ class VcsWidget(private val workspace: Workspace) : JPanel() {
     }
 
     private fun promptCreateGitRepository(workspaceRoot: File, parent: Component) {
-        val options = arrayOf("创建", I18n.translate(I18nKeys.Action.CANCEL))
+        if (isCreateGitPromptSuppressed()) return
+        val options = arrayOf("创建", I18n.translate(I18nKeys.Action.CANCEL), "不再提示")
         val choice = JOptionPane.showOptionDialog(
             parent,
             "当前工作区不是 Git 仓库，是否创建一个新的 Git 仓库？",
             "创建 Git 仓库",
-            JOptionPane.YES_NO_OPTION,
+            JOptionPane.DEFAULT_OPTION,
             JOptionPane.QUESTION_MESSAGE,
             null,
             options,
             options[0]
         )
-        if (choice == JOptionPane.YES_OPTION) {
-            createGitRepository(workspaceRoot, parent)
+        when (choice) {
+            0 -> createGitRepository(workspaceRoot, parent)
+            2 -> suppressCreateGitPrompt()
         }
     }
 

@@ -8,6 +8,7 @@ import editorx.core.util.IconUtils
 import editorx.gui.MainWindow
 import editorx.gui.core.FileHandlerManager
 import editorx.gui.core.FileTypeManager
+import editorx.gui.settings.SettingsStoreKeys
 import editorx.gui.theme.ThemeManager
 import editorx.gui.widget.NoBorderScrollPane
 import java.awt.*
@@ -959,6 +960,9 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
             // 已经存在 Git 仓库，不需要提示
             return
         }
+        if (isCreateGitPromptSuppressed()) {
+            return
+        }
 
         // 检查 git 是否可用
         if (!isGitAvailable()) {
@@ -974,16 +978,21 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
      * 提示用户是否创建 Git 仓库
      */
     private fun promptCreateGitRepository(outputDir: File) {
-        val response = JOptionPane.showConfirmDialog(
+        val options = arrayOf("创建", "取消", "不再提示")
+        val response = JOptionPane.showOptionDialog(
             mainWindow,
             "是否要为当前项目创建 Git 仓库？\n这将帮助您跟踪代码修改历史。",
             "创建 Git 仓库",
-            JOptionPane.YES_NO_OPTION,
-            JOptionPane.QUESTION_MESSAGE
+            JOptionPane.DEFAULT_OPTION,
+            JOptionPane.QUESTION_MESSAGE,
+            null,
+            options,
+            options[0]
         )
 
-        if (response == JOptionPane.YES_OPTION) {
-            createGitRepository(outputDir)
+        when (response) {
+            0 -> createGitRepository(outputDir)
+            2 -> suppressCreateGitPrompt()
         }
     }
 
@@ -1197,6 +1206,17 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         } catch (e: Exception) {
             false
         }
+    }
+
+    private fun isCreateGitPromptSuppressed(): Boolean {
+        val settings = mainWindow.guiContext.getSettings()
+        return settings.get(SettingsStoreKeys.SUPPRESS_GIT_CREATE_PROMPT, "false") == "true"
+    }
+
+    private fun suppressCreateGitPrompt() {
+        val settings = mainWindow.guiContext.getSettings()
+        settings.put(SettingsStoreKeys.SUPPRESS_GIT_CREATE_PROMPT, "true")
+        settings.sync()
     }
 
     /**

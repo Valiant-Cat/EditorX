@@ -5,6 +5,15 @@ import javax.swing.Icon
 import javax.swing.ImageIcon
 
 object IconLoader {
+    @Volatile
+    private var isDarkThemeProvider: (() -> Boolean)? = null
+
+    fun setDarkThemeProvider(provider: (() -> Boolean)?) {
+        isDarkThemeProvider = provider
+    }
+
+    private fun isDarkTheme(): Boolean = isDarkThemeProvider?.invoke() ?: false
+
     /**
      * 尝试从多个 ClassLoader 查找资源
      * 查找顺序：
@@ -74,13 +83,26 @@ object IconLoader {
         getThemeColor: (() -> java.awt.Color)? = null,
         getDisabledColor: (() -> java.awt.Color)? = null
     ): Icon? {
-        val icon = if (iconRef.isSvg) loadSvg(iconRef, size) else loadRaster(iconRef, size)
-        
-        if (adaptToTheme && icon != null && getThemeColor != null) {
+        val resolved = resolveThemeVariant(iconRef)
+        val icon = if (resolved.isSvg) loadSvg(resolved, size) else loadRaster(resolved, size)
+
+        if (adaptToTheme && icon != null && getThemeColor != null && resolved == iconRef) {
             return ThemeIcon(icon, getThemeColor, getDisabledColor)
         }
-        
+
         return icon
+    }
+
+    private fun resolveThemeVariant(iconRef: IconRef): IconRef {
+        if (!isDarkTheme()) return iconRef
+        val path = iconRef.resourcePath
+        if (!path.contains(".")) return iconRef
+        if (path.contains("_dark.")) return iconRef
+        val idx = path.lastIndexOf('.')
+        if (idx <= 0) return iconRef
+        val darkPath = path.substring(0, idx) + "_dark" + path.substring(idx)
+        val found = findResource(darkPath, iconRef.classLoader) != null
+        return if (found) iconRef.copy(resourcePath = darkPath) else iconRef
     }
 
     private fun loadRaster(iconRef: IconRef, size: Int): Icon? {
