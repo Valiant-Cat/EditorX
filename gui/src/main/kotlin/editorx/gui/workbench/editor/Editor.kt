@@ -179,6 +179,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         // 切换标签时更新状态栏与事件
         tabbedPane.addChangeListener {
             val file = getCurrentFile()
+            syncBottomTabsForFile(file)
             mainWindow.statusBar.setFileInfo(file?.name ?: "", file?.let { it.length().toString() + " B" })
             updateNavigation(file)
 
@@ -202,12 +203,6 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             }
 
             updateTabHeaderStyles()
-
-            // 检测是否为 AndroidManifest.xml，显示/隐藏底部视图标签
-            updateManifestViewTabs(file)
-
-            // 检测是否为 smali 文件，显示/隐藏底部视图标签
-            updateSmaliViewTabs(file)
 
             // 文件内查找条：切换标签后同步高亮
             file?.let { currentFile ->
@@ -1322,12 +1317,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         // 触发 tabbedPane 重绘以确保 tab 背景色正确
         tabbedPane.repaint()
         updateNavigation(file)
-
-        // 检测是否为 AndroidManifest.xml，显示/隐藏底部视图标签
-        updateManifestViewTabs(file)
-
-        // 检测是否为 smali 文件，显示/隐藏底部视图标签
-        updateSmaliViewTabs(file)
+        syncBottomTabsForFile(file)
 
         // 打开文件后显示编辑器内容（隐藏欢迎界面）
         showEditorContent()
@@ -1463,6 +1453,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         }
 
         // 新建文件后显示编辑器内容（隐藏欢迎界面）
+        syncBottomTabsForFile(null)
         showEditorContent()
     }
 
@@ -1924,6 +1915,9 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             val file = tabToFile[index]
             if (file != null && file == manifestFile) {
                 removeManifestViewTabs()
+            }
+            if (file != null && file == smaliFile) {
+                removeSmaliViewTabs()
             }
             tabbedPane.removeTabAt(index)
             file?.let {
@@ -2597,19 +2591,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
 
     // 检测并更新 AndroidManifest 底部视图标签
     private fun updateManifestViewTabs(file: File?) {
-        val isManifest = file?.name?.equals("AndroidManifest.xml", ignoreCase = true) == true
-
-        if (isManifest && file != null && file.exists()) {
-            // 显示底部视图标签
-            if (!isManifestMode) {
-                createManifestViewTabs(file)
-            }
-        } else {
-            // 隐藏底部视图标签
-            if (isManifestMode) {
-                removeManifestViewTabs()
-            }
-        }
+        // 已由 syncBottomTabsForFile 统一处理
     }
 
     // 创建 AndroidManifest 底部视图标签
@@ -2734,13 +2716,8 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             // 将底部标签面板添加到统一容器中，避免与查找条冲突
             // 如果已有 smaliViewTabs，需要处理布局
             if (smaliViewTabs != null) {
-                // 检查是否已经有容器
-                val existingContainer = if (bottomContainer.componentCount > 0) {
-                    bottomContainer.getComponent(0) as? JPanel
-                } else {
-                    null
-                }
-                if (existingContainer != null && existingContainer.layout is BorderLayout) {
+                val existingContainer = getBottomWrapper()
+                if (existingContainer != null) {
                     // 已有容器，直接添加到容器中
                     existingContainer.add(manifestViewTabs!!, BorderLayout.NORTH)
                 } else {
@@ -2754,15 +2731,11 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                     bottomContainer.add(container, BorderLayout.SOUTH)
                 }
             } else {
-                // 检查是否已有容器
-                val existingContainer = if (bottomContainer.componentCount > 0) {
-                    bottomContainer.getComponent(0) as? JPanel
-                } else {
-                    null
-                }
-                if (existingContainer != null && existingContainer.layout is BorderLayout) {
+                val existingContainer = getBottomWrapper()
+                if (existingContainer != null) {
                     existingContainer.add(manifestViewTabs!!, BorderLayout.NORTH)
                 } else {
+                    bottomContainer.removeAll()
                     bottomContainer.add(manifestViewTabs!!, BorderLayout.SOUTH)
                 }
             }
@@ -2831,12 +2804,8 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
     private fun removeManifestViewTabs() {
         if (manifestViewTabs != null) {
             // 移除底部标签面板
-            val container = if (bottomContainer.componentCount > 0) {
-                bottomContainer.getComponent(0) as? JPanel
-            } else {
-                null
-            }
-            if (container != null && container.layout is BorderLayout) {
+            val container = getBottomWrapper()
+            if (container != null) {
                 // 从容器中移除
                 container.remove(manifestViewTabs!!)
                 if (container.componentCount == 0) {
@@ -3199,6 +3168,14 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         tabContent.repaint()
     }
 
+    private fun getBottomWrapper(): JPanel? {
+        if (bottomContainer.componentCount == 0) return null
+        val comp = bottomContainer.getComponent(0) as? JPanel ?: return null
+        if (comp is EditorTabPane) return null
+        if (comp.layout !is BorderLayout) return null
+        return comp
+    }
+
     private fun captureViewState(textArea: TextArea, scroll: RTextScrollPane): EditorViewState {
         val caret = runCatching { textArea.caretPosition }.getOrDefault(0)
         val v = runCatching { scroll.verticalScrollBar.value }.getOrDefault(0)
@@ -3341,44 +3318,22 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
 
     // 检测并更新 Smali 底部视图标签
     private fun updateSmaliViewTabs(file: File?) {
-        val isSmali = file?.let {
-            val name = it.name.lowercase()
-            name.endsWith(".smali", ignoreCase = true)
-        } ?: false
+        // 已由 syncBottomTabsForFile 统一处理
+    }
 
-        if (isSmali && file != null && file.exists()) {
-            // 显示底部视图标签
-            if (!isSmaliMode) {
-                logger.debug("检测到 smali 文件: ${file.name}, 创建底部 tab")
-                createSmaliViewTabs(file)
-            } else {
-                // 如果已经是 smali 模式，但文件不同，需要更新
-                if (smaliFile != file) {
-                    // 先保存当前文件的 tab 状态
-                    smaliFile?.let { currentFile ->
-                        smaliViewTabs?.let { tabs ->
-                            smaliTabState[currentFile] = tabs.selectedIndex
-                            logger.debug("保存 smali 文件 ${currentFile.name} 的 tab 状态: ${tabs.selectedIndex}")
-                        }
-                    }
-                    logger.debug("切换到新的 smali 文件: ${file.name}")
-                    removeSmaliViewTabs()
-                    createSmaliViewTabs(file)
-                }
-            }
-        } else {
-            // 隐藏底部视图标签
-            if (isSmaliMode) {
-                // 保存当前文件的 tab 状态
-                smaliFile?.let { currentFile ->
-                    smaliViewTabs?.let { tabs ->
-                        smaliTabState[currentFile] = tabs.selectedIndex
-                        logger.debug("保存 smali 文件 ${currentFile.name} 的 tab 状态: ${tabs.selectedIndex}")
-                    }
-                }
-                logger.debug("隐藏 smali 底部 tab")
-                removeSmaliViewTabs()
-            }
+    private fun syncBottomTabsForFile(file: File?) {
+        // 先清理再按当前文件重建，保证只显示一套底部栏
+        if (manifestViewTabs != null) {
+            removeManifestViewTabs()
+        }
+        if (smaliViewTabs != null) {
+            removeSmaliViewTabs()
+        }
+        if (file == null || !file.exists()) return
+        val lower = file.name.lowercase()
+        when {
+            lower == "androidmanifest.xml" -> createManifestViewTabs(file)
+            lower.endsWith(".smali") -> createSmaliViewTabs(file)
         }
     }
 
@@ -3436,13 +3391,8 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             // 将底部标签面板添加到统一容器中，避免与查找条冲突
             // 如果已有 manifestViewTabs，需要处理布局
             if (manifestViewTabs != null) {
-                // 检查是否已经有容器
-                val existingContainer = if (bottomContainer.componentCount > 0) {
-                    bottomContainer.getComponent(0) as? JPanel
-                } else {
-                    null
-                }
-                if (existingContainer != null && existingContainer.layout is BorderLayout) {
+                val existingContainer = getBottomWrapper()
+                if (existingContainer != null) {
                     // 已有容器，直接添加到容器中
                     existingContainer.add(smaliViewTabs!!, BorderLayout.SOUTH)
                 } else {
@@ -3456,15 +3406,8 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                     bottomContainer.add(container, BorderLayout.SOUTH)
                 }
             } else {
-                // 没有 manifest tabs，直接添加到 bottomContainer
-                // 检查是否已有容器
-                val existingContainer = if (bottomContainer.componentCount > 0) {
-                    bottomContainer.getComponent(0) as? JPanel
-                } else {
-                    null
-                }
-
-                if (existingContainer != null && existingContainer.layout is BorderLayout) {
+                val existingContainer = getBottomWrapper()
+                if (existingContainer != null) {
                     // 已有容器，添加到容器中
                     existingContainer.add(smaliViewTabs!!, BorderLayout.SOUTH)
                 } else {
@@ -4055,12 +3998,8 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         if (smaliViewTabs != null) {
             smaliFile?.let { cancelSmaliConversion(it) }
             // 移除底部标签面板
-            val container = if (bottomContainer.componentCount > 0) {
-                bottomContainer.getComponent(0) as? JPanel
-            } else {
-                null
-            }
-            if (container != null && container.layout is BorderLayout) {
+            val container = getBottomWrapper()
+            if (container != null) {
                 // 从容器中移除
                 container.remove(smaliViewTabs!!)
                 if (container.componentCount == 0) {
@@ -4074,6 +4013,14 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             } else {
                 // 直接添加到 bottomContainer
                 bottomContainer.remove(smaliViewTabs!!)
+            }
+            val file = smaliFile
+            if (file != null) {
+                val index = fileToTab[file]
+                val tabContent = index?.let { tabbedPane.getComponentAt(it) as? TabContent }
+                if (tabContent != null) {
+                    setTabCenter(tabContent, tabContent.scrollPane)
+                }
             }
             smaliViewTabs = null
             isSmaliMode = false
@@ -4110,6 +4057,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
 
             mainWindow.statusBar.setFileInfo(file.name, Files.size(file.toPath()).toString() + " B")
             updateNavigation(file)
+            syncBottomTabsForFile(null)
 
         } catch (e: Exception) {
             logger.error("打开压缩包文件失败", e)
