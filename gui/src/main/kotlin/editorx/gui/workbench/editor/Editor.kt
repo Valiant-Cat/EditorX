@@ -10,6 +10,7 @@ import editorx.core.gui.DiffHunk
 import editorx.core.gui.EditorMenuHandler
 import editorx.core.gui.EditorMenuView
 import editorx.gui.core.FileHandlerManager
+import editorx.gui.theme.Theme
 import editorx.gui.theme.ThemeManager
 import editorx.gui.MainWindow
 import editorx.gui.workbench.explorer.ExplorerIcons
@@ -213,7 +214,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
 
                         // 为选中的 tab 添加底部指示器（指针）
                         if (isSelected) {
-                            g2d.color = theme.primary
+                            g2d.color = ThemeManager.editorTabSelectedUnderline
                             g2d.fillRect(x, y + h - 2, w, 2)
                         }
                     } finally {
@@ -341,22 +342,20 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
 
         // 更新所有已存在的 TextArea 和 RTextScrollPane 的背景色
         for (i in 0 until tabbedPane.tabCount) {
-            val tabContent = tabbedPane.getComponentAt(i) as? TabContent ?: continue
-            val scrollPane = tabContent.scrollPane
-
-            // 更新 RTextScrollPane 的背景色
-            scrollPane.background = theme.editorBackground
-            scrollPane.viewport.background = theme.editorBackground
-
-            // 更新滚动条的背景色
-            scrollPane.verticalScrollBar.background = theme.editorBackground
-            scrollPane.horizontalScrollBar.background = theme.editorBackground
-
-            // 更新 TextArea 的背景色和前景色
-            val textArea = tabTextAreas[i] ?: continue
-            textArea.background = theme.editorBackground
-            textArea.foreground = theme.onSurface
+            when (val tab = tabbedPane.getComponentAt(i)) {
+                is TabContent -> {
+                    applyScrollPaneTheme(tab.scrollPane, theme)
+                    tabTextAreas[i]?.applyEditorTheme(theme)
+                }
+                is DiffTabContent -> {
+                    applyTextAreaTheme(tab.leftArea, theme)
+                    applyTextAreaTheme(tab.rightArea, theme)
+                }
+            }
         }
+
+        smaliCodeTextAreas.values.forEach { it.applyEditorTheme(theme) }
+        smaliCodeScrollPanes.values.forEach { applyScrollPaneTheme(it, theme) }
 
         // 更新 tabbedPane 的背景色和前景色
         tabbedPane.background = theme.surface
@@ -376,7 +375,8 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
 
         // 更新底部 manifest 视图标签
         manifestViewTabs?.let { tabs ->
-            tabs.border = BorderFactory.createMatteBorder(1, 0, 0, 0, theme.outline)
+            val dividerColor = theme.statusBarSeparator
+            tabs.border = BorderFactory.createMatteBorder(1, 0, 0, 0, dividerColor)
             tabs.background = theme.surface
             tabs.foreground = theme.onSurfaceVariant
             // 更新所有 tab 的背景色和前景色
@@ -396,7 +396,8 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
 
         // 更新底部 smali 视图标签
         smaliViewTabs?.let { tabs ->
-            tabs.border = BorderFactory.createMatteBorder(1, 0, 0, 0, theme.outline)
+            val dividerColor = theme.statusBarSeparator
+            tabs.border = BorderFactory.createMatteBorder(1, 0, 0, 0, dividerColor)
             tabs.background = theme.surface
             tabs.foreground = theme.onSurfaceVariant
             // 更新所有 tab 的背景色和前景色
@@ -419,6 +420,21 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
 
         revalidate()
         repaint()
+    }
+
+    private fun applyTextAreaTheme(textArea: TextArea, theme: Theme) {
+        textArea.applyEditorTheme(theme)
+        val scroll = SwingUtilities.getAncestorOfClass(RTextScrollPane::class.java, textArea) as? RTextScrollPane
+        if (scroll != null) {
+            applyScrollPaneTheme(scroll, theme)
+        }
+    }
+
+    private fun applyScrollPaneTheme(scrollPane: RTextScrollPane, theme: Theme) {
+        scrollPane.background = theme.editorBackground
+        scrollPane.viewport.background = theme.editorBackground
+        scrollPane.verticalScrollBar.background = theme.editorBackground
+        scrollPane.horizontalScrollBar.background = theme.editorBackground
     }
 
     private fun updateEditorContent() {
@@ -716,8 +732,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         return TextArea().apply {
             isEditable = false
             isCodeFoldingEnabled = false
-            background = ThemeManager.currentTheme.editorBackground
-            foreground = ThemeManager.currentTheme.onSurface
+            applyEditorTheme()
             this.text = text
             caretPosition = 0
             if (file != null) {
@@ -729,9 +744,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
     private fun createEditableTextArea(file: File, text: String): TextArea {
         return TextArea().apply {
             isEditable = true
-            background = ThemeManager.currentTheme.editorBackground
-            foreground = ThemeManager.currentTheme.onSurface
-            caretColor = ThemeManager.currentTheme.onSurface
+            applyEditorTheme()
             this.text = text
             caretPosition = 0
             runCatching { detectSyntax(file) }
@@ -814,10 +827,9 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             // 如果当前 tab 被选中，绘制底部指示器
             val idx = tabbedPane.indexOfTabComponent(this)
             if (idx >= 0 && idx == tabbedPane.selectedIndex) {
-                val theme = ThemeManager.currentTheme
                 val g2d = g.create() as Graphics2D
                 try {
-                    g2d.color = theme.primary
+                    g2d.color = ThemeManager.editorTabSelectedUnderline
                     g2d.fillRect(0, height - 2, width, 2)
                 } finally {
                     g2d.dispose()
@@ -1014,10 +1026,9 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             // 如果当前 tab 被选中，绘制底部指示器
             val idx = tabbedPane.indexOfTabComponent(this)
             if (idx >= 0 && idx == tabbedPane.selectedIndex) {
-                val theme = ThemeManager.currentTheme
                 val g2d = g.create() as Graphics2D
                 try {
-                    g2d.color = theme.primary
+                    g2d.color = ThemeManager.editorTabSelectedUnderline
                     g2d.fillRect(0, height - 2, width, 2)
                 } finally {
                     g2d.dispose()
@@ -1235,8 +1246,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
 
         val textArea = TextArea().apply {
             font = Font("Consolas", Font.PLAIN, 14)
-            background = ThemeManager.currentTheme.editorBackground
-            foreground = ThemeManager.currentTheme.onSurface
+            applyEditorTheme()
             addCaretListener {
                 val caretPos = caretPosition
                 val line = try {
@@ -1397,8 +1407,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
 
         val textArea = TextArea().apply {
             font = Font("Consolas", Font.PLAIN, 14)
-            background = ThemeManager.currentTheme.editorBackground
-            foreground = ThemeManager.currentTheme.onSurface
+            applyEditorTheme()
             text = ""  // 空内容
             addCaretListener {
                 val caretPos = caretPosition
@@ -2983,8 +2992,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         val theme = ThemeManager.currentTheme
         val area = createReadOnlyTextArea(null, "").apply {
             syntaxEditingStyle = org.fife.ui.rsyntaxtextarea.SyntaxConstants.SYNTAX_STYLE_JAVA
-            background = theme.editorBackground
-            foreground = theme.onSurface
+            applyEditorTheme(theme)
         }
         // Code 视图快捷键：仅查找（Code 视图为只读，不提供替换）
         runCatching {
@@ -3058,10 +3066,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
         })
         val scroll = RTextScrollPane(area).apply {
             border = javax.swing.BorderFactory.createEmptyBorder()
-            background = theme.editorBackground
-            viewport.background = theme.editorBackground
-            verticalScrollBar.background = theme.editorBackground
-            horizontalScrollBar.background = theme.editorBackground
+            applyScrollPaneTheme(this, theme)
         }
         smaliCodeTextAreas[file] = area
         smaliCodeScrollPanes[file] = scroll

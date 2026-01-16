@@ -49,7 +49,37 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
     private val refreshBtn = JButton("刷新")
     private val treeRoot = DefaultMutableTreeNode()
     private val treeModel = DefaultTreeModel(treeRoot)
-    private val tree = JTree(treeModel)
+    private val tree = object : JTree(treeModel) {
+        override fun paintComponent(g: Graphics) {
+            val theme = ThemeManager.currentTheme
+            if (theme is editorx.gui.theme.Theme.Dark) {
+                val g2 = g.create() as Graphics2D
+                try {
+                    val selectedBg =
+                        Color(theme.onSurface.red, theme.onSurface.green, theme.onSurface.blue, 0x20)
+                    val hoverBg =
+                        Color(theme.onSurface.red, theme.onSurface.green, theme.onSurface.blue, 0x14)
+                    val effectiveSelectedBg = if (isFocusOwner) selectedBg else hoverBg
+                    val w = width
+                    selectionRows?.forEach { row ->
+                        val bounds = getRowBounds(row) ?: return@forEach
+                        g2.color = effectiveSelectedBg
+                        g2.fillRect(0, bounds.y, w, bounds.height)
+                    }
+                    if (hoverRow >= 0 && !isRowSelected(hoverRow)) {
+                        val bounds = getRowBounds(hoverRow)
+                        if (bounds != null) {
+                            g2.color = hoverBg
+                            g2.fillRect(0, bounds.y, w, bounds.height)
+                        }
+                    }
+                } finally {
+                    g2.dispose()
+                }
+            }
+            super.paintComponent(g)
+        }
+    }
     private var scrollPane: NoBorderScrollPane? = null
     private var locateButton: JButton? = null
     private var refreshButton: JButton? = null
@@ -58,6 +88,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
     private var viewModeTextLabel: JLabel? = null
     private var viewMode: ExplorerViewMode = loadSavedViewMode()
     private var lastKnownFile: File? = null
+    private var hoverRow: Int = -1
     private val i18nListener: () -> Unit = { SwingUtilities.invokeLater { updateI18n() } }
 
     // 任务取消机制
@@ -356,7 +387,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
             tree.updateUI()
         } catch (_: Exception) {
         }
-        tree.cellRenderer = FileTreeCellRenderer(mainWindow)
+        tree.cellRenderer = FileTreeCellRenderer(mainWindow) { hoverRow }
     }
 
     private fun locateCurrentFile() {
@@ -573,8 +604,22 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                         if (node.file.isFile) openFile(node.file)
                     }
                 }
+
+                override fun mouseExited(e: MouseEvent) {
+                    updateHoverRow(-1)
+                }
             }
         )
+
+        tree.addMouseMotionListener(object : MouseAdapter() {
+            override fun mouseMoved(e: MouseEvent) {
+                val row = tree.getClosestRowForLocation(e.x, e.y)
+                val bounds = if (row != -1) tree.getRowBounds(row) else null
+                val hitRow =
+                    if (row != -1 && bounds != null && e.y >= bounds.y && e.y < bounds.y + bounds.height) row else -1
+                updateHoverRow(hitRow)
+            }
+        })
 
         tree.addKeyListener(
             object : KeyAdapter() {
@@ -1375,6 +1420,11 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
     private class FileTreeCellRenderer(private val mainWindow: MainWindow) :
         javax.swing.tree.DefaultTreeCellRenderer() {
         private val fileIconCache = mutableMapOf<String, Icon>()
+        private var hoverRowProvider: (() -> Int)? = null
+
+        constructor(mainWindow: MainWindow, hoverRowProvider: () -> Int) : this(mainWindow) {
+            this.hoverRowProvider = hoverRowProvider
+        }
 
         override fun getTreeCellRendererComponent(
             tree: JTree,
@@ -1401,9 +1451,13 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                 icon = getIconForFile(file)
                 text = node.displayName
             }
-            // 设置文本颜色为主题颜色（如果未选中）
-            if (!sel) {
-                foreground = ThemeManager.currentTheme.onSurface
+            val theme = ThemeManager.currentTheme
+            if (theme is editorx.gui.theme.Theme.Dark) {
+                foreground = theme.onSurface
+                isOpaque = false
+            } else if (!sel) {
+                // 设置文本颜色为主题颜色（如果未选中）
+                foreground = theme.onSurface
             }
             return c
         }
@@ -1476,6 +1530,12 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                     }
                 }
             }
+    }
+
+    private fun updateHoverRow(row: Int) {
+        if (hoverRow == row) return
+        hoverRow = row
+        tree.repaint()
     }
 
     // DnD: allow dropping a folder to set workspace root

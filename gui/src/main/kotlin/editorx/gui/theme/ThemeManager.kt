@@ -1,6 +1,7 @@
 package editorx.gui.theme
 
 import editorx.core.util.IconLoader
+import editorx.gui.workbench.editor.TextArea
 import java.awt.Color
 import javax.swing.BorderFactory
 import javax.swing.SwingUtilities
@@ -116,6 +117,10 @@ object ThemeManager {
                         component.foreground = theme.onSurface
                     }
 
+                    is TextArea -> {
+                        component.applyEditorTheme(theme)
+                    }
+
                     is javax.swing.JTextArea -> {
                         // 文本区域的背景色和前景色
                         component.background = theme.surface
@@ -155,6 +160,24 @@ object ThemeManager {
                         component.background = theme.surface
                         component.foreground = theme.outline
                         // 注意：滚动条的滑块颜色主要通过 UIManager 设置
+                    }
+
+                    is javax.swing.JMenu -> {
+                        component.background = theme.surface
+                        component.foreground = theme.onSurface
+                        component.isOpaque = true
+                    }
+
+                    is javax.swing.JMenuItem -> {
+                        component.background = theme.surface
+                        component.foreground = theme.onSurface
+                        component.isOpaque = true
+                    }
+
+                    is javax.swing.JPopupMenu -> {
+                        component.background = theme.surface
+                        component.foreground = theme.onSurface
+                        component.isOpaque = true
                     }
 
                     is javax.swing.JTabbedPane -> {
@@ -226,6 +249,21 @@ object ThemeManager {
         UIManager.put("TabbedPane.contentAreaColor", currentTheme.surface)
         UIManager.put("MenuBar.background", currentTheme.surface)
         UIManager.put("PopupMenu.background", currentTheme.surface)
+        UIManager.put("PopupMenu.foreground", currentTheme.onSurface)
+        UIManager.put("Menu.background", currentTheme.surface)
+        UIManager.put("Menu.foreground", currentTheme.onSurface)
+        UIManager.put("MenuItem.background", currentTheme.surface)
+        UIManager.put("MenuItem.foreground", currentTheme.onSurface)
+        UIManager.put("MenuItem.selectionBackground", currentTheme.primaryContainer)
+        UIManager.put("MenuItem.selectionForeground", currentTheme.onPrimaryContainer)
+        UIManager.put("CheckBoxMenuItem.background", currentTheme.surface)
+        UIManager.put("CheckBoxMenuItem.foreground", currentTheme.onSurface)
+        UIManager.put("CheckBoxMenuItem.selectionBackground", currentTheme.primaryContainer)
+        UIManager.put("CheckBoxMenuItem.selectionForeground", currentTheme.onPrimaryContainer)
+        UIManager.put("RadioButtonMenuItem.background", currentTheme.surface)
+        UIManager.put("RadioButtonMenuItem.foreground", currentTheme.onSurface)
+        UIManager.put("RadioButtonMenuItem.selectionBackground", currentTheme.primaryContainer)
+        UIManager.put("RadioButtonMenuItem.selectionForeground", currentTheme.onPrimaryContainer)
         UIManager.put("control", currentTheme.surface)
 
         // Foregrounds
@@ -236,6 +274,26 @@ object ThemeManager {
         // Outlines and dividers
         UIManager.put("Component.borderColor", currentTheme.outline)
         UIManager.put("Separator.foreground", currentTheme.outline)
+
+        // Tree selection colors
+        val treeSelectionBg = java.awt.Color(
+            currentTheme.onSurface.red,
+            currentTheme.onSurface.green,
+            currentTheme.onSurface.blue,
+            0x20
+        )
+        val treeSelectionInactiveBg = java.awt.Color(
+            currentTheme.onSurface.red,
+            currentTheme.onSurface.green,
+            currentTheme.onSurface.blue,
+            0x14
+        )
+        UIManager.put("Tree.selectionBackground", treeSelectionBg)
+        UIManager.put("Tree.selectionInactiveBackground", treeSelectionInactiveBg)
+        UIManager.put("Tree.textBackground", currentTheme.surface)
+        UIManager.put("Tree.selectionForeground", currentTheme.onSurface)
+        UIManager.put("Tree.selectionInactiveForeground", currentTheme.onSurface)
+        UIManager.put("Tree.textForeground", currentTheme.onSurface)
 
         // Rounding for Material feel (FlatLaf honors these keys)
         UIManager.put("Component.arc", 12)
@@ -269,7 +327,8 @@ object ThemeManager {
     val activityBarItemHoverBackground: Color get() = Color(0, 0, 0, 0x20) // very light overlay
 
     // Editor tabs
-    val editorTabSelectedUnderline: Color get() = currentTheme.primary
+    val editorTabSelectedUnderline: Color
+        get() = if (currentTheme is Theme.Dark) Color(0x5B, 0x5D, 0x62) else currentTheme.primary
     val editorTabSelectedForeground: Color get() = currentTheme.onSurface
     val editorTabForeground: Color get() = currentTheme.onSurfaceVariant
     val editorTabHoverBackground: Color get() = Color(0, 0, 0, 15)

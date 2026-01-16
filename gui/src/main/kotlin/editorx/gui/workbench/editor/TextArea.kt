@@ -1,9 +1,13 @@
 package editorx.gui.workbench.editor
 
 import editorx.gui.core.SyntaxHighlighterManager
+import editorx.gui.theme.Theme
+import editorx.gui.theme.ThemeManager
 import org.fife.ui.rsyntaxtextarea.RSyntaxTextArea
 import org.fife.ui.rsyntaxtextarea.SyntaxConstants
+import org.fife.ui.rsyntaxtextarea.Theme as RSyntaxTheme
 import org.slf4j.LoggerFactory
+import java.awt.Color
 import java.awt.Font
 import java.io.File
 
@@ -14,11 +18,46 @@ class TextArea : RSyntaxTextArea() {
 
     companion object {
         private val logger = LoggerFactory.getLogger(TextArea::class.java)
+        private const val DARK_THEME_RESOURCE = "org/fife/ui/rsyntaxtextarea/themes/dark.xml"
+        private const val LIGHT_THEME_RESOURCE = "org/fife/ui/rsyntaxtextarea/themes/default.xml"
+
+        private val darkSyntaxTheme: RSyntaxTheme? by lazy { loadSyntaxTheme(DARK_THEME_RESOURCE) }
+        private val lightSyntaxTheme: RSyntaxTheme? by lazy { loadSyntaxTheme(LIGHT_THEME_RESOURCE) }
+
+        private fun loadSyntaxTheme(resource: String): RSyntaxTheme? {
+            return runCatching {
+                TextArea::class.java.classLoader.getResourceAsStream(resource)?.use { RSyntaxTheme.load(it) }
+            }.onFailure {
+                logger.warn("加载语法高亮主题失败: {}", resource, it)
+            }.getOrNull()
+        }
+
+        private fun withAlpha(color: Color, alpha: Int): Color {
+            val a = alpha.coerceIn(0, 255)
+            return Color(color.red, color.green, color.blue, a)
+        }
     }
 
     init {
         // 设置默认字体
         font = Font("Consolas", Font.PLAIN, 14)
+        applyEditorTheme(ThemeManager.currentTheme)
+    }
+
+    fun applyEditorTheme(theme: Theme = ThemeManager.currentTheme) {
+        val syntaxTheme = if (theme is Theme.Dark) darkSyntaxTheme else lightSyntaxTheme
+        if (syntaxTheme != null) {
+            syntaxTheme.apply(this)
+        }
+
+        background = theme.editorBackground
+        foreground = theme.onSurface
+        caretColor = theme.onSurface
+        selectionColor = theme.primaryContainer
+        selectedTextColor = theme.onPrimaryContainer
+        setHighlightCurrentLine(true)
+        setFadeCurrentLineHighlight(false)
+        setCurrentLineHighlightColor(withAlpha(theme.surfaceVariant, 0x33))
     }
 
     /**
