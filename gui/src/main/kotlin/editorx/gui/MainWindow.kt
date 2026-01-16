@@ -4,10 +4,12 @@ import editorx.core.gui.GuiContext
 import editorx.core.util.SystemUtils
 import editorx.gui.widget.NoLineSplitPaneUI
 import editorx.gui.workbench.activitybar.ActivityBar
+import editorx.gui.workbench.agent.AgentPanel
 import editorx.gui.workbench.editor.Editor
 import editorx.gui.workbench.explorer.Explorer
 import editorx.gui.workbench.menubar.MenuBar
 import editorx.gui.workbench.navigationbar.NavigationBar
+import editorx.gui.workbench.sidebar.RightSideBar
 import editorx.gui.workbench.sidebar.SideBar
 import editorx.gui.workbench.statusbar.StatusBar
 import editorx.gui.workbench.titlebar.TitleBar
@@ -29,27 +31,37 @@ class MainWindow(val guiContext: GuiContext) : JFrame() {
     val toolBar by lazy { ToolBar(this) }
     val activityBar by lazy { ActivityBar(this) }
     val sideBar by lazy { SideBar(this) }
+    val rightSideBar by lazy { RightSideBar(this) }
     val editor by lazy { Editor(this) }
     val statusBar by lazy { StatusBar(this) }
     val navigationBar by lazy { NavigationBar(this) }
 
-    // SideBar 和 Editor 的水平分割（ActivityBar 独立在外层）
-    private val horizontalSplit by lazy {
-        JSplitPane(JSplitPane.HORIZONTAL_SPLIT, sideBar, editor).apply {
+    // Editor 与右侧 SideBar 的水平分割
+    private val rightSplit by lazy {
+        JSplitPane(JSplitPane.HORIZONTAL_SPLIT, editor, rightSideBar).apply {
+            dividerLocation = Int.MAX_VALUE  // 初始时右侧 SideBar 隐藏
+            isOneTouchExpandable = false
+            dividerSize = 0  // 初始时右侧 SideBar 关闭，隐藏拖拽条
+        }
+    }
+
+    // SideBar 与 Editor+右侧 SideBar 的水平分割（ActivityBar 独立在外层）
+    private val leftSplit by lazy {
+        JSplitPane(JSplitPane.HORIZONTAL_SPLIT, sideBar, rightSplit).apply {
             dividerLocation = 0  // 初始时 SideBar 隐藏
             isOneTouchExpandable = false
             dividerSize = 0  // 初始时 SideBar 关闭，隐藏拖拽条
         }
     }
 
-    // 主容器：ActivityBar（固定） + horizontalSplit（SideBar + Editor）
+    // 主容器：ActivityBar（固定） + leftSplit（SideBar + Editor + 右侧 SideBar）
     private val mainContentContainer by lazy {
         JPanel(BorderLayout()).apply {
             isOpaque = false
             // ActivityBar 固定在左侧，宽度固定为 38，不受 SideBar 拖动影响
             add(activityBar, BorderLayout.WEST)
-            // horizontalSplit 在右侧，包含 SideBar 和 Editor
-            add(horizontalSplit, BorderLayout.CENTER)
+            // leftSplit 在右侧，包含 SideBar 与 Editor+右侧 SideBar
+            add(leftSplit, BorderLayout.CENTER)
         }
     }
 
@@ -101,26 +113,36 @@ class MainWindow(val guiContext: GuiContext) : JFrame() {
         add(centerContainer, BorderLayout.CENTER)
         add(statusBar, BorderLayout.SOUTH)
 
-        horizontalSplit.setUI(NoLineSplitPaneUI())
-        horizontalSplit.border = javax.swing.BorderFactory.createEmptyBorder()
+        leftSplit.setUI(NoLineSplitPaneUI())
+        leftSplit.border = javax.swing.BorderFactory.createEmptyBorder()
+        rightSplit.setUI(NoLineSplitPaneUI())
+        rightSplit.border = javax.swing.BorderFactory.createEmptyBorder()
         // 启用连续布局，减少布局跳动
-        horizontalSplit.isContinuousLayout = true
+        leftSplit.isContinuousLayout = true
+        rightSplit.isContinuousLayout = true
 
-        // 当用户手动拖动分割条时，同步 SideBar 状态
-        horizontalSplit.addPropertyChangeListener(JSplitPane.DIVIDER_LOCATION_PROPERTY) { _ ->
-            val sidebarVisible = horizontalSplit.dividerLocation > 0
-            // 同步SideBar内部状态与分割条位置
-            syncVisibilityWithDivider()
+        rightSideBar.registerView("agent", AgentPanel(this))
 
-            // 同步更新ToolBar中的侧边栏toggle按钮
+        // 当用户手动拖动分割条时，同步左侧 SideBar 状态
+        leftSplit.addPropertyChangeListener(JSplitPane.DIVIDER_LOCATION_PROPERTY) { _ ->
+            val sidebarVisible = leftSplit.dividerLocation > 0
+            syncLeftVisibilityWithDivider()
             titleBar.updateSideBarIcon(sidebarVisible)
+        }
+
+        // 当用户手动拖动分割条时，同步右侧 SideBar 状态
+        rightSplit.addPropertyChangeListener(JSplitPane.DIVIDER_LOCATION_PROPERTY) { _ ->
+            val sidebarVisible = rightSplit.dividerLocation < rightSplit.maximumDividerLocation
+            syncRightVisibilityWithDivider()
+            titleBar.updateAgentPanelIcon(sidebarVisible)
         }
 
         // 初始化时同步 ActivityBar 的状态（确保高亮状态与实际显示状态一致）
         // 由于 SideBar 初始是隐藏的，所以不应该有任何按钮高亮
-        syncVisibilityWithDivider()
+        syncLeftVisibilityWithDivider()
+        syncRightVisibilityWithDivider()
 
-        // 添加自定义拖拽功能：在 SideBar 右边缘和 Editor 左边缘检测拖拽
+        // 添加自定义拖拽功能：在 SideBar 右边缘和右侧 SideBar 左边缘检测拖拽
         addDragListeners()
     }
 
@@ -128,13 +150,13 @@ class MainWindow(val guiContext: GuiContext) : JFrame() {
      * 同步 SideBar 内部状态与分割条位置
      * 当用户手动拖拽分割条时调用此方法来同步内部状态
      */
-    private fun syncVisibilityWithDivider() {
-        val dividerLocation = horizontalSplit.dividerLocation
+    private fun syncLeftVisibilityWithDivider() {
+        val dividerLocation = leftSplit.dividerLocation
         // SideBar 可见的条件是 dividerLocation > 0
         val shouldBeVisible = dividerLocation > 0
 
-        if (shouldBeVisible != sideBar.isVisible) {
-            sideBar.isVisible = shouldBeVisible
+        if (shouldBeVisible != sideBar.isSideBarVisible()) {
+            sideBar.syncVisibilityFromDivider(shouldBeVisible)
             // 同步 ActivityBar 的状态
             if (shouldBeVisible) {
                 // 如果 SideBar 变为可见，同步 ActivityBar 的高亮状态
@@ -161,9 +183,22 @@ class MainWindow(val guiContext: GuiContext) : JFrame() {
         }
     }
 
-    private var isDragging = false
-    private var dragStartX = 0
-    private var dragStartLocation = 0
+    /**
+     * 同步右侧 SideBar 的显示状态
+     */
+    private fun syncRightVisibilityWithDivider() {
+        val shouldBeVisible = rightSplit.dividerLocation < rightSplit.maximumDividerLocation
+        if (shouldBeVisible != rightSideBar.isSideBarVisible()) {
+            rightSideBar.syncVisibilityFromDivider(shouldBeVisible)
+        }
+    }
+
+    private var isLeftDragging = false
+    private var leftDragStartX = 0
+    private var leftDragStartLocation = 0
+    private var isRightDragging = false
+    private var rightDragStartX = 0
+    private var rightDragStartLocation = 0
 
     private fun addDragListeners() {
         // 在 SideBar 右边缘添加鼠标监听器
@@ -172,17 +207,17 @@ class MainWindow(val guiContext: GuiContext) : JFrame() {
                 val rightEdge = sideBar.width
                 val mouseX = e.x
                 // 检测是否在右边缘 5 像素范围内
-                if (mouseX >= rightEdge - 5 && mouseX <= rightEdge && horizontalSplit.dividerLocation > 0) {
-                    isDragging = true
-                    dragStartX = e.xOnScreen
-                    dragStartLocation = horizontalSplit.dividerLocation
+                if (mouseX >= rightEdge - 5 && mouseX <= rightEdge && leftSplit.dividerLocation > 0) {
+                    isLeftDragging = true
+                    leftDragStartX = e.xOnScreen
+                    leftDragStartLocation = leftSplit.dividerLocation
                     sideBar.cursor = java.awt.Cursor(java.awt.Cursor.E_RESIZE_CURSOR)
                 }
             }
 
             override fun mouseReleased(e: java.awt.event.MouseEvent) {
-                if (isDragging) {
-                    isDragging = false
+                if (isLeftDragging) {
+                    isLeftDragging = false
                     sideBar.cursor = java.awt.Cursor(java.awt.Cursor.DEFAULT_CURSOR)
                 }
             }
@@ -190,21 +225,65 @@ class MainWindow(val guiContext: GuiContext) : JFrame() {
 
         sideBar.addMouseMotionListener(object : MouseMotionAdapter() {
             override fun mouseDragged(e: java.awt.event.MouseEvent) {
-                if (isDragging) {
-                    val deltaX = e.xOnScreen - dragStartX
-                    val newLocation = (dragStartLocation + deltaX).coerceAtLeast(0)
-                        .coerceAtMost(horizontalSplit.width)
-                    horizontalSplit.dividerLocation = newLocation
+                if (isLeftDragging) {
+                    val deltaX = e.xOnScreen - leftDragStartX
+                    val newLocation = (leftDragStartLocation + deltaX).coerceAtLeast(0)
+                        .coerceAtMost(leftSplit.width)
+                    leftSplit.dividerLocation = newLocation
                 }
             }
 
             override fun mouseMoved(e: java.awt.event.MouseEvent) {
                 val rightEdge = sideBar.width
                 val mouseX = e.x
-                if (mouseX >= rightEdge - 5 && mouseX <= rightEdge && horizontalSplit.dividerLocation > 0) {
+                if (mouseX >= rightEdge - 5 && mouseX <= rightEdge && leftSplit.dividerLocation > 0) {
                     sideBar.cursor = java.awt.Cursor(java.awt.Cursor.E_RESIZE_CURSOR)
                 } else {
                     sideBar.cursor = java.awt.Cursor(java.awt.Cursor.DEFAULT_CURSOR)
+                }
+            }
+        })
+
+        // 在右侧 SideBar 左边缘添加鼠标监听器
+        rightSideBar.addMouseListener(object : MouseAdapter() {
+            override fun mousePressed(e: java.awt.event.MouseEvent) {
+                val leftEdge = 0
+                val mouseX = e.x
+                if (mouseX >= leftEdge && mouseX <= leftEdge + 5 &&
+                    rightSplit.dividerLocation < rightSplit.maximumDividerLocation
+                ) {
+                    isRightDragging = true
+                    rightDragStartX = e.xOnScreen
+                    rightDragStartLocation = rightSplit.dividerLocation
+                    rightSideBar.cursor = java.awt.Cursor(java.awt.Cursor.W_RESIZE_CURSOR)
+                }
+            }
+
+            override fun mouseReleased(e: java.awt.event.MouseEvent) {
+                if (isRightDragging) {
+                    isRightDragging = false
+                    rightSideBar.cursor = java.awt.Cursor(java.awt.Cursor.DEFAULT_CURSOR)
+                }
+            }
+        })
+
+        rightSideBar.addMouseMotionListener(object : MouseMotionAdapter() {
+            override fun mouseDragged(e: java.awt.event.MouseEvent) {
+                if (isRightDragging) {
+                    val deltaX = e.xOnScreen - rightDragStartX
+                    val newLocation = (rightDragStartLocation + deltaX)
+                        .coerceAtLeast(0)
+                        .coerceAtMost(rightSplit.maximumDividerLocation)
+                    rightSplit.dividerLocation = newLocation
+                }
+            }
+
+            override fun mouseMoved(e: java.awt.event.MouseEvent) {
+                val mouseX = e.x
+                if (mouseX <= 5 && rightSplit.dividerLocation < rightSplit.maximumDividerLocation) {
+                    rightSideBar.cursor = java.awt.Cursor(java.awt.Cursor.W_RESIZE_CURSOR)
+                } else {
+                    rightSideBar.cursor = java.awt.Cursor(java.awt.Cursor.DEFAULT_CURSOR)
                 }
             }
         })

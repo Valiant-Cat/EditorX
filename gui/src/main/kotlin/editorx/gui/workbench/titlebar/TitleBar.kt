@@ -28,6 +28,7 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
     }
 
     private var toggleSideBarButton: JButton? = null
+    private var toggleAgentPanelButton: JButton? = null
     private var buildButton: JButton? = null
     private var searchButton: JButton? = null
     private var settingsButton: JButton? = null
@@ -98,6 +99,7 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
             getThemeColor = { theme.onSurface }
         )
         toggleSideBarButton?.icon = getSideBarIcon()
+        toggleAgentPanelButton?.icon = getAgentPanelIcon()
 
         revalidate()
         repaint()
@@ -213,6 +215,13 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
 
         add(Box.createHorizontalStrut(6))
 
+        toggleAgentPanelButton = JButton(getAgentPanelIcon()).compact(I18n.translate(I18nKeys.Toolbar.TOGGLE_AGENT_PANEL)) {
+            toggleAgentPanel()
+        }
+        add(toggleAgentPanelButton)
+
+        add(Box.createHorizontalStrut(6))
+
         // 全局搜索按钮（Command+K）
         val globalSearchShortcutText = if (SystemUtils.isMacOS()) "⌘K" else "Ctrl+K"
         searchButton = JButton(
@@ -248,10 +257,26 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
         toggleSideBarButton?.icon = getSideBarIcon()
     }
 
+    fun updateAgentPanelIcon(panelVisible: Boolean) {
+        toggleAgentPanelButton?.icon = getAgentPanelIcon()
+    }
+
     private fun getSideBarIcon(): Icon? {
         val isVisible = mainWindow.sideBar.isSideBarVisible()
         val iconName =
             if (isVisible) "icons/common/layout-sidebar-left.svg" else "icons/common/layout-sidebar-left-off.svg"
+        return IconLoader.getIcon(
+            IconRef(iconName),
+            ICON_SIZE,
+            adaptToTheme = true,
+            getThemeColor = { ThemeManager.currentTheme.onSurface }
+        )
+    }
+
+    private fun getAgentPanelIcon(): Icon? {
+        val isVisible = mainWindow.rightSideBar.isSideBarVisible()
+        val iconName =
+            if (isVisible) "icons/common/layout-sidebar-right.svg" else "icons/common/layout-sidebar-right-off.svg"
         return IconLoader.getIcon(
             IconRef(iconName),
             ICON_SIZE,
@@ -282,6 +307,23 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
             }
         }
         toggleSideBarButton?.icon = getSideBarIcon()
+    }
+
+    private fun toggleAgentPanel() {
+        val panel = mainWindow.rightSideBar
+        if (panel.isSideBarVisible()) {
+            panel.hideSideBar()
+        } else {
+            val targetId = panel.getCurrentViewId() ?: panel.getRegisteredViewIds().firstOrNull()
+            if (targetId != null) {
+                if (panel.hasView(targetId)) {
+                    panel.showView(targetId)
+                } else {
+                    panel.getRegisteredViewIds().firstOrNull()?.let { panel.showView(it) }
+                }
+            }
+        }
+        toggleAgentPanelButton?.icon = getAgentPanelIcon()
     }
 
     private fun showSettings() {

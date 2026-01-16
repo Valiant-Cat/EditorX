@@ -3,6 +3,7 @@ package editorx.plugins.smali
 import editorx.core.plugin.Plugin
 import editorx.core.plugin.PluginContext
 import editorx.core.plugin.PluginInfo
+import org.fife.ui.rsyntaxtextarea.folding.FoldParserManager
 
 class SmaliPlugin : Plugin {
     override fun getInfo() = PluginInfo(
@@ -20,6 +21,9 @@ class SmaliPlugin : Plugin {
 
         // 注册 Smali 语法高亮
         pluginContext.gui()?.registerSyntaxHighlighter(SmaliLanguage, SmaliHighlighter)
+
+        // 注册 Smali 折叠解析器
+        FoldParserManager.get().addFoldParserMapping(SmaliHighlighter.syntaxStyleKey, SmaliFoldParser())
     }
 
     override fun deactivate() {

@@ -169,6 +169,7 @@ private val dictionary = buildMap {
     put(I18nKeys.Toolbar.EDIT_APP_ICONS, "图标多尺寸")
     put(I18nKeys.Toolbar.BUILD, "构建")
     put(I18nKeys.Toolbar.TOGGLE_SIDEBAR, "切换侧边栏")
+    put(I18nKeys.Toolbar.TOGGLE_AGENT_PANEL, "切换 Agent 面板")
     put(I18nKeys.Toolbar.GLOBAL_SEARCH, "全局搜索")
     put(I18nKeys.Toolbar.SETTINGS, "打开设置")
     put(I18nKeys.Toolbar.DOUBLE_SHIFT, "双击Shift")

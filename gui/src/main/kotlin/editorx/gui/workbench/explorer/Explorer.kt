@@ -31,10 +31,19 @@ import javax.swing.tree.DefaultTreeModel
 import javax.swing.tree.TreePath
 
 class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
+    private data class DirRule(val pattern: String, val iconKey: String? = null)
+
     companion object {
         private const val TOP_BAR_ICON_SIZE = 16
         private const val SETTINGS_KEY_VIEW_MODE = "explorer.viewMode"
         private const val WORKSPACE_MARKER_FILE = ".editorx-aar"
+        private val KEY_DIR_RULES = listOf(
+            DirRule("res", iconKey = "resourcesRoot"),
+            DirRule("assets", iconKey = "resourcesRoot"),
+            DirRule("smali", iconKey = "sourceRoot"),
+            DirRule("smali_classes*", iconKey = "sourceRoot"),
+            DirRule("smali_*", iconKey = "sourceRoot"),
+        )
     }
 
     private enum class ExplorerViewMode(val nameKey: String) {
@@ -89,6 +98,8 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
     private var viewMode: ExplorerViewMode = loadSavedViewMode()
     private var lastKnownFile: File? = null
     private var hoverRow: Int = -1
+    private var lastLeftPressedPath: TreePath? = null
+    private var lastLeftPressedWasFile: Boolean = false
     private val i18nListener: () -> Unit = { SwingUtilities.invokeLater { updateI18n() } }
 
     // 任务取消机制
@@ -587,21 +598,25 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                         tree.selectionPath = path
                         // 然后显示菜单
                         showContextMenu(node, e.x, e.y)
+                    } else if (SwingUtilities.isLeftMouseButton(e)) {
+                        val path = tree.getPathForLocation(e.x, e.y)
+                        val node = path?.lastPathComponent as? FileNode
+                        lastLeftPressedPath = path
+                        lastLeftPressedWasFile = node?.file?.isFile == true
+                    } else {
+                        lastLeftPressedPath = null
+                        lastLeftPressedWasFile = false
                     }
                 }
 
                 override fun mouseClicked(e: MouseEvent) {
-                    val row = tree.getClosestRowForLocation(e.x, e.y)
-                    if (row == -1) return
-                    val bounds = tree.getRowBounds(row) ?: return
-                    // 仅当点击发生在该行的垂直范围内才认为命中（横向不做限制，实现整行可点击）
-                    if (e.y < bounds.y || e.y >= bounds.y + bounds.height) return
-                    val path = tree.getPathForRow(row) ?: return
+                    val path = tree.getPathForLocation(e.x, e.y) ?: return
                     val node = path.lastPathComponent as? FileNode ?: return
 
                     if (SwingUtilities.isLeftMouseButton(e) && e.clickCount == 2) {
+                        val shouldOpen = lastLeftPressedWasFile && lastLeftPressedPath == path
                         // 文件：双击打开；目录：交给 JTree 自身处理展开/收起，避免重复切换
-                        if (node.file.isFile) openFile(node.file)
+                        if (shouldOpen && node.file.isFile) openFile(node.file)
                     }
                 }
 
@@ -671,6 +686,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
                 val newRoot = FileNode(
                     rootDir,
                     childFilter = { file -> !isWorkspaceMarker(file) },
+                    workspaceRoot = rootDir,
                 ).apply { loadChildrenIfNeeded(true) }
 
                 // 检查是否被取消
@@ -1331,6 +1347,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         representedFiles: List<File> = listOf(file),
         private val chainSeparator: String = "/",
         private val childFilter: ((File) -> Boolean)? = null,
+        private val workspaceRoot: File? = null,
     ) : DefaultMutableTreeNode(file) {
         private var loaded = false
         private val representedPaths = representedFiles.map { it.absolutePath }.toSet()
@@ -1346,22 +1363,35 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
             val children = file.visibleChildren(showHidden)
             children.forEach { child ->
                 if (child.isDirectory) {
-                    val compressed = compressDirectoryChain(child, showHidden)
-                    add(
-                        FileNode(
-                            compressed.finalDir,
-                            compressed.displayName,
-                            compressed.representedFiles,
-                            chainSeparator = chainSeparator,
-                            childFilter = childFilter,
+                    if (shouldSkipCompression(child)) {
+                        add(
+                            FileNode(
+                                child,
+                                chainSeparator = chainSeparator,
+                                childFilter = childFilter,
+                                workspaceRoot = workspaceRoot,
+                            )
                         )
-                    )
+                    } else {
+                        val compressed = compressDirectoryChain(child, showHidden)
+                        add(
+                            FileNode(
+                                compressed.finalDir,
+                                compressed.displayName,
+                                compressed.representedFiles,
+                                chainSeparator = chainSeparator,
+                                childFilter = childFilter,
+                                workspaceRoot = workspaceRoot,
+                            )
+                        )
+                    }
                 } else {
                     add(
                         FileNode(
                             child,
                             chainSeparator = chainSeparator,
                             childFilter = childFilter,
+                            workspaceRoot = workspaceRoot,
                         )
                     )
                 }
@@ -1374,6 +1404,27 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         }
 
         override fun toString(): String = displayName
+
+        private fun shouldSkipCompression(child: File): Boolean {
+            if (workspaceRoot == null) return false
+            if (file.absolutePath != workspaceRoot.absolutePath) return false
+            return findDirRule(child.name) != null
+        }
+
+        private fun findDirRule(name: String): DirRule? {
+            val normalized = name.lowercase()
+            return KEY_DIR_RULES.firstOrNull { rule ->
+                matchesRule(normalized, rule.pattern.lowercase())
+            }
+        }
+
+        private fun matchesRule(name: String, pattern: String): Boolean {
+            return if (pattern.endsWith("*")) {
+                name.startsWith(pattern.removeSuffix("*"))
+            } else {
+                name == pattern
+            }
+        }
 
         private fun File.visibleChildren(showHidden: Boolean): List<File> =
             listFiles()
@@ -1453,7 +1504,15 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
             }
             val theme = ThemeManager.currentTheme
             if (theme is editorx.gui.theme.Theme.Dark) {
-                foreground = theme.onSurface
+                if (file != null && file.isDirectory) {
+                    foreground = if (isKeyDirectory(file)) {
+                        java.awt.Color(0xFF, 0xFF, 0xFF)
+                    } else {
+                        java.awt.Color(0xDF, 0xE1, 0xE5)
+                    }
+                } else {
+                    foreground = theme.onSurface
+                }
                 isOpaque = false
             } else if (!sel) {
                 // 设置文本颜色为主题颜色（如果未选中）
@@ -1467,24 +1526,15 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
 
                 // 检查是否是根目录（assets、res、smali）
                 val workspaceRoot = mainWindow.guiContext.getWorkspace().getWorkspaceRoot()
-                if (workspaceRoot != null && file.parentFile?.absolutePath == workspaceRoot.absolutePath) {
-                    val dirName = file.name.lowercase()
-                    when {
-                        dirName == "assets" || dirName == "res" -> {
-                            // 使用 resourcesRoot 图标
-                            return fileIconCache.getOrPut("resourcesRoot") {
-                                val base: Icon =
-                                    ExplorerIcons.ResourcesRoot ?: ExplorerIcons.Folder ?: createDefaultIcon()
-                                IconUtils.resizeIcon(base, 16, 16)
-                            }
-                        }
-
-                        dirName == "smali" || dirName.startsWith("smali_") -> {
-                            // 使用 sourceRoot 图标（包括 smali、smali_classes2 等）
-                            return fileIconCache.getOrPut("sourceRoot") {
-                                val base: Icon = ExplorerIcons.SourceRoot ?: ExplorerIcons.Folder ?: createDefaultIcon()
-                                IconUtils.resizeIcon(base, 16, 16)
-                            }
+                if (workspaceRoot != null) {
+                    val isWorkspaceLevel =
+                        file.parentFile?.absolutePath == workspaceRoot.absolutePath ||
+                            file.absolutePath == workspaceRoot.absolutePath
+                    if (isWorkspaceLevel) {
+                        val dirName = file.name.lowercase()
+                        val rule = findDirRule(dirName)
+                        if (rule != null) {
+                            return getSpecialDirectoryIcon(rule.iconKey)
                         }
                     }
                 }
@@ -1508,6 +1558,42 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
             return fileIconCache.getOrPut(key) {
                 val base: Icon = ExplorerIcons.AnyType ?: createDefaultIcon()
                 IconUtils.resizeIcon(base, 16, 16)
+            }
+        }
+
+        private fun isKeyDirectory(dir: File): Boolean {
+            val workspaceRoot = mainWindow.guiContext.getWorkspace().getWorkspaceRoot() ?: return false
+            if (dir.parentFile?.absolutePath != workspaceRoot.absolutePath) return false
+            return findDirRule(dir.name) != null
+        }
+
+        private fun getSpecialDirectoryIcon(iconKey: String?): Icon? {
+            val key = iconKey?.lowercase()
+            return when (key) {
+                "resourcesroot" -> fileIconCache.getOrPut("resourcesRoot") {
+                    val base: Icon = ExplorerIcons.ResourcesRoot ?: ExplorerIcons.Folder ?: createDefaultIcon()
+                    IconUtils.resizeIcon(base, 16, 16)
+                }
+                "sourceroot" -> fileIconCache.getOrPut("sourceRoot") {
+                    val base: Icon = ExplorerIcons.SourceRoot ?: ExplorerIcons.Folder ?: createDefaultIcon()
+                    IconUtils.resizeIcon(base, 16, 16)
+                }
+                else -> null
+            }
+        }
+
+        private fun findDirRule(name: String): DirRule? {
+            val normalized = name.lowercase()
+            return KEY_DIR_RULES.firstOrNull { rule ->
+                matchesRule(normalized, rule.pattern.lowercase())
+            }
+        }
+
+        private fun matchesRule(name: String, pattern: String): Boolean {
+            return if (pattern.endsWith("*")) {
+                name.startsWith(pattern.removeSuffix("*"))
+            } else {
+                name == pattern
             }
         }
 

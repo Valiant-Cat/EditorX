@@ -8,7 +8,7 @@ object ExplorerIcons {
     val Folder: Icon? = load("icons/filetype/folder.svg")
     val AnyType: Icon? = load("icons/filetype/anyType.svg")
     val ResourcesRoot: Icon? = load("icons/filetype/resourcesRoot.svg")
-    val SourceRoot: Icon? = load("icons/filetype/sourceRoot.svg")
+    val SourceRoot: Icon? = load("icons/filetype/module.svg")
 
     private fun load(path: String): Icon? {
         return IconLoader.getIcon(IconRef(path, ExplorerIcons::class.java.classLoader))

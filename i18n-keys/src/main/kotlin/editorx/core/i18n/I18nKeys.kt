@@ -269,6 +269,7 @@ object I18nKeys {
         const val EDIT_APP_ICONS = "toolbar.editAppIcons"
         const val BUILD = "toolbar.build"
         const val TOGGLE_SIDEBAR = "toolbar.toggleSidebar"
+        const val TOGGLE_AGENT_PANEL = "toolbar.toggleAgentPanel"
         const val GLOBAL_SEARCH = "toolbar.globalSearch"
         const val SETTINGS = "toolbar.settings"
         const val DOUBLE_SHIFT = "toolbar.doubleShift"

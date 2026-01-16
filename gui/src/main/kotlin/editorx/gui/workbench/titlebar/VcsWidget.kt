@@ -282,7 +282,8 @@ class VcsWidget(
         }
 
         if (!isGitRepository(workspaceRoot)) {
-            promptCreateGitRepository(workspaceRoot, parent)
+            // 点击 VCS Widget 表示用户意向，直接提示创建仓库
+            promptCreateGitRepository(workspaceRoot, parent, allowSuppress = false)
             return
         }
 
@@ -399,9 +400,12 @@ class VcsWidget(
         return GitCommandResult(exitCode, outputBuffer.toString().trim())
     }
 
-    private fun promptCreateGitRepository(workspaceRoot: File, parent: Component) {
-        if (isCreateGitPromptSuppressed()) return
-        val options = arrayOf("创建", I18n.translate(I18nKeys.Action.CANCEL), "不再提示")
+    private fun promptCreateGitRepository(workspaceRoot: File, parent: Component, allowSuppress: Boolean = true) {
+        val options = if (allowSuppress) {
+            arrayOf("创建", I18n.translate(I18nKeys.Action.CANCEL), "不再提示")
+        } else {
+            arrayOf("创建", I18n.translate(I18nKeys.Action.CANCEL))
+        }
         val choice = JOptionPane.showOptionDialog(
             parent,
             "当前工作区不是 Git 仓库，是否创建一个新的 Git 仓库？",
@@ -414,7 +418,7 @@ class VcsWidget(
         )
         when (choice) {
             0 -> createGitRepository(workspaceRoot, parent)
-            2 -> suppressCreateGitPrompt()
+            2 -> if (allowSuppress) suppressCreateGitPrompt()
         }
     }
 

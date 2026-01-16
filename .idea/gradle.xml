@@ -26,7 +26,8 @@
             <option value="$PROJECT_DIR$/i18n-keys" />
             <option value="$PROJECT_DIR$/icons" />
             <option value="$PROJECT_DIR$/plugins" />
-            <option value="$PROJECT_DIR$/plugins/android" />
+            <option value="$PROJECT_DIR$/plugins/aar" />
+            <option value="$PROJECT_DIR$/plugins/apk" />
             <option value="$PROJECT_DIR$/plugins/git" />
             <option value="$PROJECT_DIR$/plugins/i18n-en" />
             <option value="$PROJECT_DIR$/plugins/i18n-zh" />
