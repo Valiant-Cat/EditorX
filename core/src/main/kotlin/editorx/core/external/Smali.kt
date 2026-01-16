@@ -137,6 +137,58 @@ object Smali {
         }
     }
 
+    /**
+     * 将一个 smali 目录编译成 DEX。
+     */
+    fun assembleDir(
+        smaliDir: File,
+        outputDexFile: File,
+        cancelSignal: (() -> Boolean)? = null
+    ): RunResult {
+        val smaliPath = locate() ?: return RunResult(Status.NOT_FOUND, -1, "smali not found")
+        if (!smaliDir.exists() || !smaliDir.isDirectory) {
+            return RunResult(Status.FAILED, -1, "smali dir not found: ${smaliDir.absolutePath}")
+        }
+
+        val command = if (smaliPath.endsWith(".jar")) {
+            val jarFile = File(smaliPath)
+            val jarDir = jarFile.parentFile
+            val libDir = File(jarDir, "lib")
+            val classpath = if (libDir.exists() && libDir.isDirectory) {
+                val libJars =
+                    libDir.listFiles { _, name -> name.endsWith(".jar") }?.map { it.absolutePath } ?: emptyList()
+                if (libJars.isNotEmpty()) {
+                    (listOf(smaliPath) + libJars).joinToString(File.pathSeparator)
+                } else {
+                    smaliPath
+                }
+            } else {
+                smaliPath
+            }
+
+            listOf(
+                javaBin(),
+                "-cp",
+                classpath,
+                "org.jf.smali.Main",
+                "assemble",
+                "-o",
+                outputDexFile.absolutePath,
+                smaliDir.absolutePath
+            )
+        } else {
+            listOf(
+                smaliPath,
+                "assemble",
+                "-o",
+                outputDexFile.absolutePath,
+                smaliDir.absolutePath
+            )
+        }
+
+        return run(command, smaliDir, cancelSignal)
+    }
+
     private fun javaBin(): String {
         val home = System.getProperty("java.home").orEmpty()
         if (home.isNotBlank()) {

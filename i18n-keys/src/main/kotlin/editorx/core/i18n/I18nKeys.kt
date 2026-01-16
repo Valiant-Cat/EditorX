@@ -218,6 +218,13 @@ object I18nKeys {
         const val RESTART_REQUIRED_MESSAGE = "dialog.restartRequiredMessage"
         const val RESTART = "dialog.restart"
         const val LATER = "dialog.later"
+        const val OPEN_AAR_FILE = "dialog.openAarFile"
+        const val DETECTED_AAR = "dialog.detectedAar"
+        const val AAR_DIR_EXISTS = "dialog.aarDirExists"
+        const val AAR_DIR_EXISTS_TITLE = "dialog.aarDirExistsTitle"
+        const val OPEN_EXISTING_PROJECT = "dialog.openExistingProject"
+        const val REEXTRACT = "dialog.reextract"
+        const val AAR_EXTRACT_FAILED = "dialog.aarExtractFailed"
     }
 
     /**
@@ -360,6 +367,12 @@ object I18nKeys {
         const val COMPILE_AND_SIGN_SUCCESS = "toolbarMessage.compileAndSignSuccess"
         const val APK_GENERATED = "toolbarMessage.apkGenerated"
         const val COMPILE_COMPLETE = "toolbarMessage.compileComplete"
+        const val EXTRACTING_AAR = "toolbarMessage.extractingAar"
+        const val DECOMPILING_AAR = "toolbarMessage.decompilingAar"
+        const val PACKING_AAR = "toolbarMessage.packingAar"
+        const val PACK_AAR_FAILED = "toolbarMessage.packAarFailed"
+        const val REBUILDING_AAR_CLASSES = "toolbarMessage.rebuildingAarClasses"
+        const val REBUILD_AAR_CLASSES_FAILED = "toolbarMessage.rebuildAarClassesFailed"
         const val SIGN_FAILED = "toolbarMessage.signFailed"
         const val SIGN_FAILED_DETAIL = "toolbarMessage.signFailedDetail"
         const val APKTOOL_NOT_FOUND = "toolbarMessage.apktoolNotFound"

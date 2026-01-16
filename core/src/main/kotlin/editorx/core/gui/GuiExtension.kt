@@ -131,6 +131,12 @@ interface GuiExtension {
     fun setToolBarItemEnabled(id: String, enabled: Boolean)
 
     /**
+     * 取消注册所有 ToolBar 按钮（按插件 ID）
+     * 插件应在需要隐藏入口或 deactivate 时调用此方法
+     */
+    fun unregisterAllToolBarItems()
+
+    /**
      * 注册文件类型
      */
     fun registerFileType(fileType: FileType)

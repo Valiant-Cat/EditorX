@@ -33,6 +33,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
     companion object {
         private const val TOP_BAR_ICON_SIZE = 16
         private const val SETTINGS_KEY_VIEW_MODE = "explorer.viewMode"
+        private const val WORKSPACE_MARKER_FILE = ".editorx-aar"
     }
 
     private enum class ExplorerViewMode(val nameKey: String) {
@@ -623,6 +624,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
 
                 val newRoot = FileNode(
                     rootDir,
+                    childFilter = { file -> !isWorkspaceMarker(file) },
                 ).apply { loadChildrenIfNeeded(true) }
 
                 // 检查是否被取消
@@ -681,6 +683,8 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         tree.selectionPath = tp
         tree.scrollPathToVisible(tp)
     }
+
+    private fun isWorkspaceMarker(file: File): Boolean = file.name == WORKSPACE_MARKER_FILE
 
     private fun expandTo(path: TreePath) {
         var p: TreePath? = path.parentPath

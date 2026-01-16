@@ -161,6 +161,10 @@ class GuiExtensionImpl(
         mainWindow?.toolBar?.setItemEnabled(id, enabled)
     }
 
+    override fun unregisterAllToolBarItems() {
+        mainWindow?.toolBar?.removeItems(pluginId)
+    }
+
     override fun registerFileType(fileType: FileType) {
         FileTypeManager.registerFileType(fileType, ownerId = pluginId)
     }
