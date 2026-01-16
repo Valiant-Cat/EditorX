@@ -25,14 +25,15 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
     private var activeId: String? = null
     private var autoSelected: Boolean = false
 
-    private val backgroundColor = ThemeManager.activityBarBackground
-    private val itemNormalBackgroundColor = backgroundColor
-    private val itemSelectedBackgroundColor = ThemeManager.activityBarItemSelectedBackground
-    private val hoverColor = ThemeManager.activityBarItemHoverBackground
+    private var backgroundColor = ThemeManager.currentTheme.sidebarBackground
+    private var itemNormalBackgroundColor = backgroundColor
+    private var itemSelectedBackgroundColor = ThemeManager.currentTheme.primary
+    private var hoverColor = ThemeManager.currentTheme.onSurface
 
     init {
         setupActivityBar()
         setupDefaultActivityBarItems()
+        ThemeManager.addThemeChangeListener { updateTheme() }
     }
 
     private fun setupActivityBar() {
@@ -40,13 +41,24 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
         preferredSize = Dimension(38, 0)
         minimumSize = Dimension(38, 38)  // 确保最小宽度和高度
         maximumSize = Dimension(38, Int.MAX_VALUE)
+        updateTheme()
+    }
+
+    private fun updateTheme() {
+        val theme = ThemeManager.currentTheme
+        backgroundColor = theme.sidebarBackground
+        itemNormalBackgroundColor = backgroundColor
+        itemSelectedBackgroundColor = Color(theme.primary.red, theme.primary.green, theme.primary.blue, 0x66)
+        hoverColor = Color(theme.onSurface.red, theme.onSurface.green, theme.onSurface.blue, 0x20)
         // 在靠近可拖拽区域一侧增加一条细分割线以增强层次
-        val separator = ThemeManager.separator
         border = BorderFactory.createCompoundBorder(
-            BorderFactory.createMatteBorder(0, 0, 0, 1, separator),
+            BorderFactory.createMatteBorder(0, 0, 0, 1, theme.statusBarSeparator),
             BorderFactory.createEmptyBorder(5, 5, 5, 5)
         )
         background = backgroundColor
+        updateAllButtonStates()
+        revalidate()
+        repaint()
     }
 
     fun addItem(ownerId: String, id: String, tooltip: String, iconRef: IconRef?, viewProvider: GuiViewProvider) {
@@ -85,7 +97,7 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
                     val oldAA = g2.getRenderingHint(RenderingHints.KEY_ANTIALIASING)
                     val oldPaint = g2.paint
                     g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-                    g2.color = Color(108, 112, 126)
+                    g2.color = ThemeManager.currentTheme.onSurfaceVariant
                     g2.fillRect(x + 2, y + 2, ICON_SIZE - 4, ICON_SIZE - 4)
                     g2.paint = oldPaint
                     g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, oldAA)
