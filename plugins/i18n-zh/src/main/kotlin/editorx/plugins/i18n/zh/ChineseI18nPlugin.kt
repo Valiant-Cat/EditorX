@@ -57,7 +57,7 @@ private val dictionary = buildMap {
     put(I18nKeys.Settings.APPEARANCE, "外观")
     put(I18nKeys.Settings.LANGUAGE, "语言")
     put(I18nKeys.Settings.THEME, "主题")
-    put(I18nKeys.Settings.APPEARANCE_TIP, "提示：语言和主题切换立即生效。")
+    put(I18nKeys.Settings.APPEARANCE_TIP, "提示：语言和主题切换需重启后生效。")
     put(I18nKeys.Settings.KEYMAP, "快捷键")
     put(I18nKeys.Settings.PLUGINS, "插件")
     put(I18nKeys.Settings.CACHE, "缓存")

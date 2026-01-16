@@ -66,7 +66,7 @@ import javax.swing.SwingUtilities
  *
  * 说明：
  * - 弹窗框架由 Swing 承载（JDialog + ComposeHostPanel），内容全部由 Compose Desktop 渲染
- * - 语言切换需要重启：仅写入设置，提示重启；不在运行时强制刷新全局语言
+ * - 语言与主题切换需要重启：仅写入设置，提示重启；不在运行时强制刷新
  */
 class SettingsDialog(
     owner: MainWindow,
@@ -177,19 +177,20 @@ class SettingsDialog(
 
         // 外观设置状态
         val savedLocale = remember { readLocaleFromSettings(settings) }
+        val savedTheme = remember { readThemeFromSettings(settings) }
         var pendingLocale by remember { mutableStateOf<Locale?>(null) }
+        var pendingTheme by remember { mutableStateOf<Theme?>(null) }
         val currentLocaleToShow = pendingLocale ?: savedLocale
         val hasPendingLocale = pendingLocale != null && pendingLocale != savedLocale
+        val currentThemeToShow = pendingTheme ?: savedTheme
+        val hasPendingTheme = pendingTheme != null && pendingTheme != savedTheme
 
-        fun applyTheme(target: Theme) {
-            if (ThemeManager.currentTheme == target) return
-            ThemeManager.currentTheme = target
-            settings.put(SettingsStoreKeys.THEME, ThemeManager.getThemeName(target))
-            settings.sync()
+        fun selectTheme(target: Theme) {
+            pendingTheme = target
         }
 
         fun resetToDefault() {
-            applyTheme(Theme.Light)
+            pendingTheme = Theme.Light
             val defaultLocale = Locale.SIMPLIFIED_CHINESE
             val available = I18n.getAvailableLocales()
             pendingLocale = if (available.contains(defaultLocale)) defaultLocale else available.firstOrNull()
@@ -202,12 +203,20 @@ class SettingsDialog(
                 runCatching { Locale.forLanguageTag(it) }.getOrNull()
             }
 
-            val needRestart = localeToSave != null && localeToSave != currentSavedLocale
-            if (localeToSave != null && needRestart) {
+            val localeChanged = localeToSave != null && localeToSave != currentSavedLocale
+            if (localeToSave != null && localeChanged) {
                 settings.put(SettingsStoreKeys.LOCALE, localeToSave.toLanguageTag())
                 settings.sync()
             }
 
+            val themeToSave = pendingTheme
+            val themeChanged = themeToSave != null && themeToSave != savedTheme
+            if (themeToSave != null && themeChanged) {
+                settings.put(SettingsStoreKeys.THEME, ThemeManager.getThemeName(themeToSave))
+                settings.sync()
+            }
+
+            val needRestart = localeChanged || themeChanged
             if (!needRestart) {
                 dispose()
                 return
@@ -252,7 +261,7 @@ class SettingsDialog(
                 Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
                     SettingsNav(
                         selectedSection = selectedSection,
-                        hasAppearanceChanges = hasPendingLocale,
+                        hasAppearanceChanges = hasPendingLocale || hasPendingTheme,
                         outline = outline,
                         surface = surface,
                         primary = primary,
@@ -280,10 +289,14 @@ class SettingsDialog(
                                     theme = theme,
                                     i18nVersion = i18nTick,
                                     localeToShow = currentLocaleToShow,
-                                    hasPendingLocale = hasPendingLocale,
+                                    themeToShow = currentThemeToShow,
+                                    hasPendingChanges = hasPendingLocale || hasPendingTheme,
                                     onSelectLocale = { pendingLocale = it },
-                                    onRevertLocale = { pendingLocale = null },
-                                    onSelectTheme = { applyTheme(it) }
+                                    onRevertChanges = {
+                                        pendingLocale = null
+                                        pendingTheme = null
+                                    },
+                                    onSelectTheme = { selectTheme(it) }
                                 )
 
                                 Section.KEYMAP -> KeymapSettingsPanel(theme = theme, i18nVersion = i18nTick)
@@ -358,5 +371,14 @@ class SettingsDialog(
         return savedLocaleTag.takeIf { it.isNotEmpty() }
             ?.let { runCatching { Locale.forLanguageTag(it) }.getOrNull() }
             ?: I18n.locale()
+    }
+
+    private fun readThemeFromSettings(settings: Store): Theme {
+        val savedThemeName = settings.get(SettingsStoreKeys.THEME, null)?.trim().orEmpty()
+        return if (savedThemeName.isNotEmpty()) {
+            ThemeManager.loadTheme(savedThemeName)
+        } else {
+            ThemeManager.currentTheme
+        }
     }
 }

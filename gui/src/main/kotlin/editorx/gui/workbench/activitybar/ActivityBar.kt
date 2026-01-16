@@ -48,8 +48,10 @@ class ActivityBar(private val mainWindow: MainWindow) : JPanel() {
         val theme = ThemeManager.currentTheme
         backgroundColor = theme.sidebarBackground
         itemNormalBackgroundColor = backgroundColor
-        itemSelectedBackgroundColor = Color(theme.primary.red, theme.primary.green, theme.primary.blue, 0x66)
-        hoverColor = Color(theme.onSurface.red, theme.onSurface.green, theme.onSurface.blue, 0x20)
+        // 选中态使用旧悬浮色
+        itemSelectedBackgroundColor = Color(theme.onSurface.red, theme.onSurface.green, theme.onSurface.blue, 0x20)
+        // 悬浮色更浅一些
+        hoverColor = Color(theme.onSurface.red, theme.onSurface.green, theme.onSurface.blue, 0x14)
         // 在靠近可拖拽区域一侧增加一条细分割线以增强层次
         border = BorderFactory.createCompoundBorder(
             BorderFactory.createMatteBorder(0, 0, 0, 1, theme.statusBarSeparator),

@@ -25,7 +25,6 @@ import editorx.core.i18n.I18n
 import editorx.core.i18n.I18nKeys
 import editorx.gui.compose.toComposeColor
 import editorx.gui.theme.Theme
-import editorx.gui.theme.ThemeManager
 import java.util.Locale
 
 @Composable
@@ -33,9 +32,10 @@ fun AppearanceSettingsPanel(
     theme: Theme,
     i18nVersion: Int,
     localeToShow: Locale,
-    hasPendingLocale: Boolean,
+    themeToShow: Theme,
+    hasPendingChanges: Boolean,
     onSelectLocale: (Locale) -> Unit,
-    onRevertLocale: () -> Unit,
+    onRevertChanges: () -> Unit,
     onSelectTheme: (Theme) -> Unit,
 ) {
     val availableLocales = remember(i18nVersion) { I18n.getAvailableLocales() }
@@ -52,8 +52,8 @@ fun AppearanceSettingsPanel(
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.weight(1f)
             )
-            if (hasPendingLocale) {
-                OutlinedButton(onClick = onRevertLocale) {
+            if (hasPendingChanges) {
+                OutlinedButton(onClick = onRevertChanges) {
                     Text(I18n.translate(I18nKeys.Action.REVERT_CHANGES))
                 }
             }
@@ -103,7 +103,7 @@ fun AppearanceSettingsPanel(
             titleColor = onSurface
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                val isLight = ThemeManager.currentTheme is Theme.Light
+                val isLight = themeToShow is Theme.Light
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -116,7 +116,7 @@ fun AppearanceSettingsPanel(
                     Text(I18n.translate(I18nKeys.Theme.LIGHT), color = onSurface, fontSize = 13.sp)
                 }
 
-                val isDark = ThemeManager.currentTheme is Theme.Dark
+                val isDark = themeToShow is Theme.Dark
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -142,4 +142,3 @@ private fun languageDisplayName(locale: Locale): String {
         translated
     }
 }
-

@@ -72,7 +72,7 @@ sealed class Theme(
         statusBarBackground = Color(0x14, 0x14, 0x14),  // #141414
         statusBarForeground = Color(0xC9, 0xD1, 0xD9),  // #c9d1d9
         statusBarSecondaryForeground = Color(0x8B, 0x94, 0x9F), // #8b949f
-        statusBarSeparator = Color(0x21, 0x27, 0x2E),   // #21272e
+        statusBarSeparator = Color(0x23, 0x23, 0x23),   // #232323
         statusBarHoverBackground = Color(0x21, 0x27, 0x2E, 0xEF),
         cardBackground = Color(0x2D, 0x2D, 0x2D),      // #2d2d2d
     )

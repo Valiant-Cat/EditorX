@@ -82,13 +82,17 @@ class AppearancePanel(private val settings: Store) : SettingsPanel() {
         val savedLocale = savedLocaleTag?.let { 
             runCatching { Locale.forLanguageTag(it) }.getOrNull() 
         } ?: I18n.locale()
+
+        val savedThemeName = settings.get(THEME_KEY, null)
+        val savedTheme = savedThemeName?.let { ThemeManager.loadTheme(it) } ?: ThemeManager.currentTheme
         
         // 保存原始值
         originalLocale = savedLocale
-        originalTheme = ThemeManager.currentTheme
+        originalTheme = savedTheme
         
         // 如果有待保存的语言，使用待保存的；否则使用保存的
         val displayLocale = getPendingChange<Locale>(PENDING_LOCALE) ?: savedLocale
+        val displayTheme = getPendingChange<Theme>(PENDING_THEME) ?: savedTheme
         
         // 更新语言选项按钮
         updateLanguageButtons(displayLocale)
@@ -98,8 +102,8 @@ class AppearancePanel(private val settings: Store) : SettingsPanel() {
         languagePanel.border = BorderFactory.createTitledBorder(I18n.translate(I18nKeys.Settings.LANGUAGE))
         themePanel.border = BorderFactory.createTitledBorder(I18n.translate(I18nKeys.Settings.THEME))
         
-        // 主题设置：直接使用当前主题（主题已立即生效，没有待保存的概念）
-        when (ThemeManager.currentTheme) {
+        // 主题设置：使用待保存主题或已保存主题
+        when (displayTheme) {
             is Theme.Light -> lightThemeButton.isSelected = true
             is Theme.Dark -> darkThemeButton.isSelected = true
         }
@@ -116,15 +120,16 @@ class AppearancePanel(private val settings: Store) : SettingsPanel() {
     
     /**
      * 检查是否有实际的待保存更改（与原始值比较）
-     * 注意：主题更改已立即生效，不参与此检查
+     * 注意：主题更改需要重启生效
      */
     override fun hasActualPendingChanges(): Boolean {
         val pendingLocale = getPendingChange<Locale>(PENDING_LOCALE)
+        val pendingTheme = getPendingChange<Theme>(PENDING_THEME)
         
-        // 主题更改已立即生效，不检查主题
         val localeChanged = pendingLocale != null && pendingLocale != originalLocale
+        val themeChanged = pendingTheme != null && pendingTheme != originalTheme
         
-        return localeChanged
+        return localeChanged || themeChanged
     }
 
     private fun updateLanguageButtons(currentLocale: Locale) {
@@ -190,19 +195,9 @@ class AppearancePanel(private val settings: Store) : SettingsPanel() {
             is Theme.Light -> lightThemeButton.isSelected = true
             is Theme.Dark -> darkThemeButton.isSelected = true
         }
-        
-        // 立即应用主题
-        if (ThemeManager.currentTheme != theme) {
-            ThemeManager.currentTheme = theme
-            settings.put(THEME_KEY, ThemeManager.getThemeName(theme))
-            settings.sync()
-        }
-        
-        // 主题已立即生效，更新原始主题值，不记录为待保存的更改
-        // 这样不会触发"还原更改"按钮
-        originalTheme = theme
-        // 清除可能存在的待保存主题更改
-        clearPendingChange(PENDING_THEME)
+
+        // 记录待保存的主题（重启后生效）
+        setPendingChange(PENDING_THEME, theme)
     }
     
     /**
@@ -224,9 +219,13 @@ class AppearancePanel(private val settings: Store) : SettingsPanel() {
                 needRestart = true
             }
         }
-        
-        // 主题已经在 changeTheme 中立即应用了，这里只需要清除待保存的更改
-        // 如果主题已经应用，ThemeManager.currentTheme == theme，不会重复应用
+
+        getPendingChange<Theme>(PENDING_THEME)?.let { theme ->
+            if (theme != originalTheme) {
+                settings.put(THEME_KEY, ThemeManager.getThemeName(theme))
+                needRestart = true
+            }
+        }
         
         // 清除所有待保存的更改
         clearPendingChanges()
@@ -237,11 +236,10 @@ class AppearancePanel(private val settings: Store) : SettingsPanel() {
 
     /**
      * 还原所有更改
-     * 注意：主题更改已立即生效，不需要还原
+     * 注意：主题更改需要重启生效
      */
     override fun revertChanges() {
-        // 主题更改已立即生效，不需要还原
-        // 只还原语言设置等其他待保存的更改
+        // 还原语言与主题的待保存更改
         super.revertChanges()
     }
     

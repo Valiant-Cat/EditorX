@@ -57,7 +57,7 @@ private val dictionary = buildMap {
     put(I18nKeys.Settings.APPEARANCE, "Appearance")
     put(I18nKeys.Settings.LANGUAGE, "Language")
     put(I18nKeys.Settings.THEME, "Theme")
-    put(I18nKeys.Settings.APPEARANCE_TIP, "Tip: language and theme changes apply immediately.")
+    put(I18nKeys.Settings.APPEARANCE_TIP, "Tip: language and theme changes take effect after restart.")
     put(I18nKeys.Settings.KEYMAP, "Keymap")
     put(I18nKeys.Settings.PLUGINS, "Plugins")
     put(I18nKeys.Settings.CACHE, "Cache")
