@@ -2521,7 +2521,7 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
             manifestViewTabs = JTabbedPane().apply {
                 tabPlacement = JTabbedPane.TOP
                 tabLayoutPolicy = JTabbedPane.SCROLL_TAB_LAYOUT
-                border = BorderFactory.createMatteBorder(1, 0, 0, 0, theme.outline)
+                border = BorderFactory.createMatteBorder(1, 0, 0, 0, theme.statusBarSeparator)
                 background = theme.surface
                 foreground = theme.onSurfaceVariant
                 preferredSize = Dimension(0, 36)
@@ -2555,8 +2555,8 @@ class Editor(private val mainWindow: MainWindow) : JPanel() {
                                 g2d.color = theme.surface
                                 g2d.fillRect(x, y, w, h)
 
-                                // 主题主色底部边框
-                                g2d.color = theme.primary
+                                // 选中指示器颜色
+                                g2d.color = ThemeManager.editorTabSelectedUnderline
                                 g2d.fillRect(x, y + h - 2, w, 2)
                             } else {
                                 // 未选中状态：使用主题背景色
