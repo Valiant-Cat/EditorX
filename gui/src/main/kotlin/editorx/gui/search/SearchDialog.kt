@@ -43,13 +43,11 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -92,7 +90,6 @@ import java.util.regex.Pattern
 import javax.swing.JDialog
 import javax.swing.SwingUtilities
 import javax.swing.SwingWorker
-import kotlinx.coroutines.launch
 
 /**
  * 全局搜索弹窗（Compose 版本）。
@@ -138,7 +135,6 @@ class SearchDialog(
     private var statusText by mutableStateOf("输入搜索内容并按 Enter 或点击搜索按钮")
 
     private val results = mutableStateListOf<SearchMatch>()
-    private val selectedIndex = mutableIntStateOf(-1)
 
     init {
         defaultCloseOperation = DISPOSE_ON_CLOSE
@@ -183,7 +179,6 @@ class SearchDialog(
         errorText = null
         stopSearch()
         results.clear()
-        selectedIndex.intValue = -1
 
         SearchHistory.record(query)
         currentQuery = query
@@ -209,9 +204,6 @@ class SearchDialog(
             onMatch = onMatch@{ match ->
                 if (token != searchToken) return@onMatch
                 results.add(match)
-                if (selectedIndex.intValue < 0) {
-                    selectedIndex.intValue = 0
-                }
             },
             onDone = onDone@{ summary ->
                 if (token != searchToken) return@onDone
@@ -273,31 +265,9 @@ class SearchDialog(
         val palette = remember(theme) { figmaSearchPalette(theme) }
         val focusRequester = remember { FocusRequester() }
         val listState = rememberLazyListState()
-        val coroutineScope = rememberCoroutineScope()
         val focusManager = LocalFocusManager.current
 
-        val hasResults by remember { derivedStateOf { results.isNotEmpty() } }
-
         var isQueryFocused by remember { mutableStateOf(false) }
-
-        fun navigateSelected() {
-            val idx = selectedIndex.intValue
-            if (idx in results.indices) {
-                navigateTo(results[idx])
-            }
-        }
-
-        fun selectIndex(idx: Int) {
-            if (results.isEmpty()) {
-                selectedIndex.intValue = -1
-                return
-            }
-            val newIndex = idx.coerceIn(0, results.lastIndex)
-            selectedIndex.intValue = newIndex
-            coroutineScope.launch {
-                runCatching { listState.animateScrollToItem(newIndex) }
-            }
-        }
 
         LaunchedEffect(focusRequestToken.intValue) {
             runCatching { focusRequester.requestFocus() }
@@ -318,34 +288,8 @@ class SearchDialog(
                         Key.Enter, Key.NumPadEnter -> {
                             if (isQueryFocused) {
                                 startSearch()
-                            } else {
-                                navigateSelected()
                             }
                             true
-                        }
-
-                        Key.DirectionDown -> {
-                            if (hasResults) {
-                                if (isQueryFocused) {
-                                    focusManager.clearFocus(force = true)
-                                    isQueryFocused = false
-                                }
-                                val next = (selectedIndex.intValue + 1).coerceAtMost(results.lastIndex)
-                                selectIndex(next)
-                                true
-                            } else false
-                        }
-
-                        Key.DirectionUp -> {
-                            if (hasResults) {
-                                if (isQueryFocused) {
-                                    focusManager.clearFocus(force = true)
-                                    isQueryFocused = false
-                                }
-                                val prev = (selectedIndex.intValue - 1).coerceAtLeast(0)
-                                selectIndex(prev)
-                                true
-                            } else false
                         }
 
                         else -> false
@@ -479,17 +423,12 @@ class SearchDialog(
                                 items = results,
                                 key = { _, match -> "${match.file.absolutePath}:${match.line}:${match.column}:${match.type}" }
                             ) { index, match ->
-                                val selected = index == selectedIndex.intValue
                                 SearchResultRow(
                                     match = match,
                                     relPath = relPath(match.file),
-                                    selected = selected,
                                     palette = palette,
                                     theme = theme,
-                                    onDoubleClick = {
-                                        selectedIndex.intValue = index
-                                        navigateTo(match)
-                                    }
+                                    onDoubleClick = { navigateTo(match) }
                                 )
                                 if (index < results.lastIndex) {
                                     Divider(color = palette.dividerColor)
@@ -723,7 +662,6 @@ class SearchDialog(
     private fun SearchResultRow(
         match: SearchMatch,
         relPath: String,
-        selected: Boolean,
         palette: FigmaSearchPalette,
         theme: Theme,
         onDoubleClick: () -> Unit,
@@ -733,11 +671,7 @@ class SearchDialog(
         val (badgeBg, badgeFg) = remember(match.type, palette.isDark) {
             figmaBadgePalette(match.type, palette.isDark)
         }
-        val background = when {
-            selected -> palette.selectedBackground
-            hovered -> palette.hoverBackground
-            else -> palette.cardBackground
-        }
+        val background = if (hovered) palette.hoverBackground else palette.cardBackground
         val titleColor = if (hovered) palette.linkHover else palette.textPrimary
         val primaryColor = theme.primary.toComposeColor()
         val highlightBg = remember(primaryColor, palette.isDark) {
