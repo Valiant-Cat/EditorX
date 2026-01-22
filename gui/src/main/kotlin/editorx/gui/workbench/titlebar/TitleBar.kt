@@ -30,6 +30,7 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
     private var toggleSideBarButton: JButton? = null
     private var toggleAgentPanelButton: JButton? = null
     private var buildButton: JButton? = null
+    private var buildGroup: JComponent? = null
     private var searchButton: JButton? = null
     private var settingsButton: JButton? = null
     private var compileTask: Thread? = null
@@ -47,6 +48,7 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
         isOpaque = true
         updateTheme()
         buildActions()
+        updateBuildActionVisibility()
 
         // 监听主题变更
         ThemeManager.addThemeChangeListener { updateTheme() }
@@ -113,6 +115,7 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
         vcsWidget.updateDisplay()
         // 同时更新标题（工作区可能已变化）
         updateTitle()
+        updateBuildActionVisibility()
     }
 
     /**
@@ -192,6 +195,10 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
     }
 
     private fun setupRightActions() {
+        buildGroup = Box.createHorizontalBox().apply {
+            isOpaque = false
+        }
+
         buildButton = JButton(
             IconLoader.getIcon(
                 IconRef("icons/common/build.svg"),
@@ -202,11 +209,14 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
         ).compact(I18n.translate(I18nKeys.Toolbar.BUILD)) {
             buildWorkspace()
         }
-        add(buildButton)
 
-        add(Box.createHorizontalStrut(12))
-        addSeparator()
-        add(Box.createHorizontalStrut(12))
+        buildGroup?.apply {
+            add(buildButton)
+            add(Box.createHorizontalStrut(12))
+            add(JToolBar.Separator())
+            add(Box.createHorizontalStrut(12))
+        }
+        add(buildGroup)
 
         toggleSideBarButton = JButton(getSideBarIcon()).compact(I18n.translate(I18nKeys.Toolbar.TOGGLE_SIDEBAR)) {
             toggleSideBar()
@@ -251,6 +261,15 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
         add(settingsButton)
 
         add(Box.createHorizontalStrut(12))
+    }
+
+    private fun updateBuildActionVisibility() {
+        val workspaceRoot = mainWindow.guiContext.getWorkspace().getWorkspaceRoot()
+        val hasBuildProvider = workspaceRoot != null &&
+            mainWindow.guiContext.getPluginManager().findBuildProvider(workspaceRoot) != null
+        buildGroup?.isVisible = hasBuildProvider
+        revalidate()
+        repaint()
     }
 
     fun updateSideBarIcon(sideBarVisible: Boolean) {

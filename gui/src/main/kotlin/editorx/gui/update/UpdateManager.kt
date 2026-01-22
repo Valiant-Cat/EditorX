@@ -397,11 +397,11 @@ object UpdateManager {
                         if (percent == null) {
                             val msg = "下载更新… ${formatBytes(done)}"
                             mainWindow.statusBar.updateProgressTask(handle, msg, indeterminate = true)
-                            dialog.update(msg, null)
+                            dialog.update(done, total)
                         } else {
                             val msg = "下载更新…"
                             mainWindow.statusBar.updateProgressTask(handle, percent, msg)
-                            dialog.update("$msg ${formatBytes(done)}", percent)
+                            dialog.update(done, total)
                         }
                     }
                 }

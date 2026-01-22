@@ -54,6 +54,7 @@ import javax.swing.SwingUtilities
 object UpdateDialog {
     fun confirmUpdate(mainWindow: MainWindow, info: UpdateManager.UpdateAvailable): Boolean {
         val notes = (info.releaseNotes ?: "").trim().ifEmpty { "暂无更新说明" }
+        val hasNotes = notes != "暂无更新说明" && notes.isNotBlank()
         var confirmed = false
 
         val dialog = JDialog(mainWindow, "检查更新", true).apply {
@@ -76,7 +77,8 @@ object UpdateDialog {
         }
 
         dialog.contentPane = host
-        dialog.size = Dimension(720, 560)
+        // 根据是否有更新说明调整弹窗高度
+        dialog.size = Dimension(720, if (hasNotes) 560 else 380)
         dialog.setLocationRelativeTo(mainWindow)
         dialog.isVisible = true
         return confirmed
@@ -159,7 +161,6 @@ object UpdateDialog {
     ) {
         val palette = remember(theme) {
             val accent = theme.primary.toComposeColor()
-            val accentSoft = theme.primaryContainer.toComposeColor()
             val isDark = theme is Theme.Dark
             val onAccent = if (isDark) theme.onPrimaryContainer.toComposeColor() else theme.onPrimary.toComposeColor()
             UpdatePalette(
@@ -168,13 +169,13 @@ object UpdateDialog {
                 onSurface = theme.onSurface.toComposeColor(),
                 onSurfaceMuted = theme.onSurfaceVariant.toComposeColor(),
                 accent = accent,
-                accentSoft = accentSoft,
+                accentSoft = theme.primaryContainer.toComposeColor(),
                 onAccent = onAccent,
-                headerGradient = if (isDark) listOf(accentSoft, accent) else listOf(accent, accent.copy(alpha = 0.86f)),
+                headerGradient = emptyList(), // 不再使用渐变
                 noteBg = theme.cardBackground.toComposeColor(),
-                noteBorder = theme.outline.toComposeColor().copy(alpha = 0.5f),
-                badgeBg = if (isDark) accent.copy(alpha = 0.18f) else Color.White.copy(alpha = 0.22f),
-                badgeText = onAccent,
+                noteBorder = theme.outline.toComposeColor().copy(alpha = 0.2f),
+                badgeBg = if (isDark) accent.copy(alpha = 0.12f) else accent.copy(alpha = 0.08f),
+                badgeText = accent,
             )
         }
 
@@ -183,199 +184,141 @@ object UpdateDialog {
                 .fillMaxSize()
                 .background(palette.surface)
         ) {
-            HeaderSection(info = info, palette = palette)
+            // 简化的顶部区域
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 32.dp, vertical = 32.dp)
+            ) {
+                // 标题行 - NEW标签在标题旁
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Start,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // NEW 标签
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(palette.badgeBg)
+                            .padding(horizontal = 6.dp, vertical = 3.dp)
+                    ) {
+                        Text(
+                            text = "NEW",
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = palette.badgeText,
+                            letterSpacing = 0.5.sp,
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "发现新版本",
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = palette.onSurface,
+                    )
+                }
+                
+                Spacer(modifier = Modifier.height(12.dp))
+                
+                // 版本信息
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "当前版本 ${info.currentVersion}",
+                        fontSize = 13.sp,
+                        color = palette.onSurfaceMuted,
+                    )
+                    Text(
+                        text = "→",
+                        fontSize = 13.sp,
+                        color = palette.onSurfaceMuted.copy(alpha = 0.4f),
+                    )
+                    Text(
+                        text = info.latestVersion,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = palette.accent,
+                    )
+                }
+            }
 
+            // 内容区域
+            val hasNotes = notes != "暂无更新说明" && notes.isNotBlank()
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 28.dp, vertical = 22.dp)
-            ) {
-                Text(
-                    text = info.releaseName?.trim().takeIf { !it.isNullOrBlank() } ?: "发现新版本",
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = palette.onSurface,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "更新完成后将自动重启以应用新版本。",
-                    fontSize = 13.sp,
-                    color = palette.onSurfaceMuted,
-                )
-
-                Spacer(modifier = Modifier.height(18.dp))
-
-                Text(
-                    text = "更新内容",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = palette.onSurface,
-                )
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                val scroll = rememberScrollState()
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(palette.noteBg)
-                        .border(1.dp, palette.noteBorder, RoundedCornerShape(14.dp))
-                        .padding(16.dp)
-                        .verticalScroll(scroll)
-                ) {
-                    Text(
-                        text = notes,
-                        fontSize = 13.sp,
-                        color = palette.onSurface,
-                        lineHeight = 19.sp,
+                    .padding(
+                        horizontal = 32.dp,
+                        vertical = if (hasNotes) 24.dp else 20.dp
                     )
+            ) {
+                if (hasNotes) {
+
+                    val scroll = rememberScrollState()
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(palette.noteBg)
+                            .border(1.dp, palette.noteBorder, RoundedCornerShape(8.dp))
+                            .padding(16.dp)
+                            .verticalScroll(scroll)
+                    ) {
+                        Text(
+                            text = notes,
+                            fontSize = 13.sp,
+                            color = palette.onSurface,
+                            lineHeight = 20.sp,
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+                } else {
+                    // 空状态 - 不显示大块空白区域，直接显示提示
+                    Spacer(modifier = Modifier.weight(1f))
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-                Divider(color = palette.outline.copy(alpha = 0.4f))
+                Spacer(modifier = Modifier.height(if (hasNotes) 24.dp else 20.dp))
 
+                // 按钮区域 - 更简洁的样式
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 14.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     OutlinedButton(
                         onClick = onCancel,
-                        border = BorderStroke(1.dp, palette.outline.copy(alpha = 0.7f))
+                        border = BorderStroke(0.5.dp, palette.outline.copy(alpha = 0.25f)),
+                        modifier = Modifier.padding(end = 10.dp)
                     ) {
-                        Text("取消", color = palette.onSurface)
+                        Text(
+                            "取消",
+                            fontSize = 13.sp,
+                            color = palette.onSurface,
+                        )
                     }
-                    Spacer(modifier = Modifier.width(12.dp))
                     Button(
                         onClick = onConfirm,
                         colors = ButtonDefaults.buttonColors(
                             backgroundColor = palette.accent,
-                            contentColor = theme.onPrimary.toComposeColor(),
-                        )
+                            contentColor = palette.onAccent,
+                        ),
                     ) {
-                        Text("更新并重启")
+                        Text(
+                            "更新并重启",
+                            fontSize = 13.sp,
+                        )
                     }
                 }
             }
         }
     }
 
-    @Composable
-    private fun HeaderSection(
-        info: UpdateManager.UpdateAvailable,
-        palette: UpdatePalette,
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(150.dp)
-                .background(Brush.linearGradient(palette.headerGradient))
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 28.dp, vertical = 22.dp),
-                verticalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color.White.copy(alpha = 0.16f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "↑",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = palette.onAccent,
-                        )
-                    }
-                    Column {
-                        Text(
-                            text = "检查到新版本",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = palette.onAccent,
-                        )
-                        Text(
-                            text = "更快、更稳、更轻量",
-                            fontSize = 12.sp,
-                            color = palette.onAccent.copy(alpha = 0.85f),
-                        )
-                    }
-                    Spacer(modifier = Modifier.weight(1f))
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(999.dp))
-                            .background(palette.badgeBg)
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
-                    ) {
-                        Text(
-                            text = "NEW",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = palette.badgeText,
-                        )
-                    }
-                }
-
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    VersionChip(label = "当前版本", value = info.currentVersion, palette = palette)
-                    VersionChip(
-                        label = "最新版本",
-                        value = info.latestVersion,
-                        palette = palette,
-                        highlight = true,
-                    )
-                }
-            }
-        }
-    }
-
-    @Composable
-    private fun VersionChip(
-        label: String,
-        value: String,
-        palette: UpdatePalette,
-        highlight: Boolean = false,
-    ) {
-        val bg = if (highlight) Color.White.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.12f)
-        val border = Color.White.copy(alpha = if (highlight) 0.5f else 0.3f)
-        Column(
-            modifier = Modifier
-                .clip(RoundedCornerShape(12.dp))
-                .background(bg)
-                .border(1.dp, border, RoundedCornerShape(12.dp))
-                .padding(horizontal = 12.dp, vertical = 8.dp)
-        ) {
-            Text(
-                text = label,
-                fontSize = 11.sp,
-                color = palette.onAccent.copy(alpha = 0.85f),
-            )
-            Text(
-                text = value,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = palette.onAccent,
-            )
-        }
-    }
 
     private data class DownloadPalette(
         val surface: Color,
@@ -392,8 +335,8 @@ object UpdateDialog {
 
     @Composable
     private fun DownloadingDialogScreen(
-        message: String,
-        percent: Int?,
+        downloadedBytes: Long?,
+        totalBytes: Long?,
         onCancel: () -> Unit,
     ) {
         var currentTheme by remember { mutableStateOf(ThemeManager.currentTheme) }
@@ -413,8 +356,8 @@ object UpdateDialog {
             Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colors.surface) {
                 DownloadingDialogContent(
                     theme = currentTheme,
-                    message = message,
-                    percent = percent,
+                    downloadedBytes = downloadedBytes,
+                    totalBytes = totalBytes,
                     onCancel = onCancel,
                 )
             }
@@ -424,13 +367,12 @@ object UpdateDialog {
     @Composable
     private fun DownloadingDialogContent(
         theme: Theme,
-        message: String,
-        percent: Int?,
+        downloadedBytes: Long?,
+        totalBytes: Long?,
         onCancel: () -> Unit,
     ) {
         val palette = remember(theme) {
             val accent = theme.primary.toComposeColor()
-            val accentSoft = theme.primaryContainer.toComposeColor()
             val isDark = theme is Theme.Dark
             val onAccent = if (isDark) theme.onPrimaryContainer.toComposeColor() else theme.onPrimary.toComposeColor()
             DownloadPalette(
@@ -439,168 +381,153 @@ object UpdateDialog {
                 onSurfaceMuted = theme.onSurfaceVariant.toComposeColor(),
                 outline = theme.outline.toComposeColor(),
                 accent = accent,
-                accentSoft = accentSoft,
+                accentSoft = theme.primaryContainer.toComposeColor(),
                 onAccent = onAccent,
-                headerGradient = if (isDark) listOf(accentSoft, accent) else listOf(accent, accent.copy(alpha = 0.86f)),
+                headerGradient = emptyList(), // 不再使用渐变
                 cardBg = theme.cardBackground.toComposeColor(),
-                cardBorder = theme.outline.toComposeColor().copy(alpha = 0.5f),
+                cardBorder = theme.outline.toComposeColor().copy(alpha = 0.2f),
             )
         }
 
-        val safePercent = percent?.coerceIn(0, 100)
-        val percentText = safePercent?.let { "$it%" } ?: "准备中…"
+        // 计算进度百分比
+        val progress = remember(downloadedBytes, totalBytes) {
+            if (downloadedBytes != null && totalBytes != null && totalBytes > 0) {
+                (downloadedBytes.toFloat() / totalBytes.toFloat()).coerceIn(0f, 1f)
+            } else null
+        }
+
+        // 格式化左侧文本：下载进度（百分比）
+        val leftText = remember(progress) {
+            val percentText = progress?.let { "${(it * 100).toInt()}%" } ?: ""
+            if (percentText.isNotEmpty()) {
+                "下载进度（$percentText）"
+            } else {
+                "下载进度"
+            }
+        }
+
+        // 格式化右侧文本：文件大小
+        val rightText = remember(downloadedBytes, totalBytes) {
+            when {
+                downloadedBytes != null && totalBytes != null -> {
+                    "${formatBytes(downloadedBytes)} / ${formatBytes(totalBytes)}"
+                }
+                downloadedBytes != null -> {
+                    formatBytes(downloadedBytes)
+                }
+                else -> "准备中…"
+            }
+        }
 
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .background(palette.surface)
         ) {
-            Box(
+            // 简化的顶部区域
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(120.dp)
-                    .background(Brush.linearGradient(palette.headerGradient))
+                    .padding(horizontal = 32.dp, vertical = 32.dp)
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(horizontal = 26.dp, vertical = 20.dp),
-                    verticalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .background(Color.White.copy(alpha = 0.16f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "⬇",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = palette.onAccent,
-                            )
-                        }
-                        Column {
-                            Text(
-                                text = "正在下载更新",
-                                fontSize = 17.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = palette.onAccent,
-                            )
-                            Text(
-                                text = "请保持网络连接",
-                                fontSize = 12.sp,
-                                color = palette.onAccent.copy(alpha = 0.85f),
-                            )
-                        }
-                        Spacer(modifier = Modifier.weight(1f))
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(999.dp))
-                                .background(Color.White.copy(alpha = 0.22f))
-                                .padding(horizontal = 10.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = percentText,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = palette.onAccent,
-                            )
-                        }
-                    }
-                }
+                Text(
+                    text = "正在下载更新",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Normal,
+                    color = palette.onSurface,
+                )
             }
 
+            // 内容区域
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 26.dp, vertical = 20.dp)
+                    .padding(horizontal = 32.dp, vertical = 24.dp)
             ) {
-                Text(
-                    text = "正在准备新版本",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = palette.onSurface,
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = message,
-                    fontSize = 13.sp,
-                    color = palette.onSurfaceMuted,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-
-                Spacer(modifier = Modifier.height(16.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
-                        .background(palette.cardBg)
-                        .border(1.dp, palette.cardBorder, RoundedCornerShape(14.dp))
-                        .padding(16.dp)
-                ) {
-                    Column {
+                // 进度条区域
+                Column {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Text(
-                            text = "下载进度",
+                            text = leftText,
                             fontSize = 13.sp,
-                            color = palette.onSurfaceMuted,
-                        )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        if (safePercent == null) {
-                            LinearProgressIndicator(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(6.dp),
-                                color = palette.accent,
-                                backgroundColor = palette.outline.copy(alpha = 0.3f),
-                            )
-                        } else {
-                            LinearProgressIndicator(
-                                progress = safePercent / 100f,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(6.dp),
-                                color = palette.accent,
-                                backgroundColor = palette.outline.copy(alpha = 0.3f),
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = percentText,
-                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
                             color = palette.onSurface,
+                        )
+                        Text(
+                            text = rightText,
+                            fontSize = 13.sp,
+                            color = palette.accent,
+                            fontWeight = FontWeight.Medium,
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    // 进度条
+                    if (progress == null) {
+                        LinearProgressIndicator(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(2.dp)),
+                            color = palette.accent,
+                            backgroundColor = palette.outline.copy(alpha = 0.2f),
+                        )
+                    } else {
+                        LinearProgressIndicator(
+                            progress = progress,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(2.dp)),
+                            color = palette.accent,
+                            backgroundColor = palette.outline.copy(alpha = 0.2f),
                         )
                     }
                 }
 
                 Spacer(modifier = Modifier.weight(1f))
-                Divider(color = palette.outline.copy(alpha = 0.35f))
+
+                // 按钮区域
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 12.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     OutlinedButton(
                         onClick = onCancel,
-                        border = BorderStroke(1.dp, palette.outline.copy(alpha = 0.7f))
+                        border = BorderStroke(0.5.dp, palette.outline.copy(alpha = 0.25f)),
                     ) {
-                        Text("取消下载", color = palette.onSurface)
+                        Text(
+                            "取消下载",
+                            fontSize = 13.sp,
+                            color = palette.onSurface,
+                        )
                     }
                 }
             }
         }
     }
 
+    private fun formatBytes(bytes: Long): String {
+        val kb = bytes / 1024.0
+        val mb = kb / 1024.0
+        val gb = mb / 1024.0
+        return when {
+            gb >= 1 -> String.format("%.2f GB", gb)
+            mb >= 1 -> String.format("%.2f MB", mb)
+            kb >= 1 -> String.format("%.2f KB", kb)
+            else -> "$bytes B"
+        }
+    }
+
     class DownloadingDialog(owner: MainWindow, title: String) {
-        private val messageState = mutableStateOf("准备下载…")
-        private val percentState = mutableStateOf<Int?>(null)
+        private val downloadedBytesState = mutableStateOf<Long?>(null)
+        private val totalBytesState = mutableStateOf<Long?>(null)
         private var onCancel: (() -> Unit)? = null
 
         private val dialog = JDialog(owner, title, false).apply {
@@ -613,8 +540,8 @@ object UpdateDialog {
             dialog.contentPane = ComposeHostPanel().apply {
                 setContent {
                     DownloadingDialogScreen(
-                        message = messageState.value,
-                        percent = percentState.value,
+                        downloadedBytes = downloadedBytesState.value,
+                        totalBytes = totalBytesState.value,
                         onCancel = { onCancel?.invoke() },
                     )
                 }
@@ -634,10 +561,10 @@ object UpdateDialog {
             dialog.dispose()
         }
 
-        fun update(message: String, percent: Int?) {
+        fun update(downloadedBytes: Long?, totalBytes: Long?) {
             SwingUtilities.invokeLater {
-                messageState.value = message
-                percentState.value = percent
+                downloadedBytesState.value = downloadedBytes
+                totalBytesState.value = totalBytes
             }
         }
     }
