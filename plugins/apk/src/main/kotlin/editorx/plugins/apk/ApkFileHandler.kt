@@ -146,8 +146,8 @@ class ApkFileHandler(private val gui: GuiExtension) : FileHandler {
                             gui.hideProgress()
                             JOptionPane.showMessageDialog(
                                 null,
-                                "未找到apktool，请确保apktool已安装并在PATH中",
-                                "错误",
+                                I18n.translate(I18nKeys.ToolbarMessage.APKTOOL_NOT_FOUND_DETAIL),
+                                I18n.translate(I18nKeys.ToolbarMessage.APKTOOL_NOT_FOUND),
                                 JOptionPane.ERROR_MESSAGE
                             )
                         }

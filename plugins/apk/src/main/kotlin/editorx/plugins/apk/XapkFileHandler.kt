@@ -135,7 +135,20 @@ class XapkFileHandler(private val gui: GuiExtension) : FileHandler {
             val projectDir = File(apkFile.parentFile, apkFile.nameWithoutExtension)
             File(projectDir, "apktool.yml").isFile
         }
+        // 只有在没有反编译项目时才尝试反编译，避免打开已存在的项目时不必要的检查
         if (!hasProject) {
+            // 先检查apktool是否可用，避免显示进度后才发现没有apktool
+            if (!ApkTool.isAvailable()) {
+                SwingUtilities.invokeLater {
+                    JOptionPane.showMessageDialog(
+                        null,
+                        I18n.translate(I18nKeys.ToolbarMessage.APKTOOL_NOT_FOUND_DETAIL),
+                        I18n.translate(I18nKeys.ToolbarMessage.APKTOOL_NOT_FOUND),
+                        JOptionPane.ERROR_MESSAGE
+                    )
+                }
+                return
+            }
             SwingUtilities.invokeLater {
                 gui.showProgress(I18n.translate(I18nKeys.ToolbarMessage.DECOMPILING_XAPK), indeterminate = true)
             }

@@ -83,6 +83,39 @@ object AppPaths {
         if (path.toFile().isDirectory) return null
 
         val parent = path.parent ?: return null
+        
+        // 开发模式：如果路径包含 build/libs 或 build/classes，说明是开发模式，应该回退到项目根目录
+        val pathStr = path.toString()
+        if (pathStr.contains("/build/libs/") || pathStr.contains("\\build\\libs\\") ||
+            pathStr.contains("/build/classes/") || pathStr.contains("\\build\\classes\\")) {
+            // 开发模式：从 build 目录向上找到项目根目录
+            var current = parent
+            while (current != null) {
+                val fileName = current.fileName?.toString()
+                if (fileName == "build" || fileName == "libs" || fileName == "classes") {
+                    // 继续向上查找
+                    current = current.parent
+                    continue
+                }
+                // 找到可能的项目根目录，验证是否包含 tools/ 或 plugins/ 目录
+                val toolsDir = current.resolve("tools")
+                val pluginsDir = current.resolve("plugins")
+                if (toolsDir.toFile().exists() || pluginsDir.toFile().exists()) {
+                    logger.debug("开发模式：从 build 推导项目根目录: {}", current)
+                    return current
+                }
+                // 如果当前目录名是模块名（如 core, gui），继续向上查找
+                if (fileName == "core" || fileName == "gui" || fileName == "plugins") {
+                    current = current.parent
+                    continue
+                }
+                // 如果找不到项目根目录，回退到 user.dir
+                break
+            }
+            // 如果找不到项目根目录，回退到 user.dir
+            return null
+        }
+        
         return if (parent.fileName?.toString() == "lib") {
             // installDist: <appHome>/lib/core.jar -> <appHome>
             parent.parent

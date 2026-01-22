@@ -22,3 +22,12 @@ dependencies {
 
     testImplementation(kotlin("test"))
 }
+
+tasks.register<JavaExec>("verifyApktool") {
+    group = "verification"
+    description = "验证 apktool 检测逻辑"
+    classpath = sourceSets["test"].runtimeClasspath
+    mainClass.set("editorx.core.VerifyApktoolKt")
+    // 确保从项目根目录运行
+    workingDir = rootProject.projectDir
+}

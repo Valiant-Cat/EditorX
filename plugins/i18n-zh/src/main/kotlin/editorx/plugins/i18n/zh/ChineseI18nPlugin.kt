@@ -244,7 +244,7 @@ private val dictionary = buildMap {
     put(I18nKeys.ToolbarMessage.SIGN_FAILED, "签名失败: %s")
     put(I18nKeys.ToolbarMessage.SIGN_FAILED_DETAIL, "APK 编译成功，但签名失败:\n%s")
     put(I18nKeys.ToolbarMessage.APKTOOL_NOT_FOUND, "未找到 apktool")
-    put(I18nKeys.ToolbarMessage.APKTOOL_NOT_FOUND_DETAIL, "未找到 apktool，可执行文件需放在 toolchain/apktool 或 tools/apktool，或加入 PATH")
+    put(I18nKeys.ToolbarMessage.APKTOOL_NOT_FOUND_DETAIL, "未找到 apktool\n\n请选择以下方式之一安装：\n1. 下载 apktool.jar 放到应用目录的 tools/ 文件夹\n2. 将 apktool 可执行文件放到 toolchain/apktool\n3. 将 apktool 添加到系统 PATH\n\n下载地址：https://ibotpeaches.github.io/Apktool/")
     put(I18nKeys.ToolbarMessage.COMPILE_CANCELLED, "APK 编译被取消")
     put(I18nKeys.ToolbarMessage.COMPILE_FAILED, "APK 编译失败 (exit=%d)")
     put(I18nKeys.ToolbarMessage.COMPILE_FAILED_DETAIL, "apktool 编译失败 (exit=%d)\n%s")
