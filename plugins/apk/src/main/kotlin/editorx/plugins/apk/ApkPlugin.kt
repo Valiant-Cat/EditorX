@@ -30,14 +30,17 @@ class ApkPlugin : Plugin {
     private var lastWorkspaceState: Boolean = false
     private var toolbarRegistered: Boolean = false
     private var pluginContext: PluginContext? = null
-    private var buildProvider: ApkBuildService? = null
+    private val buildProviders = mutableListOf<BuildService>()
 
     override fun activate(pluginContext: PluginContext) {
         this.pluginContext = pluginContext
 
         // 创建并注册 BuildProvider 服务
-        buildProvider = ApkBuildService()
-        pluginContext.registerService(BuildService::class.java, buildProvider!!)
+        buildProviders.clear()
+        buildProviders += ApkBuildService()
+        buildProviders += XapkBuildService()
+        buildProviders += AabBuildService()
+        buildProviders.forEach { pluginContext.registerService(BuildService::class.java, it) }
 
         val gui = pluginContext.gui() ?: return
 
@@ -46,16 +49,18 @@ class ApkPlugin : Plugin {
         // 启动定时器，定期检查工作区状态
         startWorkspaceStateChecker(gui)
 
-        // 注册 APK 文件处理器
+        // 注册 APK/XAPK/AAB 文件处理器
         pluginContext.gui()?.registerFileHandler(ApkFileHandler(gui))
+        pluginContext.gui()?.registerFileHandler(XapkFileHandler(gui))
+        pluginContext.gui()?.registerFileHandler(AabFileHandler(gui))
     }
 
     override fun deactivate() {
         // 取消注册 BuildProvider 服务
-        buildProvider?.let { provider ->
+        buildProviders.forEach { provider ->
             pluginContext?.unregisterService(BuildService::class.java, provider)
         }
-        buildProvider = null
+        buildProviders.clear()
 
         // 取消注册文件处理器
         pluginContext?.gui()?.unregisterAllFileHandlers()

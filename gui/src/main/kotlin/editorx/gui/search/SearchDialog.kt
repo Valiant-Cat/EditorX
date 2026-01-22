@@ -1049,12 +1049,24 @@ class SearchDialog(
 
             if (isJavaFile || isSmaliFile) {
                 if (options.searchClass) {
-                    if (
-                        lineLower.contains("class $queryLower") ||
-                        lineLower.contains("interface $queryLower") ||
-                        lineLower.contains("enum $queryLower")
-                    ) {
-                        return "class"
+                    if (isSmaliFile) {
+                        val desc = extractSmaliClassDescriptor(lineLower)
+                        if (desc != null) {
+                            val normalizedQuery = normalizeSmaliQuery(queryLower)
+                            val simpleName = desc.substringAfterLast('/')
+                            if (normalizedQuery == desc || normalizedQuery == simpleName) {
+                                return "class"
+                            }
+                        }
+                    } else {
+                        val escapedQuery = Pattern.quote(queryLower)
+                        if (
+                            Pattern.compile("\\b(class|interface|enum|object|record)\\s+$escapedQuery\\b").matcher(lineLower).find() ||
+                            Pattern.compile("@interface\\s+$escapedQuery\\b").matcher(lineLower).find() ||
+                            Pattern.compile("\\bannotation\\s+class\\s+$escapedQuery\\b").matcher(lineLower).find()
+                        ) {
+                            return "class"
+                        }
                     }
                 }
                 if (options.searchMethod) {
@@ -1084,6 +1096,23 @@ class SearchDialog(
             }
 
             return null
+        }
+
+        private fun extractSmaliClassDescriptor(lineLower: String): String? {
+            if (!lineLower.startsWith(".class")) return null
+            val match = Pattern.compile("l[^;]+;").matcher(lineLower)
+            if (!match.find()) return null
+            val raw = match.group()
+            if (raw.length <= 2) return null
+            return raw.substring(1, raw.length - 1)
+        }
+
+        private fun normalizeSmaliQuery(queryLower: String): String {
+            var q = queryLower.trim()
+            if (q.startsWith("l") && q.endsWith(";") && q.length > 2) {
+                q = q.substring(1, q.length - 1)
+            }
+            return q.replace('.', '/')
         }
 
         private fun shouldSkip(path: Path): Boolean {

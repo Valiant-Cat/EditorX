@@ -36,7 +36,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
     companion object {
         private const val TOP_BAR_ICON_SIZE = 16
         private const val SETTINGS_KEY_VIEW_MODE = "explorer.viewMode"
-        private const val WORKSPACE_MARKER_FILE = ".editorx-aar"
+        private val WORKSPACE_MARKER_FILES = setOf(".editorx-aar", ".editorx-xapk", ".editorx-aab")
         private val KEY_DIR_RULES = listOf(
             DirRule("res", iconKey = "resourcesRoot"),
             DirRule("assets", iconKey = "resourcesRoot"),
@@ -746,7 +746,7 @@ class Explorer(private val mainWindow: MainWindow) : JPanel(BorderLayout()) {
         tree.scrollPathToVisible(tp)
     }
 
-    private fun isWorkspaceMarker(file: File): Boolean = file.name == WORKSPACE_MARKER_FILE
+    private fun isWorkspaceMarker(file: File): Boolean = file.name in WORKSPACE_MARKER_FILES
 
     private fun expandTo(path: TreePath) {
         var p: TreePath? = path.parentPath
