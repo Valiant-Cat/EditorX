@@ -6,7 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,7 +33,7 @@ import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.material.Colors
 import androidx.compose.material.Divider
 import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.LocalMinimumTouchTargetEnforcement
+import androidx.compose.material.LocalMinimumInteractiveComponentEnforcement
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
@@ -133,6 +132,7 @@ class SearchDialog(
     private var searchField by mutableStateOf(true)
     private var searchCode by mutableStateOf(true)
     private var searchResource by mutableStateOf(true)
+    private var searchFile by mutableStateOf(true)
 
     private var isSearching by mutableStateOf(false)
     private var statusText by mutableStateOf("输入搜索内容并按 Enter 或点击搜索按钮")
@@ -175,7 +175,7 @@ class SearchDialog(
             return
         }
 
-        if (!searchClass && !searchMethod && !searchField && !searchCode && !searchResource) {
+        if (!searchClass && !searchMethod && !searchField && !searchCode && !searchResource && !searchFile) {
             errorText = "请至少选择一个搜索类型"
             return
         }
@@ -196,6 +196,7 @@ class SearchDialog(
             searchField = searchField,
             searchCode = searchCode,
             searchResource = searchResource,
+            searchFile = searchFile,
         )
 
         val newWorker = SearchWorker(
@@ -361,9 +362,8 @@ class SearchDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 18.dp)
-                        .padding(bottom = 6.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     SearchInput(
@@ -373,12 +373,14 @@ class SearchDialog(
                         placeholder = "搜索类、方法、字段...",
                         focusRequester = focusRequester,
                         palette = palette,
+                        theme = theme,
                         onFocusChanged = { isFocused -> isQueryFocused = isFocused }
                     )
                     SearchButton(
                         enabled = !isSearching && queryText.trim().isNotEmpty(),
                         searching = isSearching,
                         palette = palette,
+                        theme = theme,
                         onClick = { startSearch() }
                     )
                 }
@@ -387,47 +389,59 @@ class SearchDialog(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp)
-                        .padding(bottom = 16.dp)
+                        .padding(horizontal = 20.dp)
+                        .padding(bottom = 12.dp)
                         .horizontalScroll(rememberScrollState()),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Text(
-                        text = "搜索范围：",
+                        text = "搜索范围",
                         color = palette.textSecondary,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Normal,
                     )
                     ScopeChip(
                         label = "类",
                         checked = searchClass,
                         palette = palette,
+                        theme = theme,
                         onCheckedChange = { searchClass = it }
                     )
                     ScopeChip(
                         label = "方法",
                         checked = searchMethod,
                         palette = palette,
+                        theme = theme,
                         onCheckedChange = { searchMethod = it }
                     )
                     ScopeChip(
                         label = "字段",
                         checked = searchField,
                         palette = palette,
+                        theme = theme,
                         onCheckedChange = { searchField = it }
                     )
                     ScopeChip(
                         label = "代码",
                         checked = searchCode,
                         palette = palette,
+                        theme = theme,
                         onCheckedChange = { searchCode = it }
                     )
                     ScopeChip(
                         label = "资源",
                         checked = searchResource,
                         palette = palette,
+                        theme = theme,
                         onCheckedChange = { searchResource = it }
+                    )
+                    ScopeChip(
+                        label = "文件",
+                        checked = searchFile,
+                        palette = palette,
+                        theme = theme,
+                        onCheckedChange = { searchFile = it }
                     )
                 }
 
@@ -436,11 +450,9 @@ class SearchDialog(
                         text = errorText.orEmpty(),
                         color = palette.errorText,
                         fontSize = 12.sp,
-                        modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
+                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 4.dp)
                     )
                 }
-
-                Divider(color = palette.borderColor)
             }
 
             // Results
@@ -450,7 +462,7 @@ class SearchDialog(
                     .fillMaxWidth()
             ) {
                 when {
-                    isSearching -> SearchingState(palette = palette, statusText = statusText)
+                    isSearching -> SearchingState(palette = palette, theme = theme, statusText = statusText)
                     currentQuery.isBlank() -> EmptyState(
                         palette = palette,
                         title = "输入关键词并点击搜索",
@@ -473,12 +485,11 @@ class SearchDialog(
                                     relPath = relPath(match.file),
                                     selected = selected,
                                     palette = palette,
-                                    onClick = {
+                                    theme = theme,
+                                    onDoubleClick = {
                                         selectedIndex.intValue = index
-                                        focusManager.clearFocus(force = true)
-                                        isQueryFocused = false
-                                    },
-                                    onDoubleClick = { navigateTo(match) }
+                                        navigateTo(match)
+                                    }
                                 )
                                 if (index < results.lastIndex) {
                                     Divider(color = palette.dividerColor)
@@ -496,7 +507,6 @@ class SearchDialog(
             }
 
             // Footer
-            Divider(color = palette.borderColor)
             FooterBar(
                 resultCount = results.size,
                 palette = palette,
@@ -512,31 +522,33 @@ class SearchDialog(
         placeholder: String,
         focusRequester: FocusRequester,
         palette: FigmaSearchPalette,
+        theme: Theme,
         onFocusChanged: (Boolean) -> Unit,
     ) {
         var focused by remember { mutableStateOf(false) }
+        val primaryColor = theme.primary.toComposeColor()
 
         Box(
             modifier = modifier
-                .height(44.dp)
+                .height(40.dp)
                 .background(
                     color = if (focused) palette.inputBackgroundFocused else palette.inputBackground,
                     shape = palette.inputShape
                 )
                 .border(
-                    width = 1.dp,
-                    color = if (focused) palette.focusColor else palette.inputBorder,
+                    width = if (focused) 1.5.dp else 1.dp,
+                    color = if (focused) primaryColor else palette.inputBorder,
                     shape = palette.inputShape
                 )
-                .padding(horizontal = 14.dp),
+                .padding(horizontal = 12.dp),
             contentAlignment = Alignment.CenterStart
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text("🔍", color = palette.placeholderText, fontSize = 16.sp)
-                Spacer(Modifier.width(10.dp))
+                Text("🔍", color = palette.placeholderText, fontSize = 15.sp)
+                Spacer(Modifier.width(8.dp))
                 BasicTextField(
                     value = value,
                     onValueChange = { onValueChange(it) },
@@ -544,9 +556,9 @@ class SearchDialog(
                     textStyle = TextStyle(
                         color = palette.textPrimary,
                         fontSize = 14.sp,
-                        lineHeight = 18.sp,
+                        lineHeight = 20.sp,
                     ),
-                    cursorBrush = SolidColor(palette.focusColor),
+                    cursorBrush = SolidColor(primaryColor),
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
@@ -565,7 +577,7 @@ class SearchDialog(
                                     text = placeholder,
                                     color = palette.placeholderText,
                                     fontSize = 14.sp,
-                                    lineHeight = 18.sp,
+                                    lineHeight = 20.sp,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier.fillMaxWidth()
@@ -584,30 +596,34 @@ class SearchDialog(
         enabled: Boolean,
         searching: Boolean,
         palette: FigmaSearchPalette,
+        theme: Theme,
         onClick: () -> Unit,
     ) {
+        val primaryColor = theme.primary.toComposeColor()
+        val onPrimaryColor = theme.onPrimary.toComposeColor()
+        
         Button(
             onClick = onClick,
             enabled = enabled,
             colors = ButtonDefaults.buttonColors(
-                backgroundColor = palette.primaryButtonBackground,
-                contentColor = Color.White,
+                backgroundColor = primaryColor,
+                contentColor = onPrimaryColor,
                 disabledBackgroundColor = palette.primaryButtonDisabledBackground,
-                disabledContentColor = Color.White,
+                disabledContentColor = palette.textMuted,
             ),
             shape = palette.inputShape,
-            modifier = Modifier.height(44.dp)
+            modifier = Modifier.height(40.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (searching) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(18.dp),
-                        color = Color.White,
+                        modifier = Modifier.size(16.dp),
+                        color = onPrimaryColor,
                         strokeWidth = 2.dp
                     )
-                    Text("搜索中", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    Text("搜索中", fontSize = 13.sp, fontWeight = FontWeight.Medium)
                 } else {
-                    Text("搜索", fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    Text("搜索", fontSize = 13.sp, fontWeight = FontWeight.Medium)
                 }
             }
         }
@@ -619,42 +635,44 @@ class SearchDialog(
         label: String,
         checked: Boolean,
         palette: FigmaSearchPalette,
+        theme: Theme,
         onCheckedChange: (Boolean) -> Unit,
     ) {
         val interactionSource = remember { MutableInteractionSource() }
         val hovered by interactionSource.collectIsHoveredAsState()
-        val shape = palette.chipShape
+        val primaryColor = theme.primary.toComposeColor()
 
         Row(
             modifier = Modifier
                 .hoverable(interactionSource)
-                .background(
-                    color = if (hovered) palette.hoverBackground else Color.Transparent,
-                    shape = shape
-                )
                 .clickable { onCheckedChange(!checked) }
-                .padding(horizontal = 8.dp, vertical = 2.dp),
+                .padding(horizontal = 6.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            CompositionLocalProvider(LocalMinimumTouchTargetEnforcement provides false) {
+            CompositionLocalProvider(LocalMinimumInteractiveComponentEnforcement provides false) {
                 Checkbox(
                     checked = checked,
                     onCheckedChange = null,
                     modifier = Modifier.size(14.dp),
                     colors = CheckboxDefaults.colors(
-                        checkedColor = palette.focusColor,
+                        checkedColor = primaryColor,
                         uncheckedColor = palette.checkboxUnchecked,
                         checkmarkColor = Color.White,
                     )
                 )
             }
-            Text(label, color = palette.textChip, fontSize = 12.sp)
+            Text(
+                label,
+                color = if (checked) palette.textPrimary else palette.textSecondary,
+                fontSize = 13.sp,
+                fontWeight = if (checked) FontWeight.Medium else FontWeight.Normal
+            )
         }
     }
 
     @Composable
-    private fun SearchingState(palette: FigmaSearchPalette, statusText: String) {
+    private fun SearchingState(palette: FigmaSearchPalette, theme: Theme, statusText: String) {
         Column(
             modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.Center,
@@ -662,7 +680,7 @@ class SearchDialog(
         ) {
             CircularProgressIndicator(
                 modifier = Modifier.size(48.dp),
-                color = palette.focusColor,
+                color = theme.primary.toComposeColor(),
                 strokeWidth = 4.dp
             )
             Spacer(Modifier.height(12.dp))
@@ -707,7 +725,7 @@ class SearchDialog(
         relPath: String,
         selected: Boolean,
         palette: FigmaSearchPalette,
-        onClick: () -> Unit,
+        theme: Theme,
         onDoubleClick: () -> Unit,
     ) {
         val interactionSource = remember { MutableInteractionSource() }
@@ -721,8 +739,9 @@ class SearchDialog(
             else -> palette.cardBackground
         }
         val titleColor = if (hovered) palette.linkHover else palette.textPrimary
-        val highlightBg = remember(palette.focusColor, palette.isDark) {
-            palette.focusColor.copy(alpha = if (palette.isDark) 0.35f else 0.22f)
+        val primaryColor = theme.primary.toComposeColor()
+        val highlightBg = remember(primaryColor, palette.isDark) {
+            primaryColor.copy(alpha = if (palette.isDark) 0.35f else 0.22f)
         }
         val highlightStyle = remember(highlightBg) { SpanStyle(background = highlightBg) }
 
@@ -731,12 +750,7 @@ class SearchDialog(
                 .fillMaxWidth()
                 .background(background)
                 .hoverable(interactionSource)
-                .pointerInput(match) {
-                    detectTapGestures(
-                        onTap = { onClick() },
-                        onDoubleTap = { onDoubleClick() }
-                    )
-                }
+                .clickable { onDoubleClick() }
                 .padding(horizontal = 24.dp, vertical = 16.dp),
             verticalAlignment = Alignment.Top,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -769,12 +783,14 @@ class SearchDialog(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Text(
-                        text = ":${match.line}",
-                        color = palette.textMuted,
-                        fontSize = 12.sp,
-                        maxLines = 1
-                    )
+                    if (match.type != SearchMatchType.UNKNOWN || match.line > 1) {
+                        Text(
+                            text = ":${match.line}",
+                            color = palette.textMuted,
+                            fontSize = 12.sp,
+                            maxLines = 1
+                        )
+                    }
                 }
 
                 Spacer(Modifier.height(2.dp))
@@ -786,22 +802,30 @@ class SearchDialog(
                     overflow = TextOverflow.Ellipsis
                 )
 
-                Spacer(Modifier.height(8.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(palette.codeBackground, palette.codeShape)
-                        .padding(horizontal = 8.dp, vertical = 6.dp)
-                ) {
-                    val previewText = match.preview.trimEnd()
-                    Text(
-                        text = buildHighlightText(previewText, currentQuery, highlightStyle),
-                        color = palette.codeText,
-                        fontSize = 12.sp,
-                        fontFamily = FontFamily.Monospace,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                // 对于文件搜索（UNKNOWN类型且preview是文件名），不显示代码预览
+                val isFileSearch = match.type == SearchMatchType.UNKNOWN && 
+                    match.preview.trim() == match.file.name && 
+                    match.line == 1 && 
+                    match.column == 0
+                
+                if (!isFileSearch) {
+                    Spacer(Modifier.height(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(palette.codeBackground, palette.codeShape)
+                            .padding(horizontal = 8.dp, vertical = 6.dp)
+                    ) {
+                        val previewText = match.preview.trimEnd()
+                        Text(
+                            text = buildHighlightText(previewText, currentQuery, highlightStyle),
+                            color = palette.codeText,
+                            fontSize = 12.sp,
+                            fontFamily = FontFamily.Monospace,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
         }
@@ -835,42 +859,37 @@ class SearchDialog(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(palette.footerBackground)
-                .padding(horizontal = 24.dp, vertical = 12.dp),
+                .padding(horizontal = 20.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text("找到", color = palette.footerText, fontSize = 12.sp)
                 Text(
                     "$resultCount",
                     color = palette.footerNumber,
                     fontSize = 12.sp,
-                    fontWeight = FontWeight.SemiBold
+                    fontWeight = FontWeight.Medium
                 )
                 Text("项结果", color = palette.footerText, fontSize = 12.sp)
             }
 
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Box(
+                Text(
+                    text = if (System.getProperty("os.name").lowercase().contains("mac")) "⌘K" else "Ctrl+K",
+                    color = palette.textMuted,
+                    fontSize = 11.sp,
+                    fontFamily = FontFamily.Monospace,
                     modifier = Modifier
-                        .background(palette.keycapBackground, palette.keycapShape)
-                        .border(1.dp, palette.keycapBorder, palette.keycapShape)
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = if (System.getProperty("os.name").lowercase().contains("mac")) "⌘K" else "Ctrl+K",
-                        color = palette.footerText,
-                        fontSize = 12.sp,
-                        fontFamily = FontFamily.Monospace
-                    )
-                }
+                        .background(palette.keycapBackground.copy(alpha = 0.6f), palette.keycapShape)
+                        .padding(horizontal = 6.dp, vertical = 3.dp)
+                )
                 Text("打开搜索", color = palette.textMuted, fontSize = 12.sp)
             }
         }
@@ -912,6 +931,7 @@ class SearchDialog(
         val searchField: Boolean,
         val searchCode: Boolean,
         val searchResource: Boolean,
+        val searchFile: Boolean,
     )
 
     private class SearchWorker(
@@ -940,13 +960,42 @@ class SearchDialog(
 
                     val file = path.toFile()
                     if (!file.canRead()) continue
-                    if (file.length() > MAX_FILE_BYTES) continue
-                    if (isLikelyBinary(file)) continue
-
+                    
                     filesScanned++
                     if (filesScanned % 50 == 0) {
                         publishProgress()
                     }
+                    
+                    // 文件搜索：根据文件名匹配（不检查文件大小和二进制）
+                    if (options.searchFile) {
+                        val fileName = file.name.lowercase()
+                        if (fileName.contains(queryLower)) {
+                            matches++
+                            publishMatch(
+                                SearchMatch(
+                                    file = file,
+                                    line = 1,
+                                    column = 0,
+                                    length = queryLower.length,
+                                    preview = file.name,
+                                    type = SearchMatchType.UNKNOWN,
+                                )
+                            )
+                            if (matches >= MAX_RESULTS) {
+                                hitLimit = true
+                                break
+                            }
+                            // 如果只搜索文件名，跳过内容搜索
+                            if (!options.searchClass && !options.searchMethod && !options.searchField && 
+                                !options.searchCode && !options.searchResource) {
+                                continue
+                            }
+                        }
+                    }
+                    
+                    // 内容搜索需要检查文件大小和二进制
+                    if (file.length() > MAX_FILE_BYTES) continue
+                    if (isLikelyBinary(file)) continue
 
                     searchFile(file, queryLower)
                     if (matches >= MAX_RESULTS) {
@@ -987,6 +1036,9 @@ class SearchDialog(
             val isXmlFile = fileExt == "xml"
             val isResourceFile = fileExt in setOf("xml", "png", "jpg", "jpeg", "gif", "webp", "ico", "ttf", "otf")
 
+            // 文件搜索已在 doInBackground 中处理，这里跳过
+            if (options.searchFile) return
+            
             var shouldSearch = false
             if (options.searchCode) shouldSearch = true
             if (options.searchClass && (isJavaFile || isSmaliFile)) shouldSearch = true
@@ -1198,9 +1250,9 @@ private fun figmaSearchPalette(theme: Theme): FigmaSearchPalette {
             dividerColor = Color(0xFFF3F4F6), // gray-100
             hoverBackground = Color(0xFFF9FAFB), // gray-50
             selectedBackground = Color(0xFFEFF6FF), // blue-50
-            inputBackground = Color(0xFFF9FAFB),
+            inputBackground = Color(0xFFF5F5F7),
             inputBackgroundFocused = Color.White,
-            inputBorder = Color(0xFFE5E7EB),
+            inputBorder = Color(0xFFD1D1D6),
             focusColor = Color(0xFF3B82F6), // blue-500
             placeholderText = Color(0xFF9CA3AF), // gray-400
             checkboxUnchecked = Color(0xFFD1D5DB), // gray-300
@@ -1211,7 +1263,7 @@ private fun figmaSearchPalette(theme: Theme): FigmaSearchPalette {
             linkHover = Color(0xFF2563EB), // blue-600
             primaryButtonBackground = Color(0xFF3B82F6), // blue-500
             primaryButtonDisabledBackground = Color(0xFFD1D5DB), // gray-300
-            footerBackground = Color(0xFFF9FAFB), // gray-50
+            footerBackground = Color(0xFFF5F5F7), // 更接近Apple的浅灰
             footerText = Color(0xFF4B5563), // gray-600
             footerNumber = Color(0xFF111827), // gray-900
             keycapBackground = Color.White,
@@ -1221,11 +1273,11 @@ private fun figmaSearchPalette(theme: Theme): FigmaSearchPalette {
             codeText = Color(0xFF4B5563), // gray-600
             errorText = Color(0xFFD4183D),
             cardShape = RoundedCornerShape(16.dp),
-            inputShape = RoundedCornerShape(12.dp),
-            chipShape = RoundedCornerShape(10.dp),
+            inputShape = RoundedCornerShape(8.dp),
+            chipShape = RoundedCornerShape(6.dp),
             badgeShape = RoundedCornerShape(6.dp),
-            codeShape = RoundedCornerShape(8.dp),
-            keycapShape = RoundedCornerShape(6.dp),
+            codeShape = RoundedCornerShape(6.dp),
+            keycapShape = RoundedCornerShape(4.dp),
         )
     } else {
         FigmaSearchPalette(
@@ -1259,11 +1311,11 @@ private fun figmaSearchPalette(theme: Theme): FigmaSearchPalette {
             codeText = Color(0xFF9CA3AF),
             errorText = Color(0xFFFB7185),
             cardShape = RoundedCornerShape(16.dp),
-            inputShape = RoundedCornerShape(12.dp),
-            chipShape = RoundedCornerShape(10.dp),
+            inputShape = RoundedCornerShape(8.dp),
+            chipShape = RoundedCornerShape(6.dp),
             badgeShape = RoundedCornerShape(6.dp),
-            codeShape = RoundedCornerShape(8.dp),
-            keycapShape = RoundedCornerShape(6.dp),
+            codeShape = RoundedCornerShape(6.dp),
+            keycapShape = RoundedCornerShape(4.dp),
         )
     }
 }
