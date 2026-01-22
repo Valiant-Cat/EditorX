@@ -61,6 +61,8 @@ class EditorTabPane : JPanel(BorderLayout()) {
             viewport.isOpaque = false
             horizontalScrollBar.isOpaque = false
         }
+        // 给tabBar添加底部padding，为滚动条留出空间（滚动条高度通常为16-20px）
+        tabBar.border = BorderFactory.createEmptyBorder(0, 6, 18, 6)
         contentPanel = JPanel(java.awt.CardLayout()).apply {
             isOpaque = true
         }
