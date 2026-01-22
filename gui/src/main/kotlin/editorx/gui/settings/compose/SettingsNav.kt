@@ -1,7 +1,6 @@
 package editorx.gui.settings.compose
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.Divider
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -51,23 +49,10 @@ fun SettingsNav(
 
     Column(
         modifier = Modifier
-            .width(240.dp)
+            .fillMaxWidth()
             .fillMaxHeight()
-            .background(surface)
-            .border(width = 1.dp, color = outline)
-            .padding(12.dp),
+            .padding(horizontal = 10.dp, vertical = 10.dp),
     ) {
-        Text(
-            text = I18n.translate(I18nKeys.Settings.PREFERENCES),
-            color = onSurface,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(bottom = 8.dp)
-        )
-
-        Divider(color = outline.copy(alpha = 0.6f))
-        Spacer(Modifier.height(8.dp))
-
         items.forEach { (section, key) ->
             SettingsNavItem(
                 title = I18n.translate(key),
@@ -80,7 +65,7 @@ fun SettingsNav(
                 onSurfaceMuted = onSurfaceMuted,
                 onClick = { onSelect(section) }
             )
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(4.dp))
         }
     }
 }
@@ -97,9 +82,14 @@ fun SettingsNavItem(
     onSurfaceMuted: androidx.compose.ui.graphics.Color,
     onClick: () -> Unit,
 ) {
-    val bg = if (selected) primary else surface
+    // 选中状态使用背景色，而不是字体高亮
+    val bg = if (selected) {
+        primary.copy(alpha = 0.1f)
+    } else {
+        null
+    }
     val fg = when {
-        selected -> onPrimary
+        selected -> primary
         hasChanges -> primary
         else -> onSurface
     }
@@ -108,9 +98,9 @@ fun SettingsNavItem(
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(bg, RoundedCornerShape(8.dp))
+            .then(if (bg != null) Modifier.background(bg, RoundedCornerShape(6.dp)) else Modifier)
             .clickable { onClick() }
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .padding(horizontal = 12.dp, vertical = 5.dp),
         contentAlignment = Alignment.CenterStart
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -128,7 +118,7 @@ fun SettingsNavItem(
                 Box(
                     modifier = Modifier
                         .size(6.dp)
-                        .background(onSurfaceMuted.copy(alpha = 0.9f), RoundedCornerShape(3.dp))
+                        .background(primary.copy(alpha = 0.6f), RoundedCornerShape(3.dp))
                 )
             }
         }

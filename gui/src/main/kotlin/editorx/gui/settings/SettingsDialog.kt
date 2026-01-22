@@ -1,17 +1,25 @@
 package editorx.gui.settings
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.pointerHoverIcon
+import androidx.compose.ui.input.pointer.PointerIcon
+import java.awt.Cursor
 import androidx.compose.material.AlertDialog
 import androidx.compose.material.Button
 import androidx.compose.material.Divider
@@ -30,6 +38,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -242,6 +251,20 @@ class SettingsDialog(
         val onPrimary = theme.onPrimary.toComposeColor()
         val onSurface = theme.onSurface.toComposeColor()
         val textMuted = theme.onSurfaceVariant.toComposeColor()
+        
+        // macOS Finder 风格的颜色，根据主题动态变化
+        val isDark = theme is Theme.Dark
+        val sidebarBackground = if (isDark) {
+            theme.sidebarBackground.toComposeColor()
+        } else {
+            Color(0xFFfafafa)  // 浅色主题使用 Finder 风格的浅灰色
+        }
+        val contentBackground = theme.surface.toComposeColor()  // 使用主题的 surface 颜色
+        val dividerColor = if (isDark) {
+            outline.copy(alpha = 0.3f)  // 深色主题使用更明显的分割线
+        } else {
+            Color(0xFFE0E0E0)  // 浅色主题使用 Finder 风格的分割线
+        }
 
         Box(
             modifier = Modifier
@@ -259,82 +282,112 @@ class SettingsDialog(
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
                 Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                    SettingsNav(
-                        selectedSection = selectedSection,
-                        hasAppearanceChanges = hasPendingLocale || hasPendingTheme,
-                        outline = outline,
-                        surface = surface,
-                        primary = primary,
-                        onPrimary = onPrimary,
-                        onSurface = onSurface,
-                        onSurfaceMuted = textMuted,
-                        onSelect = { selectedSection = it }
-                    )
-
+                    // 可调整宽度的导航栏
+                    val minNavWidth = 180.dp
+                    val maxNavWidth = 400.dp
+                    var navWidth by remember { mutableStateOf(minNavWidth) } // 默认宽度为最小宽度
+                    
                     Box(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .background(surfaceVariant)
-                            .padding(16.dp)
+                            .width(navWidth)
+                            .fillMaxHeight()
+                            .background(sidebarBackground)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(surface, RoundedCornerShape(10.dp))
-                                .border(1.dp, outline, RoundedCornerShape(10.dp))
-                                .padding(16.dp)
-                        ) {
-                            when (selectedSection) {
-                                Section.APPEARANCE -> AppearanceSettingsPanel(
-                                    theme = theme,
-                                    i18nVersion = i18nTick,
-                                    localeToShow = currentLocaleToShow,
-                                    themeToShow = currentThemeToShow,
-                                    hasPendingChanges = hasPendingLocale || hasPendingTheme,
-                                    onSelectLocale = { pendingLocale = it },
-                                    onRevertChanges = {
-                                        pendingLocale = null
-                                        pendingTheme = null
-                                    },
-                                    onSelectTheme = { selectTheme(it) }
-                                )
-
-                                Section.KEYMAP -> KeymapSettingsPanel(theme = theme, i18nVersion = i18nTick)
-                                Section.PLUGINS -> PluginsSettingsPanel(
-                                    theme = theme,
-                                    settings = settings,
-                                    pluginManager = pluginManager,
-                                    parentDialog = this@SettingsDialog,
-                                    showAlert = { alert = it },
-                                    coroutineScope = coroutineScope
-                                )
-
-                                Section.CACHE -> CacheSettingsPanel(
-                                    theme = theme,
-                                    environment = environment,
-                                    showAlert = { alert = it },
-                                    coroutineScope = coroutineScope
-                                )
+                        SettingsNav(
+                            selectedSection = selectedSection,
+                            hasAppearanceChanges = hasPendingLocale || hasPendingTheme,
+                            outline = outline,
+                            surface = surface,
+                            primary = primary,
+                            onPrimary = onPrimary,
+                            onSurface = onSurface,
+                            onSurfaceMuted = textMuted,
+                            onSelect = { selectedSection = it }
+                        )
+                    }
+                    
+                    // 可拖动的分割线（macOS Finder 风格）
+                    Box(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .fillMaxHeight()
+                            .background(dividerColor)
+                            .pointerHoverIcon(PointerIcon(Cursor.getPredefinedCursor(Cursor.E_RESIZE_CURSOR))) // 鼠标悬停时显示可拖动指针
+                            .pointerInput(Unit) {
+                                detectDragGestures { change, dragAmount ->
+                                    val delta = dragAmount.x.toDp()
+                                    val newWidth = (navWidth + delta).coerceIn(minNavWidth, maxNavWidth)
+                                    navWidth = newWidth
+                                    change.consume()
+                                }
                             }
+                    )
+                    
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .background(contentBackground)
+                            .padding(horizontal = 32.dp, vertical = 32.dp)
+                    ) {
+                        when (selectedSection) {
+                            Section.APPEARANCE -> AppearanceSettingsPanel(
+                                theme = theme,
+                                i18nVersion = i18nTick,
+                                localeToShow = currentLocaleToShow,
+                                themeToShow = currentThemeToShow,
+                                hasPendingChanges = hasPendingLocale || hasPendingTheme,
+                                onSelectLocale = { pendingLocale = it },
+                                onRevertChanges = {
+                                    pendingLocale = null
+                                    pendingTheme = null
+                                },
+                                onSelectTheme = { selectTheme(it) }
+                            )
+
+                            Section.KEYMAP -> KeymapSettingsPanel(theme = theme, i18nVersion = i18nTick)
+                            Section.PLUGINS -> PluginsSettingsPanel(
+                                theme = theme,
+                                settings = settings,
+                                pluginManager = pluginManager,
+                                parentDialog = this@SettingsDialog,
+                                showAlert = { alert = it },
+                                coroutineScope = coroutineScope
+                            )
+
+                            Section.CACHE -> CacheSettingsPanel(
+                                theme = theme,
+                                environment = environment,
+                                showAlert = { alert = it },
+                                coroutineScope = coroutineScope
+                            )
                         }
                     }
                 }
 
-                Divider(color = outline)
+                // 底部操作栏上方的分割线
+                Divider(color = dividerColor)
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(surface)
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                        .background(contentBackground)
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    OutlinedButton(onClick = { resetToDefault() }) {
-                        Text(I18n.translate(I18nKeys.Action.RESET))
+                    TextButton(onClick = { resetToDefault() }) {
+                        Text(
+                            I18n.translate(I18nKeys.Action.RESET),
+                            color = primary
+                        )
                     }
 
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        OutlinedButton(onClick = { dispose() }) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        OutlinedButton(
+                            onClick = { dispose() },
+                            border = BorderStroke(0.5.dp, outline.copy(alpha = 0.3f))
+                        ) {
                             Text(I18n.translate(I18nKeys.Action.CANCEL))
                         }
                         Button(onClick = { applyAndClose() }) {
