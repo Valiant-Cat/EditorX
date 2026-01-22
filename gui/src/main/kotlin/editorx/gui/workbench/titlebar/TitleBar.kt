@@ -30,7 +30,6 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
     private var toggleSideBarButton: JButton? = null
     private var toggleAgentPanelButton: JButton? = null
     private var buildButton: JButton? = null
-    private var buildGroup: JComponent? = null
     private var searchButton: JButton? = null
     private var settingsButton: JButton? = null
     private var compileTask: Thread? = null
@@ -195,10 +194,6 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
     }
 
     private fun setupRightActions() {
-        buildGroup = Box.createHorizontalBox().apply {
-            isOpaque = false
-        }
-
         buildButton = JButton(
             IconLoader.getIcon(
                 IconRef("icons/common/build.svg"),
@@ -209,14 +204,9 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
         ).compact(I18n.translate(I18nKeys.Toolbar.BUILD)) {
             buildWorkspace()
         }
+        add(buildButton)
 
-        buildGroup?.apply {
-            add(buildButton)
-            add(Box.createHorizontalStrut(12))
-            add(JToolBar.Separator())
-            add(Box.createHorizontalStrut(12))
-        }
-        add(buildGroup)
+        add(Box.createHorizontalStrut(30))
 
         toggleSideBarButton = JButton(getSideBarIcon()).compact(I18n.translate(I18nKeys.Toolbar.TOGGLE_SIDEBAR)) {
             toggleSideBar()
@@ -267,7 +257,7 @@ class TitleBar(private val mainWindow: MainWindow) : JToolBar() {
         val workspaceRoot = mainWindow.guiContext.getWorkspace().getWorkspaceRoot()
         val hasBuildProvider = workspaceRoot != null &&
             mainWindow.guiContext.getPluginManager().findBuildProvider(workspaceRoot) != null
-        buildGroup?.isVisible = hasBuildProvider
+        buildButton?.isVisible = hasBuildProvider
         revalidate()
         repaint()
     }
