@@ -12,7 +12,7 @@ import javax.swing.SwingUtilities
 
 class RightSideBar(private val mainWindow: MainWindow) : JPanel() {
     companion object {
-        const val MIN_WIDTH = 240
+        const val MIN_WIDTH = 500
         const val DEFAULT_WIDTH = 360
     }
 

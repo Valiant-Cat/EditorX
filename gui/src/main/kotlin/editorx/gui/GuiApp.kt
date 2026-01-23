@@ -34,6 +34,9 @@ import javax.swing.SwingUtilities
  * GUI 主入口点
  */
 fun main() {
+    // 启用 Compose Desktop 实验性离屏渲染，改善在 Swing 中的事件处理
+    System.setProperty("compose.swing.render.on.graphics", "true")
+    
     val startupTimer = StartupTimer("EditorX")
 
     // 初始化日志系统

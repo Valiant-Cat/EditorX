@@ -7,10 +7,6 @@ import java.awt.Dimension
 import javax.swing.*
 
 class SideBar(private val mainWindow: MainWindow) : JPanel() {
-    companion object {
-        const val MIN_WIDTH = 200
-    }
-
     private val cardLayout = CardLayout()
     private val views = mutableMapOf<String, JComponent>()
     private var currentViewId: String? = null
