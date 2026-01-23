@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -377,139 +378,227 @@ private fun InputArea(
 ) {
     // mainWindow 参数保留用于后续功能扩展
     var inputText by remember { mutableStateOf("") }
-    var modeExpanded by remember { mutableStateOf(false) }
+    var agentExpanded by remember { mutableStateOf(false) }
+    var autoExpanded by remember { mutableStateOf(false) }
     val inputFocusRequester = remember { FocusRequester() }
     
     val surfaceColor = theme.surface.toComposeColor()
     val outlineColor = theme.outline.toComposeColor()
     val textColor = theme.onSurface.toComposeColor()
     val placeholderColor = theme.onSurfaceVariant.toComposeColor().copy(alpha = 0.6f)
+    val mutedColor = theme.onSurfaceVariant.toComposeColor()
     
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .background(surfaceColor)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+            .padding(16.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.Bottom
+        // 输入框面板（包含输入区域和按钮区域）
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 80.dp, max = 200.dp)
+                .background(surfaceColor.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                .border(1.dp, outlineColor.copy(alpha = 0.3f), RoundedCornerShape(8.dp))
         ) {
-            // "添加上下文" 按钮
-            Button(
-                onClick = { },
-                modifier = Modifier.height(36.dp),
-                colors = ButtonDefaults.buttonColors(
-                    backgroundColor = surfaceColor,
-                    contentColor = textColor
-                ),
-                shape = RoundedCornerShape(6.dp)
+            Column(
+                modifier = Modifier.fillMaxSize(),
+                verticalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = "+ 添加上下文",
-                    fontSize = 12.sp
-                )
-            }
-            
-            // 输入框
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(36.dp)
-                    .background(surfaceColor.copy(alpha = 0.5f), RoundedCornerShape(6.dp))
-                    .border(1.dp, outlineColor.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
-            ) {
-                BasicTextField(
-                    value = inputText,
-                    onValueChange = { inputText = it },
+                // 输入文本区域
+                Box(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .focusRequester(inputFocusRequester),
-                    textStyle = TextStyle(
-                        color = textColor,
-                        fontSize = 13.sp
-                    ),
-                    decorationBox = { innerTextField ->
-                        if (inputText.isEmpty()) {
-                            Text(
-                                text = "输入消息...",
-                                color = placeholderColor,
-                                fontSize = 13.sp
-                            )
-                        }
-                        innerTextField()
-                    }
-                )
-            }
-            
-            // 模式选择下拉框
-            Box {
-                Button(
-                    onClick = { modeExpanded = true },
-                    modifier = Modifier.height(36.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        backgroundColor = surfaceColor,
-                        contentColor = textColor
-                    ),
-                    shape = RoundedCornerShape(6.dp)
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .padding(horizontal = 12.dp, vertical = 12.dp)
                 ) {
-                    Text(
-                        text = "智能问答",
-                        fontSize = 12.sp
+                    val textStyle = TextStyle(
+                        fontSize = 13.sp,
+                        lineHeight = 20.sp
                     )
-                    Text(
-                        text = " ▼",
-                        fontSize = 10.sp
+
+                    BasicTextField(
+                        value = inputText,
+                        onValueChange = { inputText = it },
+                        textStyle = textStyle.copy(color = textColor),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .align(Alignment.TopStart)
+                            .focusRequester(inputFocusRequester),
+                        decorationBox = { innerTextField ->
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.TopStart
+                            ) {
+                                if (inputText.isBlank()) {
+                                    Text(
+                                        text = "输入消息...",
+                                        color = placeholderColor,
+                                        fontSize = 13.sp,
+                                        lineHeight = 20.sp
+                                    )
+                                }
+                                innerTextField()
+                            }
+                        }
                     )
                 }
                 
-                DropdownMenu(
-                    expanded = modeExpanded,
-                    onDismissRequest = { modeExpanded = false }
+                // 按钮区域（在输入框内部底部）
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    DropdownMenuItem(onClick = {
-                        modeExpanded = false
-                    }) {
-                        Text("智能问答")
-                    }
-                    DropdownMenuItem(onClick = {
-                        modeExpanded = false
-                    }) {
-                        Text("代码生成")
-                    }
-                    DropdownMenuItem(onClick = {
-                        modeExpanded = false
-                    }) {
-                        Text("代码解释")
-                    }
-                }
-            }
-            
-            // 发送按钮
-            Box(
-                modifier = Modifier
-                    .size(36.dp)
-                    .clickable {
-                        // 发送消息逻辑
-                        if (inputText.isNotBlank()) {
-                            // TODO: 处理发送消息
-                            inputText = ""
+                    // 左侧：Agent 和 Auto 下拉菜单
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Agent 下拉菜单
+                        Box {
+                            Row(
+                                modifier = Modifier
+                                    .clickable { agentExpanded = true }
+                                    .background(
+                                        surfaceColor.copy(alpha = 0.6f),
+                                        RoundedCornerShape(16.dp)
+                                    )
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "∞",
+                                    color = textColor,
+                                    fontSize = 14.sp
+                                )
+                                Text(
+                                    text = "Agent",
+                                    color = textColor,
+                                    fontSize = 12.sp
+                                )
+                                Text(
+                                    text = "▼",
+                                    color = mutedColor,
+                                    fontSize = 10.sp
+                                )
+                            }
+                            
+                            DropdownMenu(
+                                expanded = agentExpanded,
+                                onDismissRequest = { agentExpanded = false }
+                            ) {
+                                DropdownMenuItem(onClick = {
+                                    agentExpanded = false
+                                }) {
+                                    Text("Agent 1")
+                                }
+                                DropdownMenuItem(onClick = {
+                                    agentExpanded = false
+                                }) {
+                                    Text("Agent 2")
+                                }
+                            }
+                        }
+                        
+                        // Auto 下拉菜单
+                        Box {
+                            Row(
+                                modifier = Modifier
+                                    .clickable { autoExpanded = true }
+                                    .background(
+                                        surfaceColor.copy(alpha = 0.6f),
+                                        RoundedCornerShape(16.dp)
+                                    )
+                                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = "Auto",
+                                    color = textColor,
+                                    fontSize = 12.sp
+                                )
+                                Text(
+                                    text = "▼",
+                                    color = mutedColor,
+                                    fontSize = 10.sp
+                                )
+                            }
+                            
+                            DropdownMenu(
+                                expanded = autoExpanded,
+                                onDismissRequest = { autoExpanded = false }
+                            ) {
+                                DropdownMenuItem(onClick = {
+                                    autoExpanded = false
+                                }) {
+                                    Text("Auto")
+                                }
+                                DropdownMenuItem(onClick = {
+                                    autoExpanded = false
+                                }) {
+                                    Text("Manual")
+                                }
+                            }
                         }
                     }
-                    .background(
-                        theme.primary.toComposeColor(),
-                        CircleShape
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "→",
-                    color = theme.onPrimary.toComposeColor(),
-                    fontSize = 16.sp
-                )
+                    
+                    // 右侧：图标按钮和发送按钮
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // @ 按钮
+                        IconButton(
+                            icon = "@",
+                            onClick = { },
+                            modifier = Modifier.size(28.dp)
+                        )
+                        
+                        // 地球图标按钮
+                        IconButton(
+                            icon = "🌐",
+                            onClick = { },
+                            modifier = Modifier.size(28.dp)
+                        )
+                        
+                        // 图片图标按钮
+                        IconButton(
+                            icon = "🖼",
+                            onClick = { },
+                            modifier = Modifier.size(28.dp)
+                        )
+                        
+                        // 发送按钮
+                        Box(
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clickable {
+                                    // 发送消息逻辑
+                                    if (inputText.isNotBlank()) {
+                                        // TODO: 处理发送消息
+                                        inputText = ""
+                                    }
+                                }
+                                .background(
+                                    theme.primary.toComposeColor(),
+                                    CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "↑",
+                                color = theme.onPrimary.toComposeColor(),
+                                fontSize = 14.sp
+                            )
+                        }
+                    }
+                }
             }
         }
     }
