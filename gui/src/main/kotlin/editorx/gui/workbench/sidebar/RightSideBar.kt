@@ -12,8 +12,8 @@ import javax.swing.SwingUtilities
 
 class RightSideBar(private val mainWindow: MainWindow) : JPanel() {
     companion object {
-        const val MIN_WIDTH = 500
-        const val DEFAULT_WIDTH = 360
+        const val MIN_WIDTH = 120
+        const val DEFAULT_WIDTH = 250
     }
 
     private val cardLayout = CardLayout()

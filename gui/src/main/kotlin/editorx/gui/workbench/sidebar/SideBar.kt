@@ -7,6 +7,11 @@ import java.awt.Dimension
 import javax.swing.*
 
 class SideBar(private val mainWindow: MainWindow) : JPanel() {
+    companion object {
+        const val MIN_WIDTH = 120
+        const val DEFAULT_WIDTH = 250
+    }
+    
     private val cardLayout = CardLayout()
     private val views = mutableMapOf<String, JComponent>()
     private var currentViewId: String? = null
@@ -101,9 +106,9 @@ class SideBar(private val mainWindow: MainWindow) : JPanel() {
                 // 保留用户当前拖拽的位置，不主动设置分割条与尺寸，避免闪烁
                 preserveNextDivider = false
             } else {
-                minimumSize = Dimension(120, 0)
-                preferredSize = Dimension(250, 0)
-                updateDividerLocation(250) // 显示SideBar时，设置dividerLocation为300（和preferredSize保持一致）
+                minimumSize = Dimension(MIN_WIDTH, 0)
+                preferredSize = Dimension(DEFAULT_WIDTH, 0)
+                updateDividerLocation(DEFAULT_WIDTH) // 显示SideBar时，设置dividerLocation为300（和preferredSize保持一致）
             }
         } else {
             isVisible = false
